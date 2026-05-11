@@ -6,6 +6,7 @@
 <title>Варя Перлина · Онлайн мини-курс по вышивке</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
 
 <style>
   :root {
@@ -364,6 +365,8 @@
 </footer>
 
 <script>
+Paddle.Initialize({ token: 'live_75ba2553f1232e36cc5897322da' });
+
 document.querySelectorAll('input[name="payment"]').forEach(radio => {
   radio.addEventListener('change', () => {
     const isRu = document.querySelector('input[name="payment"]:checked').value === 'ru';
@@ -398,15 +401,21 @@ async function handleSubmit() {
 
     if (!res.ok) throw new Error('Server error');
 
-    // Redirect to payment page
-    const payUrl = isRu
-      ? 'https://yookassa.ru/ВАША_ССЫЛКА'
-      : 'https://buy.paddle.com/ВАША_ССЫЛКА';
-
-    document.getElementById('formFields').classList.add('hide');
-    document.getElementById('successMsg').classList.add('show');
-
-    setTimeout(() => { window.location.href = payUrl; }, 2000);
+    if (isRu) {
+      document.getElementById('formFields').classList.add('hide');
+      document.getElementById('successMsg').classList.add('show');
+      setTimeout(() => { window.location.href = 'https://yookassa.ru/ВАША_ССЫЛКА'; }, 2000);
+    } else {
+      Paddle.Checkout.open({
+        items: [{ priceId: 'pri_01kr0pd6xaf86k4e0a37hjce1r', quantity: 1 }],
+        customer: { email },
+        customData: { name, telegram: tg },
+        settings: { displayMode: 'overlay', theme: 'light', locale: 'en' },
+        successUrl: 'https://embroidery-course.vercel.app/?success=true',
+      });
+      document.getElementById('formFields').classList.add('hide');
+      document.getElementById('successMsg').classList.add('show');
+    }
 
   } catch (err) {
     console.error(err);
