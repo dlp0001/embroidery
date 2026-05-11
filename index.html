@@ -310,7 +310,7 @@
         </div>
         <div style="margin-bottom:20px">
           <div class="form-label">Способ оплаты</div>
-          <div class="payment-toggle">
+          <div class="payment-toggle" style="grid-template-columns: 1fr 1fr 1fr;">
             <div class="payment-option">
               <input type="radio" name="payment" id="pay-ru" value="ru" checked>
               <label class="payment-label" for="pay-ru">
@@ -320,10 +320,18 @@
               </label>
             </div>
             <div class="payment-option">
+              <input type="radio" name="payment" id="pay-ils" value="ils">
+              <label class="payment-label" for="pay-ils">
+                <span class="payment-flag">🇮🇱</span>
+                <span class="payment-name">ישראל</span>
+                <span class="payment-sub">Paddle · ₪240</span>
+              </label>
+            </div>
+            <div class="payment-option">
               <input type="radio" name="payment" id="pay-int" value="international">
               <label class="payment-label" for="pay-int">
                 <span class="payment-flag">🌍</span>
-                <span class="payment-name">Другие страны</span>
+                <span class="payment-name">Other</span>
                 <span class="payment-sub">Paddle · $80</span>
               </label>
             </div>
@@ -332,8 +340,11 @@
         <div class="payment-info active" id="info-ru">
           <p><strong>Оплата для России:</strong> после отправки заявки вы будете автоматически переадресованы на страницу оплаты <strong>ЮKassa</strong> — карты РФ, СБП, ЮMoney.<br>Стоимость: <strong>6 000 ₽</strong><br><span style="font-size:12px">Ранняя цена для первых 20 регистраций</span></p>
         </div>
+        <div class="payment-info" id="info-ils">
+          <p><strong>תשלום בשקלים:</strong> לאחר שליחת הבקשה, יפתח חלון תשלום מאובטח של <strong>Paddle</strong> — ניתן לשלם בכרטיס אשראי ישראלי.<br>מחיר: <strong>₪240</strong><br><span style="font-size:12px">מחיר מוקדם ל-20 הנרשמים הראשונים</span></p>
+        </div>
         <div class="payment-info" id="info-int">
-          <p><strong>International payment:</strong> after submitting your application, you'll be automatically redirected to the <strong>Paddle</strong> payment page accepting Visa, Mastercard, PayPal and more.<br>Price: <strong>$80 USD</strong><br><span style="font-size:12px">Early bird price for the first 20 registrations</span></p>
+          <p><strong>International payment:</strong> after submitting your application, a secure <strong>Paddle</strong> payment window will open — Visa, Mastercard, PayPal and more.<br>Price: <strong>$80 USD</strong><br><span style="font-size:12px">Early bird price for the first 20 registrations</span></p>
         </div>
         <button class="btn-submit" id="submitBtn" onclick="handleSubmit()">Перейти к оплате · 6 000 ₽</button>
         <p class="form-note">Минимальная цена курса для первых 20 регистраций</p>
@@ -369,10 +380,12 @@ Paddle.Initialize({ token: 'live_75ba2553f1232e36cc5897322da' });
 
 document.querySelectorAll('input[name="payment"]').forEach(radio => {
   radio.addEventListener('change', () => {
-    const isRu = document.querySelector('input[name="payment"]:checked').value === 'ru';
-    document.getElementById('info-ru').classList.toggle('active', isRu);
-    document.getElementById('info-int').classList.toggle('active', !isRu);
-    document.getElementById('submitBtn').textContent = isRu ? 'Перейти к оплате · 6 000 ₽' : 'Proceed to payment · $80 USD';
+    const val = document.querySelector('input[name="payment"]:checked').value;
+    document.getElementById('info-ru').classList.toggle('active', val === 'ru');
+    document.getElementById('info-ils').classList.toggle('active', val === 'ils');
+    document.getElementById('info-int').classList.toggle('active', val === 'international');
+    const labels = { ru: 'Перейти к оплате · 6 000 ₽', ils: 'לתשלום · ₪240', international: 'Proceed to payment · $80 USD' };
+    document.getElementById('submitBtn').textContent = labels[val];
   });
 });
 
@@ -380,7 +393,7 @@ async function handleSubmit() {
   const name  = document.getElementById('name').value.trim();
   const email = document.getElementById('email').value.trim();
   const tg    = document.getElementById('tg').value.trim();
-  const isRu  = document.querySelector('input[name="payment"]:checked').value === 'ru';
+  const payMethod = document.querySelector('input[name="payment"]:checked').value;
 
   if (!name || !email || !tg) { showToast('Пожалуйста, заполните все поля'); return; }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('Проверьте формат email'); return; }
@@ -393,21 +406,22 @@ async function handleSubmit() {
     const res = await fetch('/api/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name, email, telegram: tg,
-        paymentMethod: isRu ? 'ru' : 'international',
-      }),
+      body: JSON.stringify({ name, email, telegram: tg, paymentMethod: payMethod }),
     });
 
     if (!res.ok) throw new Error('Server error');
 
-    if (isRu) {
+    if (payMethod === 'ru') {
       document.getElementById('formFields').classList.add('hide');
       document.getElementById('successMsg').classList.add('show');
       setTimeout(() => { window.location.href = 'https://yookassa.ru/ВАША_ССЫЛКА'; }, 2000);
     } else {
+      const priceId = payMethod === 'ils'
+        ? 'pri_01krc27y0y0cy9mfq6rspjn9pq'
+        : 'pri_01kr0pd6xaf86k4e0a37hjce1r';
+
       Paddle.Checkout.open({
-        items: [{ priceId: 'pri_01kr0pd6xaf86k4e0a37hjce1r', quantity: 1 }],
+        items: [{ priceId, quantity: 1 }],
         customer: { email },
         customData: { name, telegram: tg },
         settings: { displayMode: 'overlay', theme: 'light', locale: 'en' },
@@ -421,7 +435,8 @@ async function handleSubmit() {
     console.error(err);
     showToast('Ошибка отправки. Попробуйте ещё раз или напишите нам.');
     btn.disabled = false;
-    btn.textContent = isRu ? 'Перейти к оплате · 6 000 ₽' : 'Proceed to payment · $80 USD';
+    const labels = { ru: 'Перейти к оплате · 6 000 ₽', ils: 'לתשלום · ₪240', international: 'Proceed to payment · $80 USD' };
+    btn.textContent = labels[payMethod];
   }
 }
 
