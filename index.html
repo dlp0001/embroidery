@@ -420,15 +420,23 @@ async function handleSubmit() {
         ? 'pri_01krc27y0y0cy9mfq6rspjn9pq'
         : 'pri_01kr0pd6xaf86k4e0a37hjce1r';
 
+      // Re-enable button in case user closes Paddle without paying
+      btn.disabled = false;
+      const labels = { ru: 'Перейти к оплате · 6 000 ₽', ils: 'לתשלום · ₪240', international: 'Proceed to payment · $80 USD' };
+      btn.textContent = labels[payMethod];
+
       Paddle.Checkout.open({
         items: [{ priceId, quantity: 1 }],
         customer: { email },
         customData: { name, telegram: tg },
         settings: { displayMode: 'overlay', theme: 'light', locale: 'en' },
-        successUrl: 'https://embroidery-course.vercel.app/?success=true',
+        eventCallback: function(event) {
+          if (event.name === 'checkout.completed') {
+            document.getElementById('formFields').classList.add('hide');
+            document.getElementById('successMsg').classList.add('show');
+          }
+        },
       });
-      document.getElementById('formFields').classList.add('hide');
-      document.getElementById('successMsg').classList.add('show');
     }
 
   } catch (err) {
