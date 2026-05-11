@@ -512,13 +512,18 @@
     padding: 52px 64px;
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     flex-wrap: wrap;
     gap: 20px;
+    position: relative;
+    z-index: 10;
   }
 
   .footer-logo { font-family: 'Cormorant Garamond', serif; font-size: 19px; font-weight: 300; color: var(--cream); }
 
+  .footer-links-wrap { display: flex; gap: 60px; flex-wrap: wrap; }
+  .footer-link-group { display: flex; flex-direction: column; gap: 10px; }
+  .footer-link-label { font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(250,247,242,0.25); }
   .footer-links { display: flex; gap: 28px; }
   .footer-links a { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(250,247,242,0.35); text-decoration: none; transition: color 0.2s; }
   .footer-links a:hover { color: var(--rose-light); }
@@ -529,8 +534,8 @@
   .toast.show { transform: translateY(0); opacity: 1; }
 
   /* ANIMATIONS */
-  .fade-up { opacity: 0; transform: translateY(28px); transition: opacity 0.65s ease, transform 0.65s ease; }
-  .fade-up.visible { opacity: 1; transform: translateY(0); }
+  .fade-up { opacity: 0; transform: translateY(28px); transition: opacity 0.65s ease, transform 0.65s ease; pointer-events: none; }
+  .fade-up.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
 
   /* RESPONSIVE */
   @media (max-width: 860px) {
@@ -544,6 +549,7 @@
     .inside-inner { gap: 40px; }
     .form-card { padding: 32px 22px; }
     footer { padding: 40px 28px; flex-direction: column; align-items: flex-start; }
+    .footer-links-wrap { flex-direction: column; gap: 32px; }
     .footer-links { flex-wrap: wrap; gap: 16px; }
     .payment-toggle { grid-template-columns: 1fr; }
   }
@@ -776,10 +782,21 @@
 <!-- FOOTER -->
 <footer>
   <div class="footer-logo">Re.Create.Art · Варя Перлина</div>
-  <div class="footer-links">
-    <a href="#">Instagram</a>
-    <a href="#">Контакты</a>
-    <a href="#">Конфиденциальность</a>
+  <div class="footer-links-wrap">
+    <div class="footer-link-group">
+      <div class="footer-link-label">Для покупателей из России</div>
+      <div class="footer-links">
+        <a href="/agreement">Пользовательское соглашение</a>
+      </div>
+    </div>
+    <div class="footer-link-group">
+      <div class="footer-link-label">International</div>
+      <div class="footer-links">
+        <a href="/terms">Terms & Conditions</a>
+        <a href="/refunds">Refund Policy</a>
+        <a href="/privacy">Privacy Policy</a>
+      </div>
+    </div>
   </div>
   <div class="footer-copy">© 2026 Варя Перлина</div>
 </footer>
