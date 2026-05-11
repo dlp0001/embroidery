@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Варя Перлина · Онлайн мини-курс по вышивке</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.emailjs.com/dist/email.min.js"></script>
+<style>
+  :root {
+    --cream: #ffffff;
+    --linen: #f5f0fa;
+    --rose: #e91e8c;
+    --rose-dark: #c4107a;
+    --rose-light: #f9d0e8;
+    --charcoal: #1a1a2e;
+    --warm-gray: #666666;
+    --gold: #f9d0e8;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--cream);
+    color: var(--charcoal);
+    font-family: 'Jost', sans-serif;
+    font-weight: 300;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* NAV */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 52px;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(200,168,112,0.15);
+  }
+
+  .nav-logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 17px;
+    font-weight: 400;
+    color: var(--charcoal);
+    letter-spacing: 0.06em;
+  }
+
+  .nav-logo span { color: var(--rose); }
+
+  .nav-cta {
+    background: var(--rose);
+    color: #fff;
+    border: none;
+    padding: 10px 26px;
+    font-family: 'Jost', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.2s;
+    display: inline-block;
+  }
+  .nav-cta:hover { background: var(--rose-dark); }
+
+  /* HERO */
+  .hero {
+    padding-top: 80px;
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+
+  .hero-left {
+    padding: 80px 64px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .hero-pretitle {
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--warm-gray);
+    margin-bottom: 28px;
+  }
+
+  .hero-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(46px, 5.5vw, 78px);
+    font-weight: 300;
+    line-height: 1.05;
+    color: var(--charcoal);
+  }
+
+  .hero-title-italic {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(46px, 5.5vw, 78px);
+    font-weight: 300;
+    font-style: italic;
+    line-height: 1.05;
+    color: var(--rose);
+    margin-bottom: 36px;
+  }
+
+  .hero-desc {
+    font-size: 15px;
+    color: var(--warm-gray);
+    max-width: 440px;
+    line-height: 1.9;
+    margin-bottom: 48px;
+  }
+
+  .hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    flex-wrap: wrap;
+  }
+
+  .btn-primary {
+    background: var(--rose);
+    color: #fff;
+    border: none;
+    padding: 17px 40px;
+    font-family: 'Jost', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.2s;
+    display: inline-block;
+    white-space: nowrap;
+  }
+  .btn-primary:hover { background: var(--rose-dark); }
+
+  .hero-price-block { display: flex; flex-direction: column; gap: 4px; }
+
+  .price-main {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 400;
+    color: var(--charcoal);
+    line-height: 1.2;
+  }
+
+  .price-old {
+    font-size: 12px;
+    color: var(--warm-gray);
+    text-decoration: line-through;
+  }
+
+  .price-note {
+    font-size: 11px;
+    color: var(--warm-gray);
+    letter-spacing: 0.03em;
+  }
+
+  .hero-right {
+    position: relative;
+    overflow: hidden;
+    min-height: 560px;
+  }
+
+  .hero-right img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    display: block;
+  }
+
+  .hero-badge {
+    position: absolute;
+    bottom: 40px;
+    left: 0;
+    background: var(--charcoal);
+    color: var(--cream);
+    padding: 14px 24px;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    border-left: 3px solid var(--rose);
+  }
+
+  /* SECTION COMMONS */
+  .section {
+    padding: 100px 64px;
+    max-width: 1120px;
+    margin: 0 auto;
+  }
+
+  .section-label {
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--warm-gray);
+    margin-bottom: 18px;
+  }
+
+  .section-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(30px, 3.5vw, 50px);
+    font-weight: 300;
+    color: var(--charcoal);
+    line-height: 1.15;
+    margin-bottom: 56px;
+  }
+
+  /* PROGRAM */
+  .program-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 52px 88px;
+  }
+
+  .program-item { position: relative; padding-left: 48px; }
+
+  .program-num {
+    position: absolute;
+    left: 0; top: 3px;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--rose);
+    letter-spacing: 0.1em;
+  }
+
+  .program-item-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px;
+    font-weight: 400;
+    color: var(--charcoal);
+    margin-bottom: 12px;
+  }
+
+  .program-item-desc {
+    font-size: 14px;
+    color: var(--warm-gray);
+    line-height: 1.85;
+  }
+
+  /* INSIDE */
+  .inside-section {
+    background: var(--linen);
+    padding: 100px 64px;
+  }
+
+  .inside-inner {
+    max-width: 1120px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 88px;
+    align-items: center;
+  }
+
+  .inside-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .inside-list li {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .inside-check {
+    width: 20px; height: 20px;
+    background: var(--rose);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 3px;
+  }
+
+  .inside-check svg {
+    width: 10px; height: 10px;
+    stroke: #fff; fill: none;
+    stroke-width: 2.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .inside-list-text { font-size: 14.5px; color: var(--charcoal); line-height: 1.75; }
+  .inside-list-text strong { font-weight: 500; display: block; margin-bottom: 3px; }
+
+  .inside-right img {
+    width: 100%;
+    aspect-ratio: 3/4;
+    object-fit: cover;
+    display: block;
+  }
+
+  /* QUOTE */
+  .quote-section {
+    background: #ede8fa;
+    padding: 100px 64px;
+    text-align: center;
+  }
+
+  .quote-mark {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 100px;
+    line-height: 0.4;
+    color: var(--rose);
+    opacity: 0.3;
+    display: block;
+    margin-bottom: 36px;
+  }
+
+  .quote-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(22px, 3vw, 40px);
+    font-weight: 300;
+    font-style: italic;
+    color: var(--charcoal);
+    max-width: 760px;
+    margin: 0 auto;
+    line-height: 1.5;
+  }
+
+  /* REQUIREMENTS */
+  .req-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    background: var(--linen);
+    margin-top: 52px;
+  }
+
+  .req-item {
+    background: var(--cream);
+    padding: 40px 36px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .req-icon { font-size: 28px; }
+
+  .req-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 21px;
+    font-weight: 400;
+    color: var(--charcoal);
+  }
+
+  .req-desc { font-size: 13.5px; color: var(--warm-gray); line-height: 1.75; }
+
+  /* REGISTER */
+  .register-section {
+    background: linear-gradient(135deg, #fce8f0 0%, #f5f0fa 50%, #ede8fa 100%);
+    padding: 100px 64px;
+  }
+
+  .register-inner {
+    max-width: 620px;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .register-inner .section-title { margin-bottom: 8px; }
+
+  .register-sub {
+    font-size: 15px;
+    color: var(--warm-gray);
+    margin-bottom: 48px;
+  }
+
+  .form-card {
+    background: #fff;
+    padding: 52px 48px;
+    box-shadow: 0 8px 48px rgba(30,28,26,0.08);
+    text-align: left;
+  }
+
+  .form-group { margin-bottom: 24px; }
+
+  .form-label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--warm-gray);
+    margin-bottom: 8px;
+  }
+
+  .form-input {
+    width: 100%;
+    padding: 13px 0;
+    border: none;
+    border-bottom: 1.5px solid rgba(180,160,140,0.4);
+    background: transparent;
+    font-family: 'Jost', sans-serif;
+    font-size: 15px;
+    color: var(--charcoal);
+    outline: none;
+    transition: border-color 0.3s;
+  }
+
+  .form-input:focus { border-bottom-color: var(--rose); }
+  .form-input::placeholder { color: rgba(122,112,104,0.4); }
+
+  .payment-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 28px;
+  }
+
+  .payment-option { position: relative; }
+  .payment-option input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
+
+  .payment-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 18px 12px;
+    border: 1.5px solid rgba(200,168,112,0.3);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .payment-label:hover { border-color: var(--rose-light); }
+  .payment-option input:checked + .payment-label { border-color: var(--rose); background: rgba(232,96,122,0.04); }
+
+  .payment-flag { font-size: 24px; }
+  .payment-name { font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--charcoal); font-weight: 500; }
+  .payment-sub { font-size: 11px; color: var(--warm-gray); }
+
+  .payment-info {
+    background: #f5f0fa;
+    border-left: 3px solid var(--rose);
+    padding: 18px 20px;
+    margin-bottom: 28px;
+    display: none;
+    font-size: 14px;
+    color: var(--warm-gray);
+    line-height: 1.75;
+  }
+
+  .payment-info.active { display: block; }
+  .payment-info strong { color: var(--charcoal); font-weight: 500; }
+
+  .payment-link {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 8px 18px;
+    background: var(--charcoal);
+    color: var(--cream);
+    text-decoration: none;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    transition: background 0.2s;
+  }
+  .payment-link:hover { background: var(--rose-dark); }
+
+  .btn-submit {
+    width: 100%;
+    padding: 18px;
+    background: var(--rose);
+    color: #fff;
+    border: none;
+    font-family: 'Jost', sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.3s;
+  }
+  .btn-submit:hover { background: var(--rose-dark); }
+  .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .form-note {
+    text-align: center;
+    font-size: 11px;
+    color: var(--warm-gray);
+    margin-top: 14px;
+    line-height: 1.6;
+  }
+
+  /* Success */
+  .success-msg { display: none; text-align: center; padding: 32px 0; }
+  .success-msg.show { display: block; }
+  .form-fields.hide { display: none; }
+  .success-icon { font-size: 52px; display: block; margin-bottom: 16px; }
+  .success-title { font-family: 'Cormorant Garamond', serif; font-size: 34px; font-weight: 300; color: var(--charcoal); margin-bottom: 12px; }
+  .success-desc { font-size: 15px; color: var(--warm-gray); line-height: 1.7; }
+
+  /* FOOTER */
+  footer {
+    background: #1a1a2e;
+    padding: 52px 64px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+
+  .footer-logo { font-family: 'Cormorant Garamond', serif; font-size: 19px; font-weight: 300; color: var(--cream); }
+
+  .footer-links { display: flex; gap: 28px; }
+  .footer-links a { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(250,247,242,0.35); text-decoration: none; transition: color 0.2s; }
+  .footer-links a:hover { color: var(--rose-light); }
+  .footer-copy { font-size: 11px; color: rgba(250,247,242,0.25); width: 100%; }
+
+  /* TOAST */
+  .toast { position: fixed; top: 24px; right: 24px; background: var(--charcoal); color: var(--cream); padding: 14px 22px; font-size: 14px; z-index: 9999; transform: translateY(-80px); opacity: 0; transition: all 0.4s; border-left: 3px solid var(--rose); max-width: 300px; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  /* ANIMATIONS */
+  .fade-up { opacity: 0; transform: translateY(28px); transition: opacity 0.65s ease, transform 0.65s ease; }
+  .fade-up.visible { opacity: 1; transform: translateY(0); }
+
+  /* RESPONSIVE */
+  @media (max-width: 860px) {
+    nav { padding: 16px 24px; }
+    .hero { grid-template-columns: 1fr; min-height: auto; }
+    .hero-left { padding: 56px 28px 48px; }
+    .hero-right { min-height: 60vw; }
+    .program-grid, .inside-inner, .req-grid { grid-template-columns: 1fr; }
+    .section { padding: 68px 28px; }
+    .inside-section, .quote-section, .register-section { padding: 68px 28px; }
+    .inside-inner { gap: 40px; }
+    .form-card { padding: 32px 22px; }
+    footer { padding: 40px 28px; flex-direction: column; align-items: flex-start; }
+    .footer-links { flex-wrap: wrap; gap: 16px; }
+    .payment-toggle { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Re.Create.Art · <span>Варя Перлина</span></div>
+  <a href="#register" class="nav-cta">Присоединиться</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-left">
+    <div class="hero-pretitle fade-up">Онлайн мини-курс · Старт 2 июня</div>
+    <h1 class="hero-title fade-up">Как вышить</h1>
+    <div class="hero-title-italic fade-up">в современном мире</div>
+    <p class="hero-desc fade-up">
+      4 недели вышивки — от первого стежка до готового проекта. 
+      Это про удовольствие, отдых для головы, тёплую компанию 
+      и способ через стежки проживать свои состояния, замедляться 
+      и наконец делать что‑то для себя.
+    </p>
+    <div class="hero-actions fade-up">
+      <a href="#register" class="btn-primary">Присоединиться</a>
+      <div class="hero-price-block">
+        <div class="price-main">240 / $80 / 6 000 ₽</div>
+        <div class="price-old">₽ 300 / $100 / 8 000 ₽</div>
+        <div class="price-note">Ранняя цена — для первых 20 регистраций</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="hero-right">
+    <img src="photo2.jpg" alt="Вышивка в пяльцах — работа Вари Перлиной">
+    <div class="hero-badge">Старт 2 июня 2025</div>
+  </div>
+</section>
+
+<!-- PROGRAM -->
+<div class="section">
+  <div class="section-label fade-up">Программа</div>
+  <h2 class="section-title fade-up">От нити до готовой работы<br>за четыре недели</h2>
+
+  <div class="program-grid">
+    <div class="program-item fade-up">
+      <div class="program-num">01</div>
+      <div class="program-item-title">Материалы и инструменты</div>
+      <p class="program-item-desc">
+        Сразу после регистрации вы получите подробный список всего, что понадобится для вышивки — с реальными ссылками и проверенными вариантами, где всё это заказать для разных стран.
+      </p>
+    </div>
+
+    <div class="program-item fade-up">
+      <div class="program-num">02</div>
+      <div class="program-item-title">База</div>
+      <p class="program-item-desc">
+        Без сложных терминов и опасений, что «что-то не поймёте». Подробный разбор процессов и техник: какие материалы действительно нужны, как они работают, что влияет на результат. Плюс — находки, ошибки и опыт, чтобы вам не пришлось проходить этот путь заново.
+      </p>
+    </div>
+
+    <div class="program-item fade-up">
+      <div class="program-num">03</div>
+      <div class="program-item-title">Регулярные задания и тёплый чат</div>
+      <p class="program-item-desc">
+        Это не просто курс, а пространство, где приятно быть. В чате будем делиться процессом, работами, эмоциями и поддерживать друг друга. Плюс регулярные задания для постановки руки, развития насмотренности и поиска своего стиля.
+      </p>
+    </div>
+
+    <div class="program-item fade-up">
+      <div class="program-num">04</div>
+      <div class="program-item-title">Результат</div>
+      <p class="program-item-desc">
+        За 4 недели у вас останутся не только готовые вышивки, но и ощущение: «я правда это могу». Вы поймёте, какой стиль и формат откликается именно вам, и найдёте внутреннюю опору — продолжать, пробовать новое и замечать красоту вокруг.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- INSIDE -->
+<section class="inside-section">
+  <div class="inside-inner">
+    <div class="inside-left">
+      <div class="section-label fade-up">Что внутри</div>
+      <h2 class="section-title fade-up" style="margin-bottom:36px">Всё, чтобы начать<br>сегодня</h2>
+      <ul class="inside-list">
+        <li class="fade-up">
+          <div class="inside-check"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>
+          <div class="inside-list-text">
+            <strong>4 видеоурока по 60–120 минут</strong>
+            Предварительное расписание: 2, 9, 16 и 30 июня, начало в 21:00 (московское время GMT+3)
+          </div>
+        </li>
+        <li class="fade-up">
+          <div class="inside-check"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>
+          <div class="inside-list-text">
+            <strong>Тёплый общий чат</strong>, где делимся работами, процессом и эмоциями, получаем поддержку и обратную связь
+          </div>
+        </li>
+        <li class="fade-up">
+          <div class="inside-check"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>
+          <div class="inside-list-text">
+            <strong>Полный список необходимых инструментов и материалов</strong> с ссылками для разных стран — сразу после оплаты
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="inside-right fade-up">
+      <img src="photo1.jpg" alt="Вышивка в пяльцах крупным планом">
+    </div>
+  </div>
+</section>
+
+<!-- QUOTE -->
+<section class="quote-section">
+  <span class="quote-mark">"</span>
+  <blockquote class="quote-text">
+    Вышивка жизненно необходима. Динозавры не вышивали — и где они теперь?
+  </blockquote>
+</section>
+
+<!-- REQUIREMENTS -->
+<div class="section">
+  <div class="section-label fade-up">Что нужно для курса</div>
+  <h2 class="section-title fade-up">Минимум подготовки —<br>максимум практики</h2>
+  <div class="req-grid">
+    <div class="req-item fade-up">
+      <div class="req-icon">🎥</div>
+      <div class="req-title">Доступ к Zoom</div>
+      <p class="req-desc">Чат курса, видеоуроки и обратная связь.</p>
+    </div>
+    <div class="req-item fade-up">
+      <div class="req-icon">✈️</div>
+      <div class="req-title">Аккаунт в Telegram</div>
+      <p class="req-desc">Чат потока, обратная связь и материалы.</p>
+    </div>
+    <div class="req-item fade-up">
+      <div class="req-icon">🧵</div>
+      <div class="req-title">Материалы и инструменты</div>
+      <p class="req-desc">Полный список с рекомендациями вы получите после оплаты.</p>
+    </div>
+  </div>
+</div>
+
+<!-- REGISTER -->
+<section class="register-section" id="register">
+  <div class="register-inner">
+    <div class="section-label fade-up">Оформление</div>
+    <h2 class="section-title fade-up">Присоединиться<br>к курсу</h2>
+    <p class="register-sub fade-up">Два шага: оставьте контакты и выберите удобный способ оплаты.</p>
+
+    <div class="form-card fade-up">
+      <div class="success-msg" id="successMsg">
+        <span class="success-icon">🌸</span>
+        <div class="success-title">Заявка принята!</div>
+        <p class="success-desc">
+          Письмо с подтверждением и инструкциями отправлено<br>
+          на вашу почту. Проверьте папку «Спам», если письмо<br>
+          не пришло в течение 5 минут.
+        </p>
+      </div>
+
+      <div class="form-fields" id="formFields">
+        <div class="form-group">
+          <label class="form-label" for="name">Ваше имя</label>
+          <input class="form-input" type="text" id="name" placeholder="Как вас зовут?" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="email">Email</label>
+          <input class="form-input" type="email" id="email" placeholder="example@mail.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="tg">Имя пользователя в Telegram</label>
+          <input class="form-input" type="text" id="tg" placeholder="например, @username" required>
+        </div>
+
+        <div style="margin-bottom:20px">
+          <div class="form-label">Способ оплаты</div>
+          <div class="payment-toggle">
+            <div class="payment-option">
+              <input type="radio" name="payment" id="pay-ru" value="ru" checked>
+              <label class="payment-label" for="pay-ru">
+                <span class="payment-flag">🇷🇺</span>
+                <span class="payment-name">Россия</span>
+                <span class="payment-sub">ЮKassa · 6 000 ₽</span>
+              </label>
+            </div>
+            <div class="payment-option">
+              <input type="radio" name="payment" id="pay-int" value="international">
+              <label class="payment-label" for="pay-int">
+                <span class="payment-flag">🌍</span>
+                <span class="payment-name">Другие страны</span>
+                <span class="payment-sub">Paddle · $80</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="payment-info active" id="info-ru">
+          <p>
+            <strong>Оплата для России:</strong> после отправки заявки вы получите ссылку на оплату через <strong>ЮKassa</strong> — карты РФ, СБП, ЮMoney.<br>
+            Стоимость: <strong>6 000 ₽</strong><br>
+            <span style="font-size:12px">Ранняя цена для первых 20 регистраций</span>
+          </p>
+          <a class="payment-link" href="https://yookassa.ru/ВАША_ССЫЛКА" target="_blank" id="payLinkRu">Перейти к оплате →</a>
+        </div>
+
+        <div class="payment-info" id="info-int">
+          <p>
+            <strong>International payment:</strong> after submitting your application, you'll receive a <strong>Paddle</strong> payment link accepting Visa, Mastercard, PayPal and more.<br>
+            Price: <strong>$80 USD</strong><br>
+            <span style="font-size:12px">Early bird price for the first 20 registrations</span>
+          </p>
+          <a class="payment-link" href="https://buy.paddle.com/ВАША_ССЫЛКА" target="_blank" id="payLinkInt">Proceed to payment →</a>
+        </div>
+
+        <button class="btn-submit" id="submitBtn" onclick="handleSubmit()">
+          Перейти к оплате · 6 000 ₽
+        </button>
+        <p class="form-note">Минимальная цена курса для первых 20 регистраций</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">Re.Create.Art · Варя Перлина</div>
+  <div class="footer-links">
+    <a href="#">Instagram</a>
+    <a href="#">Контакты</a>
+    <a href="#">Конфиденциальность</a>
+  </div>
+  <div class="footer-copy">© 2026 Варя Перлина</div>
+</footer>
+
+<script>
+// ── EmailJS ──
+// Зарегистрируйтесь на https://emailjs.com и вставьте ключи:
+const EMAILJS_CONFIG = {
+  publicKey:  'ВАШ_PUBLIC_KEY',
+  serviceId:  'ВАШ_SERVICE_ID',
+  templateId: 'ВАШ_TEMPLATE_ID',
+};
+// Переменные шаблона: {{to_name}}, {{to_email}}, {{telegram}}, {{payment_method}}, {{pay_link}}
+emailjs.init(EMAILJS_CONFIG.publicKey);
+
+// ── Payment toggle ──
+document.querySelectorAll('input[name="payment"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    const isRu = document.querySelector('input[name="payment"]:checked').value === 'ru';
+    document.getElementById('info-ru').classList.toggle('active', isRu);
+    document.getElementById('info-int').classList.toggle('active', !isRu);
+    document.getElementById('submitBtn').textContent = isRu
+      ? 'Перейти к оплате · 6 000 ₽'
+      : 'Proceed to payment · $80 USD';
+  });
+});
+
+// ── Submit ──
+async function handleSubmit() {
+  const name  = document.getElementById('name').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const tg    = document.getElementById('tg').value.trim();
+  const isRu  = document.querySelector('input[name="payment"]:checked').value === 'ru';
+
+  if (!name || !email || !tg) { showToast('Пожалуйста, заполните все поля'); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { showToast('Проверьте формат email'); return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Отправляем...';
+
+  const payLink  = document.getElementById(isRu ? 'payLinkRu' : 'payLinkInt').href;
+  const payLabel = isRu ? 'ЮKassa (Россия) — 6 000 ₽' : 'Paddle (International) — $80 USD';
+
+  try {
+    await emailjs.send(EMAILJS_CONFIG.serviceId, EMAILJS_CONFIG.templateId, {
+      to_name: name, to_email: email, telegram: tg,
+      payment_method: payLabel, pay_link: payLink,
+    });
+    document.getElementById('formFields').classList.add('hide');
+    document.getElementById('successMsg').classList.add('show');
+    showToast('✓ Письмо отправлено!');
+  } catch (err) {
+    console.error(err);
+    showToast('Ошибка отправки. Проверьте настройки EmailJS.');
+    btn.disabled = false;
+    btn.textContent = isRu ? 'Перейти к оплате · 6 000 ₽' : 'Proceed to payment · $80 USD';
+  }
+}
+
+// ── Toast ──
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// ── Scroll animations ──
+const obs = new IntersectionObserver(entries => {
+  entries.forEach((e, i) => {
+    if (e.isIntersecting) {
+      e.target.style.transitionDelay = `${i * 0.07}s`;
+      e.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.1 });
+document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
+</script>
+</body>
+</html>
