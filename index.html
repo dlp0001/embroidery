@@ -364,13 +364,6 @@
 </footer>
 
 <script>
-const EMAILJS_CONFIG = {
-  publicKey:  'ВАШ_PUBLIC_KEY',
-  serviceId:  'ВАШ_SERVICE_ID',
-  templateId: 'ВАШ_TEMPLATE_ID',
-};
-emailjs.init(EMAILJS_CONFIG.publicKey);
-
 document.querySelectorAll('input[name="payment"]').forEach(radio => {
   radio.addEventListener('change', () => {
     const isRu = document.querySelector('input[name="payment"]:checked').value === 'ru';
