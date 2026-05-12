@@ -1,9 +1,7 @@
 const { google } = require('googleapis');
-const crypto = require('crypto');
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const PADDLE_WEBHOOK_SECRET = process.env.PADDLE_WEBHOOK_SECRET;
 const FROM_EMAIL = 'info@re-create.art';
 
 async function getSheet() {
@@ -14,14 +12,16 @@ async function getSheet() {
   return google.sheets({ version: 'v4', auth });
 }
 
-async function updateSheet(email) {
+async function updateSheet(transactionId) {
   const sheets = await getSheet();
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: 'A:F',
+    range: 'A:G',
   });
   const rows = response.data.values || [];
-  const rowIndex = rows.findIndex(row => row[2] === email);
+  console.log('looking for transaction_id:', transactionId);
+  const rowIndex = rows.findIndex(row => row[6] === transactionId);
+  console.log('found at rowIndex:', rowIndex);
   if (rowIndex > 0) {
     await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
@@ -87,63 +87,30 @@ async function sendEmail(to) {
   console.log('resend status:', r.status);
 }
 
-async function handler(req, res) {
+module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const signature = req.headers['paddle-signature'];
-  if (!signature) return res.status(401).json({ error: 'No signature' });
-
-  // req.body may be string or already-parsed object depending on Vercel
-  const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-
-  // TEMP: skip signature check to test email/sheets flow
-  // TODO: re-enable after testing
-  /*
-  try {
-    const parts = {};
-    signature.split(';').forEach(p => {
-      const idx = p.indexOf('=');
-      parts[p.slice(0, idx)] = p.slice(idx + 1);
-    });
-    const { ts, h1 } = parts;
-    const signed = `${ts}:${rawBody}`;
-    const expected = crypto
-      .createHmac('sha256', PADDLE_WEBHOOK_SECRET)
-      .update(signed)
-      .digest('hex');
-    if (expected !== h1) {
-      return res.status(401).json({ error: 'Invalid signature' });
-    }
-  } catch (e) {
-    return res.status(401).json({ error: 'Signature error' });
-  }
-  */
-
-  const event = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-  console.log('event type:', event.event_type);
+  const event = req.body;
+  console.log('paddle event_type:', event.event_type);
+  console.log('paddle data:', JSON.stringify(event.data));
 
   if (event.event_type !== 'transaction.completed') {
     return res.status(200).json({ received: true });
   }
 
-  console.log('event data:', JSON.stringify(event.data, null, 2));
-
+  const transactionId = event.data?.id;
   const email = event.data?.customer?.email;
-  console.log('email found:', email);
+  console.log('transaction_id:', transactionId);
+  console.log('email:', email);
+
   if (!email) return res.status(200).json({ received: true });
 
   try {
-    await updateSheet(email);
+    if (transactionId) await updateSheet(transactionId);
     await sendEmail(email);
     return res.status(200).json({ success: true });
   } catch (err) {
-    console.error('webhook error:', err);
+    console.error('paddle webhook error:', err);
     return res.status(500).json({ error: 'Server error' });
   }
-}
-
-handler.config = {
-  api: { bodyParser: false },
 };
-
-module.exports = handler;
