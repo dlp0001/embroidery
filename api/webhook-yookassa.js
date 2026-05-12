@@ -38,14 +38,16 @@ async function getSheet() {
   return google.sheets({ version: 'v4', auth });
 }
 
-async function updateSheet(email) {
+async function updateSheet(paymentId) {
   const sheets = await getSheet();
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: 'A:F',
+    range: 'A:G',
   });
   const rows = response.data.values || [];
-  const rowIndex = rows.findIndex(row => row[2] === email);
+  console.log('looking for payment_id:', paymentId);
+  const rowIndex = rows.findIndex(row => row[6] === paymentId);
+  console.log('found at rowIndex:', rowIndex);
   if (rowIndex > 0) {
     await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
@@ -133,15 +135,17 @@ module.exports = async function handler(req, res) {
 
   const payment = event.object;
   const email = payment?.metadata?.email;
+  const paymentId = payment?.id;
   console.log('email:', email);
+  console.log('payment_id:', paymentId);
 
-  if (!email) {
-    console.error('No email in metadata');
+  if (!email || !paymentId) {
+    console.error('Missing email or payment_id in metadata');
     return res.status(200).json({ received: true });
   }
 
   try {
-    await updateSheet(email);
+    await updateSheet(paymentId);
     await sendEmail(email);
     return res.status(200).json({ success: true });
   } catch (err) {
