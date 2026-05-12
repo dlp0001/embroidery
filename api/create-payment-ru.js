@@ -25,7 +25,7 @@ module.exports = async function handler(req, res) {
       },
       body: JSON.stringify({
         amount: {
-          value: '6000.00',
+          value: '100.00',
           currency: 'RUB',
         },
         confirmation: {
