@@ -126,7 +126,10 @@ async function handler(req, res) {
     return res.status(200).json({ received: true });
   }
 
+  console.log('event data:', JSON.stringify(event.data, null, 2));
+
   const email = event.data?.customer?.email;
+  console.log('email found:', email);
   if (!email) return res.status(200).json({ received: true });
 
   try {
