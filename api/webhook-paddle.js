@@ -99,9 +99,9 @@ module.exports = async function handler(req, res) {
   }
 
   const transactionId = event.data?.id;
-  const email = event.data?.customer?.email;
+  const email = event.data?.custom_data?.email;
   console.log('transaction_id:', transactionId);
-  console.log('email:', email);
+  console.log('email from custom_data:', email);
 
   if (!email) return res.status(200).json({ received: true });
 
