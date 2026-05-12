@@ -2,6 +2,7 @@
   "name": "embroidery-course",
   "version": "1.0.0",
   "dependencies": {
-    "googleapis": "^140.0.0"
+    "googleapis": "^140.0.0",
+    "uuid": "^9.0.0"
   }
 }
