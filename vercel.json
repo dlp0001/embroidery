@@ -1,8 +1,9 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
+  "installCommand": "npm install",
   "functions": {
-    "api/webhook-paddle.js": {
+    "api/*.js": {
       "maxDuration": 10
     }
   }
