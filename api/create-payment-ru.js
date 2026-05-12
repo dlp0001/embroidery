@@ -34,6 +34,24 @@ module.exports = async function handler(req, res) {
         },
         capture: true,
         description: 'Онлайн курс по вышивке «Как вышить в современном мире»',
+        receipt: {
+          customer: {
+            email,
+          },
+          items: [
+            {
+              description: 'Онлайн курс по вышивке «Как вышить в современном мире»',
+              quantity: '1.00',
+              amount: {
+                value: '6000.00',
+                currency: 'RUB',
+              },
+              vat_code: 1,
+              payment_mode: 'full_payment',
+              payment_subject: 'service',
+            },
+          ],
+        },
         metadata: {
           email,
           name,
