@@ -412,9 +412,15 @@ async function handleSubmit() {
     if (!res.ok) throw new Error('Server error');
 
     if (payMethod === 'ru') {
-      document.getElementById('formFields').classList.add('hide');
-      document.getElementById('successMsg').classList.add('show');
-      setTimeout(() => { window.location.href = 'https://yookassa.ru/ВАША_ССЫЛКА'; }, 2000);
+      // Create YooKassa payment via API
+      const payRes = await fetch('/api/create-payment-ru', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, telegram: tg }),
+      });
+      const payData = await payRes.json();
+      if (!payData.paymentUrl) throw new Error('No payment URL');
+      window.location.href = payData.paymentUrl;
     } else {
       const priceId = payMethod === 'ils'
         ? 'pri_01krc27y0y0cy9mfq6rspjn9pq'
