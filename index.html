@@ -434,7 +434,7 @@ async function handleSubmit() {
       Paddle.Checkout.open({
         items: [{ priceId, quantity: 1 }],
         customer: { email },
-        customData: { name, telegram: tg },
+        customData: { name, email, telegram: tg },
         settings: { displayMode: 'overlay', theme: 'light', locale: 'en' },
         eventCallback: async function(event) {
           console.log('paddle event:', event.name, event.data);
