@@ -436,8 +436,22 @@ async function handleSubmit() {
         customer: { email },
         customData: { name, telegram: tg },
         settings: { displayMode: 'overlay', theme: 'light', locale: 'en' },
-        eventCallback: function(event) {
+        eventCallback: async function(event) {
+          console.log('paddle event:', event.name, event.data);
           if (event.name === 'checkout.completed') {
+            const transactionId = event.data?.transaction_id;
+            // Save transaction_id to Google Sheets
+            if (transactionId) {
+              await fetch('/api/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  name, email, telegram: tg,
+                  paymentMethod: payMethod,
+                  transactionId,
+                }),
+              });
+            }
             document.getElementById('formFields').classList.add('hide');
             document.getElementById('successMsg').classList.add('show');
           }
