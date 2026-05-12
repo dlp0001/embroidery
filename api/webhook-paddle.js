@@ -6,19 +6,6 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const PADDLE_WEBHOOK_SECRET = process.env.PADDLE_WEBHOOK_SECRET;
 const FROM_EMAIL = 'info@re-create.art';
 
-module.exports.config = {
-  api: { bodyParser: false },
-};
-
-async function getRawBody(req) {
-  return new Promise((resolve, reject) => {
-    let data = '';
-    req.on('data', chunk => { data += chunk; });
-    req.on('end', () => resolve(data));
-    req.on('error', reject);
-  });
-}
-
 async function getSheet() {
   const auth = new google.auth.GoogleAuth({
     credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT),
@@ -27,7 +14,7 @@ async function getSheet() {
   return google.sheets({ version: 'v4', auth });
 }
 
-async function updateSheet(email, status) {
+async function updateSheet(email) {
   const sheets = await getSheet();
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
@@ -47,7 +34,7 @@ async function updateSheet(email, status) {
 
 function emailHtml() {
   return `
-    <div style="font-family: Georgia,'Times New Roman',serif;max-width:560px;margin:0 auto;color:#1a1a2e;background:#ffffff;">
+    <div style="font-family:Georgia,'Times New Roman',serif;max-width:560px;margin:0 auto;color:#1a1a2e;background:#ffffff;">
       <div style="background:#1a1a2e;padding:32px 48px;text-align:center;">
         <div style="font-size:11px;letter-spacing:0.3em;text-transform:uppercase;color:#e91e8c;margin-bottom:8px;font-family:sans-serif;">Re.Create.Art</div>
         <div style="font-size:20px;font-weight:300;color:#ffffff;letter-spacing:0.05em;">Варя Перлина</div>
@@ -97,17 +84,17 @@ async function sendEmail(to) {
       html: emailHtml(),
     }),
   });
-  const data = await r.json();
-  console.log('resend response:', data);
+  console.log('resend status:', r.status);
 }
 
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const rawBody = await getRawBody(req);
   const signature = req.headers['paddle-signature'];
-
   if (!signature) return res.status(401).json({ error: 'No signature' });
+
+  // req.body is the raw string because bodyParser is disabled
+  const rawBody = req.body;
 
   try {
     const parts = {};
@@ -117,33 +104,44 @@ module.exports = async function handler(req, res) {
     });
     const { ts, h1 } = parts;
     const signed = `${ts}:${rawBody}`;
-    const expected = crypto.createHmac('sha256', PADDLE_WEBHOOK_SECRET).update(signed).digest('hex');
+    const expected = crypto
+      .createHmac('sha256', PADDLE_WEBHOOK_SECRET)
+      .update(signed)
+      .digest('hex');
+
+    console.log('expected:', expected);
+    console.log('received:', h1);
+
     if (expected !== h1) {
-      console.error('signature mismatch', { expected, h1 });
       return res.status(401).json({ error: 'Invalid signature' });
     }
   } catch (e) {
-    console.error('signature error:', e);
+    console.error('sig error:', e);
     return res.status(401).json({ error: 'Signature error' });
   }
 
   const event = JSON.parse(rawBody);
-  console.log('paddle event:', event.event_type);
+  console.log('event type:', event.event_type);
 
   if (event.event_type !== 'transaction.completed') {
     return res.status(200).json({ received: true });
   }
 
   const email = event.data?.customer?.email;
-  console.log('customer email:', email);
   if (!email) return res.status(200).json({ received: true });
 
   try {
-    await updateSheet(email, 'оплачено ✓');
+    await updateSheet(email);
     await sendEmail(email);
     return res.status(200).json({ success: true });
   } catch (err) {
-    console.error('paddle webhook error:', err);
+    console.error('webhook error:', err);
     return res.status(500).json({ error: 'Server error' });
   }
 }
+
+handler.config = {
+  api: { bodyParser: false },
+};
+
+module.exports = handler;
