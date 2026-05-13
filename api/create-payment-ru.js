@@ -25,12 +25,12 @@ module.exports = async function handler(req, res) {
       },
       body: JSON.stringify({
         amount: {
-          value: '100.00',
+          value: '6000.00',
           currency: 'RUB',
         },
         confirmation: {
           type: 'redirect',
-          return_url: `https://embroidery-course.vercel.app/?success=true&payment_id=${payment.id}`,
+          return_url: 'https://embroidery-course.vercel.app/?success=true',
         },
         capture: true,
         description: 'Онлайн курс по вышивке «Как вышить в современном мире»',
@@ -43,7 +43,7 @@ module.exports = async function handler(req, res) {
               description: 'Онлайн курс по вышивке «Как вышить в современном мире»',
               quantity: '1.00',
               amount: {
-                value: '100.00',
+                value: '6000.00',
                 currency: 'RUB',
               },
               vat_code: 1,
