@@ -392,6 +392,16 @@
         </div>
         <div class="payment-info active" id="info-ru">
           <p><strong>Оплата для России:</strong> после отправки заявки вы будете автоматически переадресованы на страницу оплаты <strong>ЮKassa</strong> — карты РФ, СБП, ЮMoney.<br>Стоимость: <strong>6 000 ₽</strong><br><span style="font-size:12px">Ранняя цена для первых 20 регистраций</span></p>
+          <div style="margin-top:16px; display:flex; flex-direction:column; gap:10px;">
+            <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; font-size:13px; color:var(--warm-gray); line-height:1.5;">
+              <input type="checkbox" id="consent-data" style="margin-top:2px; accent-color:var(--rose); flex-shrink:0;">
+              <span>Я согласен(на) на <a href="consent-data.html" target="_blank" style="color:var(--rose); text-decoration:none;">обработку персональных данных</a></span>
+            </label>
+            <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; font-size:13px; color:var(--warm-gray); line-height:1.5;">
+              <input type="checkbox" id="consent-marketing" style="margin-top:2px; accent-color:var(--rose); flex-shrink:0;">
+              <span>Согласен(на) получать <a href="consent-marketing.html" target="_blank" style="color:var(--rose); text-decoration:none;">рекламные электронные сообщения</a></span>
+            </label>
+          </div>
         </div>
         <div class="payment-info" id="info-ils">
           <p><strong>תשלום בשקלים:</strong> לאחר שליחת הבקשה, יפתח חלון תשלום מאובטח של <strong>Paddle</strong> — ניתן לשלם בכרטיס אשראי ישראלי.<br>מחיר: <strong>₪240</strong><br><span style="font-size:12px">מחיר מוקדם ל-20 הנרשמים הראשונים</span></p>
@@ -482,13 +492,29 @@ async function handleSubmit() {
   btn.disabled = true;
   btn.textContent = 'Отправляем...';
 
+  if (payMethod === 'ru') {
+    const consentData = document.getElementById('consent-data')?.checked;
+    const consentMarketing = document.getElementById('consent-marketing')?.checked;
+    if (!consentData || !consentMarketing) {
+      showToast('Пожалуйста, отметьте оба согласия для продолжения');
+      btn.disabled = false;
+      btn.textContent = 'Перейти к оплате · 6 000 ₽';
+      return;
+    }
+  }
+
   try {
     if (payMethod === 'ru') {
       // For Russia: create-payment-ru.js handles Sheets directly, skip submit.js
       const payRes = await fetch('/api/create-payment-ru', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, telegram: tg }),
+        body: JSON.stringify({
+          name, email, telegram: tg,
+          consentData: document.getElementById('consent-data').checked,
+          consentMarketing: document.getElementById('consent-marketing').checked,
+          userAgent: navigator.userAgent,
+        }),
       });
       const payData = await payRes.json();
       if (!payData.paymentUrl) throw new Error('No payment URL');

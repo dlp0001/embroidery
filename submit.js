@@ -15,6 +15,9 @@ module.exports = async function handler(req, res) {
 
   const { name, email, telegram, paymentMethod, transactionId } = req.body;
 
+  // Get IP from request headers
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '';
+
   if (!name || !email || !telegram || !paymentMethod) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
@@ -50,21 +53,27 @@ module.exports = async function handler(req, res) {
       // (for 'ru', row is created by create-payment-ru.js with payment_id)
       await sheets.spreadsheets.values.append({
         spreadsheetId: SHEET_ID,
-        range: 'A:I',
+        range: 'A:O',
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [[
-            new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }),
-            name,
-            email,
-            telegram,
+            new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }), // A - Дата
+            name,                                          // B - Имя
+            email,                                         // C - Email
+            telegram,                                      // D - Telegram
             paymentMethod === 'ils'
               ? 'Paddle (Израиль · ₪)'
-              : 'Paddle (International · $)',
-            'ожидает оплаты',
-            '',
-            paymentMethod === 'ils' ? '240' : '80',
-            paymentMethod === 'ils' ? 'ILS' : 'USD',
+              : 'Paddle (International · $)',              // E - Способ оплаты
+            'ожидает оплаты',                              // F - Статус
+            '',                                            // G - Payment ID (заполнится позже)
+            paymentMethod === 'ils' ? '240' : '80',        // H - Сумма
+            paymentMethod === 'ils' ? 'ILS' : 'USD',       // I - Валюта
+            '',                                            // J - Согласие на ПД
+            '',                                            // K - Версия ПД
+            '',                                            // L - Согласие на рассылку
+            '',                                            // M - Версия рассылки
+            ip,                                            // N - IP адрес
+            req.headers['user-agent'] || '',               // O - User Agent
           ]],
         },
       });
