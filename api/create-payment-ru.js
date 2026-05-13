@@ -16,7 +16,7 @@ async function getSheet() {
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { name, email, telegram } = req.body;
+  const { name, email, telegram, consentData, consentMarketing, userAgent } = req.body;
 
   if (!name || !email || !telegram) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -64,23 +64,32 @@ module.exports = async function handler(req, res) {
       return res.status(500).json({ error: 'Payment creation failed' });
     }
 
-    // Save to Sheets WITH payment_id in column G
+    // Get IP from request headers
+    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '';
+
+    // Save to Sheets WITH all consent fields
     const sheets = await getSheet();
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
-      range: 'A:I',
+      range: 'A:O',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [[
-          new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }),
-          name,
-          email,
-          telegram,
-          'ЮKassa (Россия)',
-          'ожидает оплаты',
-          payment.id,
-          '6000',
-          'RUB',
+          new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }), // A - Дата
+          name,                                   // B - Имя
+          email,                                  // C - Email
+          telegram,                               // D - Telegram
+          'ЮKassa (Россия)',                      // E - Способ оплаты
+          'ожидает оплаты',                       // F - Статус
+          payment.id,                             // G - Payment ID
+          '6000',                                 // H - Сумма
+          'RUB',                                  // I - Валюта
+          consentData ? 'да' : 'нет',             // J - Согласие на ПД
+          '1.0',                                  // K - Версия документа ПД
+          consentMarketing ? 'да' : 'нет',        // L - Согласие на рассылку
+          '1.0',                                  // M - Версия документа рассылки
+          ip,                                     // N - IP адрес
+          userAgent || '',                        // O - User Agent
         ]],
       },
     });
