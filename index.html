@@ -489,7 +489,6 @@ async function handleSubmit() {
     if (!res.ok) throw new Error('Server error');
 
     if (payMethod === 'ru') {
-      // Create YooKassa payment via API
       const payRes = await fetch('/api/create-payment-ru', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -497,6 +496,9 @@ async function handleSubmit() {
       });
       const payData = await payRes.json();
       if (!payData.paymentUrl) throw new Error('No payment URL');
+      // Save payment_id to check status after redirect
+      localStorage.setItem('ru_payment_id', payData.paymentId);
+      localStorage.setItem('ru_payment_email', email);
       window.location.href = payData.paymentUrl;
     } else {
       const priceId = payMethod === 'ils'
@@ -545,13 +547,14 @@ document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
 
 // Show success message if redirected after payment
 if (window.location.search.includes('success=true')) {
-  const urlParams = new URLSearchParams(window.location.search);
-  const paymentId = urlParams.get('payment_id');
+  const paymentId = localStorage.getItem('ru_payment_id');
 
   document.getElementById('register').scrollIntoView({ behavior: 'smooth' });
 
   if (paymentId) {
-    // Verify payment status with YooKassa
+    localStorage.removeItem('ru_payment_id');
+    localStorage.removeItem('ru_payment_email');
+
     fetch(`/api/check-payment-ru?paymentId=${paymentId}`)
       .then(r => r.json())
       .then(data => {
@@ -561,11 +564,9 @@ if (window.location.search.includes('success=true')) {
             document.getElementById('successMsg').classList.add('show');
           }, 800);
         }
-        // If payment not succeeded — do nothing, show form as usual
+        // If not succeeded — show form as usual
       })
-      .catch(() => {
-        // On error — do nothing
-      });
+      .catch(() => {});
   }
 }
 </script>
