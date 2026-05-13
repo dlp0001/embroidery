@@ -25,7 +25,7 @@ module.exports = async function handler(req, res) {
       },
       body: JSON.stringify({
         amount: {
-          value: '6000.00',
+          value: '100.00',
           currency: 'RUB',
         },
         confirmation: {
@@ -43,7 +43,7 @@ module.exports = async function handler(req, res) {
               description: 'Онлайн курс по вышивке «Как вышить в современном мире»',
               quantity: '1.00',
               amount: {
-                value: '6000.00',
+                value: '100.00',
                 currency: 'RUB',
               },
               vat_code: 1,
