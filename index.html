@@ -480,15 +480,8 @@ async function handleSubmit() {
   btn.textContent = 'Отправляем...';
 
   try {
-    const res = await fetch('/api/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, telegram: tg, paymentMethod: payMethod }),
-    });
-
-    if (!res.ok) throw new Error('Server error');
-
     if (payMethod === 'ru') {
+      // For Russia: create-payment-ru.js handles Sheets directly, skip submit.js
       const payRes = await fetch('/api/create-payment-ru', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -496,16 +489,22 @@ async function handleSubmit() {
       });
       const payData = await payRes.json();
       if (!payData.paymentUrl) throw new Error('No payment URL');
-      // Save payment_id to check status after redirect
       localStorage.setItem('ru_payment_id', payData.paymentId);
       localStorage.setItem('ru_payment_email', email);
       window.location.href = payData.paymentUrl;
     } else {
+      // For Paddle: call submit.js to create row in Sheets
+      const res = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, telegram: tg, paymentMethod: payMethod }),
+      });
+      if (!res.ok) throw new Error('Server error');
+
       const priceId = payMethod === 'ils'
         ? 'pri_01krc27y0y0cy9mfq6rspjn9pq'
         : 'pri_01kr0pd6xaf86k4e0a37hjce1r';
 
-      // Re-enable button in case user closes Paddle without paying
       btn.disabled = false;
       const labels = { ru: 'Перейти к оплате · 6 000 ₽', ils: 'לתשלום · ₪240', international: 'Proceed to payment · $80 USD' };
       btn.textContent = labels[payMethod];

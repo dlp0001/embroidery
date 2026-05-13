@@ -26,7 +26,7 @@ module.exports = async function handler(req, res) {
       // Paddle checkout completed — find existing row and update transaction_id
       const response = await sheets.spreadsheets.values.get({
         spreadsheetId: SHEET_ID,
-        range: 'A:G',
+        range: 'A:I',
       });
       const rows = response.data.values || [];
       let rowIndex = -1;
@@ -50,7 +50,7 @@ module.exports = async function handler(req, res) {
       // (for 'ru', row is created by create-payment-ru.js with payment_id)
       await sheets.spreadsheets.values.append({
         spreadsheetId: SHEET_ID,
-        range: 'A:G',
+        range: 'A:I',
         valueInputOption: 'USER_ENTERED',
         requestBody: {
           values: [[
@@ -63,6 +63,8 @@ module.exports = async function handler(req, res) {
               : 'Paddle (International · $)',
             'ожидает оплаты',
             '',
+            paymentMethod === 'ils' ? '240' : '80',
+            paymentMethod === 'ils' ? 'ILS' : 'USD',
           ]],
         },
       });
