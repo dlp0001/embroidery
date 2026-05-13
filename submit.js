@@ -29,7 +29,6 @@ module.exports = async function handler(req, res) {
         range: 'A:G',
       });
       const rows = response.data.values || [];
-      // Find the most recent row with this email that has no transaction_id yet
       let rowIndex = -1;
       for (let i = rows.length - 1; i >= 1; i--) {
         if (rows[i][2]?.trim().toLowerCase() === email.trim().toLowerCase() && !rows[i][6]) {
@@ -46,8 +45,9 @@ module.exports = async function handler(req, res) {
           requestBody: { values: [[transactionId]] },
         });
       }
-    } else {
-      // Initial form submission — create new row
+    } else if (paymentMethod !== 'ru') {
+      // Initial form submission for Paddle — create new row
+      // (for 'ru', row is created by create-payment-ru.js with payment_id)
       await sheets.spreadsheets.values.append({
         spreadsheetId: SHEET_ID,
         range: 'A:G',
@@ -58,13 +58,11 @@ module.exports = async function handler(req, res) {
             name,
             email,
             telegram,
-            paymentMethod === 'ru'
-              ? 'ЮKassa (Россия)'
-              : paymentMethod === 'ils'
+            paymentMethod === 'ils'
               ? 'Paddle (Израиль · ₪)'
               : 'Paddle (International · $)',
             'ожидает оплаты',
-            '', // transaction_id placeholder
+            '',
           ]],
         },
       });
