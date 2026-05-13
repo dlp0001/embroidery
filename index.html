@@ -376,7 +376,31 @@
 </footer>
 
 <script>
-Paddle.Initialize({ token: 'live_75ba2553f1232e36cc5897322da' });
+Paddle.Initialize({
+  token: 'live_75ba2553f1232e36cc5897322da',
+  eventCallback: async function(event) {
+    console.log('paddle event:', event.name);
+    if (event.name === 'checkout.completed') {
+      const transactionId = event.data?.transaction_id;
+      const checkoutData = event.data;
+      if (transactionId) {
+        await fetch('/api/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: checkoutData?.custom_data?.name || '',
+            email: checkoutData?.customer?.email || checkoutData?.custom_data?.email || '',
+            telegram: checkoutData?.custom_data?.telegram || '',
+            paymentMethod: 'paddle',
+            transactionId,
+          }),
+        });
+      }
+      document.getElementById('formFields').classList.add('hide');
+      document.getElementById('successMsg').classList.add('show');
+    }
+  }
+});
 
 document.querySelectorAll('input[name="payment"]').forEach(radio => {
   radio.addEventListener('change', () => {
@@ -436,26 +460,6 @@ async function handleSubmit() {
         customer: { email },
         customData: { name, email, telegram: tg },
         settings: { displayMode: 'overlay', theme: 'light', locale: 'en' },
-        eventCallback: async function(event) {
-          console.log('paddle event:', event.name, event.data);
-          if (event.name === 'checkout.completed') {
-            const transactionId = event.data?.transaction_id;
-            // Save transaction_id to Google Sheets
-            if (transactionId) {
-              await fetch('/api/submit', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  name, email, telegram: tg,
-                  paymentMethod: payMethod,
-                  transactionId,
-                }),
-              });
-            }
-            document.getElementById('formFields').classList.add('hide');
-            document.getElementById('successMsg').classList.add('show');
-          }
-        },
       });
     }
 
@@ -485,6 +489,15 @@ const obs = new IntersectionObserver(entries => {
   });
 }, { threshold: 0.1 });
 document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
+
+// Show success message if redirected after payment
+if (window.location.search.includes('success=true')) {
+  document.getElementById('register').scrollIntoView({ behavior: 'smooth' });
+  setTimeout(() => {
+    document.getElementById('formFields').classList.add('hide');
+    document.getElementById('successMsg').classList.add('show');
+  }, 800);
+}
 </script>
 </body>
 </html>
