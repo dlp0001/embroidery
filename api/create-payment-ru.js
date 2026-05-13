@@ -30,7 +30,7 @@ module.exports = async function handler(req, res) {
         },
         confirmation: {
           type: 'redirect',
-          return_url: 'https://embroidery-course.vercel.app/?success=true',
+          return_url: 'https://re-create.art/?success=true',
         },
         capture: true,
         description: 'Онлайн курс по вышивке «Как вышить в современном мире»',
