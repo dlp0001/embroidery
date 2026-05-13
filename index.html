@@ -104,7 +104,7 @@
   .payment-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 28px; }
   .payment-option { position: relative; }
   .payment-option input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
-  .payment-label { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 18px 12px; border: 1.5px solid rgba(200,168,112,0.3); cursor: pointer; transition: all 0.2s; text-align: center; }
+  .payment-label { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 18px 12px; border: 1.5px solid rgba(200,168,112,0.3); cursor: pointer; transition: all 0.2s; text-align: center; min-height: 90px; }
   .payment-label:hover { border-color: var(--rose-light); }
   .payment-option input:checked + .payment-label { border-color: var(--rose); background: rgba(233,30,140,0.04); }
   .payment-flag { font-size: 24px; }
@@ -168,7 +168,7 @@
 
 <!-- NAV -->
 <nav>
-  <div class="nav-logo">Re.Create.Art · <span>Варя Перлина</span></div>
+  <a href="/" style="text-decoration:none;"><div class="nav-logo">Re.Create.Art · <span>Варя Перлина</span></div></a>
   <a href="#register" class="nav-cta">Присоединиться</a>
 </nav>
 
@@ -187,8 +187,8 @@
     <div class="hero-actions fade-up">
       <a href="#register" class="btn-primary">Присоединиться</a>
       <div class="hero-price-block">
-        <div class="price-main">₪240 / $80 / 6 000 ₽</div>
-        <div class="price-old">₪300 / $100 / 8 000 ₽</div>
+        <div class="price-main">6 000 ₽ / ₪240 / $80</div>
+        <div class="price-old">7 500 ₽ / ₪300 / $100</div>
         <div class="price-note">Ранняя цена — для первых 20 регистраций</div>
       </div>
     </div>
