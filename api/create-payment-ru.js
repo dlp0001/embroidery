@@ -1,7 +1,17 @@
 const { v4: uuidv4 } = require('uuid');
+const { google } = require('googleapis');
 
 const YOOKASSA_SHOP_ID = '1351165';
 const YOOKASSA_API_KEY = process.env.YOOKASSA_API_KEY;
+const SHEET_ID = process.env.GOOGLE_SHEET_ID;
+
+async function getSheet() {
+  const auth = new google.auth.GoogleAuth({
+    credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT),
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  });
+  return google.sheets({ version: 'v4', auth });
+}
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -24,10 +34,7 @@ module.exports = async function handler(req, res) {
         'Idempotence-Key': idempotenceKey,
       },
       body: JSON.stringify({
-        amount: {
-          value: '100.00',
-          currency: 'RUB',
-        },
+        amount: { value: '100.00', currency: 'RUB' },
         confirmation: {
           type: 'redirect',
           return_url: 'https://re-create.art/?success=true',
@@ -35,28 +42,17 @@ module.exports = async function handler(req, res) {
         capture: true,
         description: 'Онлайн курс по вышивке «Как вышить в современном мире»',
         receipt: {
-          customer: {
-            email,
-          },
-          items: [
-            {
-              description: 'Онлайн курс по вышивке «Как вышить в современном мире»',
-              quantity: '1.00',
-              amount: {
-                value: '100.00',
-                currency: 'RUB',
-              },
-              vat_code: 1,
-              payment_mode: 'full_payment',
-              payment_subject: 'service',
-            },
-          ],
+          customer: { email },
+          items: [{
+            description: 'Онлайн курс по вышивке «Как вышить в современном мире»',
+            quantity: '1.00',
+            amount: { value: '100.00', currency: 'RUB' },
+            vat_code: 1,
+            payment_mode: 'full_payment',
+            payment_subject: 'service',
+          }],
         },
-        metadata: {
-          email,
-          name,
-          telegram,
-        },
+        metadata: { email, name, telegram },
       }),
     });
 
@@ -68,15 +64,10 @@ module.exports = async function handler(req, res) {
       return res.status(500).json({ error: 'Payment creation failed' });
     }
 
-    // Save to Google Sheets with payment_id
-    const { google } = require('googleapis');
-    const auth = new google.auth.GoogleAuth({
-      credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT),
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    });
-    const sheets = google.sheets({ version: 'v4', auth });
+    // Save to Sheets WITH payment_id in column G
+    const sheets = await getSheet();
     await sheets.spreadsheets.values.append({
-      spreadsheetId: process.env.GOOGLE_SHEET_ID,
+      spreadsheetId: SHEET_ID,
       range: 'A:G',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
@@ -91,6 +82,8 @@ module.exports = async function handler(req, res) {
         ]],
       },
     });
+
+    console.log('saved to sheets with payment_id:', payment.id);
 
     return res.status(200).json({
       success: true,
