@@ -34,7 +34,7 @@ module.exports = async function handler(req, res) {
         'Idempotence-Key': idempotenceKey,
       },
       body: JSON.stringify({
-        amount: { value: '100.00', currency: 'RUB' },
+        amount: { value: '6000.00', currency: 'RUB' },
         confirmation: {
           type: 'redirect',
           return_url: 'https://re-create.art/?success=true',
@@ -46,7 +46,7 @@ module.exports = async function handler(req, res) {
           items: [{
             description: 'Онлайн курс по вышивке «Как вышить в современном мире»',
             quantity: '1.00',
-            amount: { value: '100.00', currency: 'RUB' },
+            amount: { value: '6000.00', currency: 'RUB' },
             vat_code: 1,
             payment_mode: 'full_payment',
             payment_subject: 'service',
