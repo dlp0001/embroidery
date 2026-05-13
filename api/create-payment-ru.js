@@ -68,7 +68,7 @@ module.exports = async function handler(req, res) {
     const sheets = await getSheet();
     await sheets.spreadsheets.values.append({
       spreadsheetId: SHEET_ID,
-      range: 'A:G',
+      range: 'A:I',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [[
@@ -79,6 +79,8 @@ module.exports = async function handler(req, res) {
           'ЮKassa (Россия)',
           'ожидает оплаты',
           payment.id,
+          '6000',
+          'RUB',
         ]],
       },
     });
