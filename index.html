@@ -547,6 +547,9 @@ document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
 
 // Show success message if redirected after payment
 if (window.location.search.includes('success=true')) {
+  // Clean up URL
+  window.history.replaceState({}, '', '/');
+
   const paymentId = localStorage.getItem('ru_payment_id');
 
   document.getElementById('register').scrollIntoView({ behavior: 'smooth' });
