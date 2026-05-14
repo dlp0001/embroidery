@@ -2,6 +2,7 @@ const { google } = require('googleapis');
 
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const PADDLE_API_KEY = process.env.PADDLE_API_KEY;
 const FROM_EMAIL = 'info@re-create.art';
 
 async function getSheet() {
@@ -12,11 +13,27 @@ async function getSheet() {
   return google.sheets({ version: 'v4', auth });
 }
 
+// Verify transaction directly with Paddle API
+async function verifyTransaction(transactionId) {
+  const r = await fetch(`https://api.paddle.com/transactions/${transactionId}`, {
+    headers: {
+      'Authorization': `Bearer ${PADDLE_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+  });
+  if (!r.ok) {
+    console.error('Paddle API error:', r.status);
+    return null;
+  }
+  const data = await r.json();
+  return data.data;
+}
+
 async function updateSheet(transactionId) {
   const sheets = await getSheet();
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_ID,
-    range: 'A:G',
+    range: 'A:O',
   });
   const rows = response.data.values || [];
   console.log('looking for transaction_id:', transactionId);
@@ -92,23 +109,42 @@ module.exports = async function handler(req, res) {
 
   const event = req.body;
   console.log('paddle event_type:', event.event_type);
-  console.log('paddle data:', JSON.stringify(event.data));
 
   if (event.event_type !== 'transaction.completed') {
     return res.status(200).json({ received: true });
   }
 
   const transactionId = event.data?.id;
-  const email = event.data?.custom_data?.email;
+  const emailFromWebhook = event.data?.custom_data?.email;
   console.log('transaction_id:', transactionId);
-  console.log('email from custom_data:', email);
 
-  if (!email) return res.status(200).json({ received: true });
+  if (!transactionId) return res.status(200).json({ received: true });
 
   try {
-    if (transactionId) await updateSheet(transactionId);
+    // Verify transaction directly with Paddle API
+    const transaction = await verifyTransaction(transactionId);
+
+    if (!transaction) {
+      console.error('Could not verify transaction:', transactionId);
+      return res.status(401).json({ error: 'Transaction verification failed' });
+    }
+
+    if (transaction.status !== 'completed') {
+      console.log('Transaction not completed:', transaction.status);
+      return res.status(200).json({ received: true });
+    }
+
+    console.log('Transaction verified:', transaction.id, transaction.status);
+
+    const email = transaction.custom_data?.email || emailFromWebhook;
+    console.log('email:', email);
+
+    if (!email) return res.status(200).json({ received: true });
+
+    await updateSheet(transactionId);
     await sendEmail(email);
     return res.status(200).json({ success: true });
+
   } catch (err) {
     console.error('paddle webhook error:', err);
     return res.status(500).json({ error: 'Server error' });
