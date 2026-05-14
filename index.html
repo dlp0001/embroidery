@@ -542,7 +542,14 @@ async function handleSubmit() {
         items: [{ priceId, quantity: 1 }],
         customer: { email },
         customData: { name, email, telegram: tg },
-        settings: { displayMode: 'overlay', theme: 'light', locale: 'en' },
+        settings: {
+          displayMode: 'overlay',
+          theme: 'light',
+          locale: 'en',
+          frameTarget: 'self',
+          frameInitialHeight: 450,
+          frameStyle: 'width: 100%; min-width: 312px; background-color: transparent; border: none;',
+        },
       });
     }
 
