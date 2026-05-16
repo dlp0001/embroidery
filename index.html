@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Варя Перлина · Онлайн мини-курс по вышивке</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="shortcut icon" href="favicon.svg">
@@ -142,12 +142,6 @@
   /* TOAST */
   .toast { position: fixed; top: 24px; right: 24px; background: var(--charcoal); color: var(--cream); padding: 14px 22px; font-size: 14px; z-index: 9999; transform: translateY(-80px); opacity: 0; transition: all 0.4s; border-left: 3px solid var(--rose); max-width: 300px; }
   .toast.show { transform: translateY(0); opacity: 1; }
-
-  /* Paddle checkout mobile fix */
-  .paddle-frame, iframe[name^="paddle"] {
-    max-width: 100vw !important;
-    width: 100% !important;
-  }
 
   /* ANIMATIONS */
   .fade-up { opacity: 0; transform: translateY(28px); transition: opacity 0.65s ease, transform 0.65s ease; }
@@ -398,16 +392,6 @@
         </div>
         <div class="payment-info active" id="info-ru">
           <p><strong>Оплата для России:</strong> после отправки заявки вы будете автоматически переадресованы на страницу оплаты <strong>ЮKassa</strong> — карты РФ, СБП, ЮMoney.<br>Стоимость: <strong>6 000 ₽</strong><br><span style="font-size:12px">Ранняя цена для первых 20 регистраций</span></p>
-          <div style="margin-top:16px; display:flex; flex-direction:column; gap:10px;">
-            <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; font-size:13px; color:var(--warm-gray); line-height:1.5;">
-              <input type="checkbox" id="consent-data" style="margin-top:2px; accent-color:var(--rose); flex-shrink:0;">
-              <span>Я согласен(на) на <a href="consent-data.html" target="_blank" style="color:var(--rose); text-decoration:none;">обработку персональных данных</a></span>
-            </label>
-            <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; font-size:13px; color:var(--warm-gray); line-height:1.5;">
-              <input type="checkbox" id="consent-marketing" style="margin-top:2px; accent-color:var(--rose); flex-shrink:0;">
-              <span>Согласен(на) получать <a href="consent-marketing.html" target="_blank" style="color:var(--rose); text-decoration:none;">рекламные электронные сообщения</a></span>
-            </label>
-          </div>
         </div>
         <div class="payment-info" id="info-ils">
           <p><strong>תשלום בשקלים:</strong> לאחר שליחת הבקשה, יפתח חלון תשלום מאובטח של <strong>Paddle</strong> — ניתן לשלם בכרטיס אשראי ישראלי.<br>מחיר: <strong>₪240</strong><br><span style="font-size:12px">מחיר מוקדם ל-20 הנרשמים הראשונים</span></p>
@@ -430,9 +414,6 @@
       <div class="footer-link-label">Для покупателей из России</div>
       <div class="footer-links">
         <a href="agreement.html">Пользовательское соглашение</a>
-        <a href="privacy-ru.html">Политика конфиденциальности</a>
-        <a href="consent-data.html">Согласие на обработку данных</a>
-        <a href="consent-marketing.html">Согласие на рассылку</a>
       </div>
     </div>
     <div class="footer-link-group">
@@ -498,29 +479,13 @@ async function handleSubmit() {
   btn.disabled = true;
   btn.textContent = 'Отправляем...';
 
-  if (payMethod === 'ru') {
-    const consentData = document.getElementById('consent-data')?.checked;
-    const consentMarketing = document.getElementById('consent-marketing')?.checked;
-    if (!consentData || !consentMarketing) {
-      showToast('Пожалуйста, отметьте оба согласия для продолжения');
-      btn.disabled = false;
-      btn.textContent = 'Перейти к оплате · 6 000 ₽';
-      return;
-    }
-  }
-
   try {
     if (payMethod === 'ru') {
       // For Russia: create-payment-ru.js handles Sheets directly, skip submit.js
       const payRes = await fetch('/api/create-payment-ru', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name, email, telegram: tg,
-          consentData: document.getElementById('consent-data').checked,
-          consentMarketing: document.getElementById('consent-marketing').checked,
-          userAgent: navigator.userAgent,
-        }),
+        body: JSON.stringify({ name, email, telegram: tg }),
       });
       const payData = await payRes.json();
       if (!payData.paymentUrl) throw new Error('No payment URL');
@@ -528,7 +493,7 @@ async function handleSubmit() {
       localStorage.setItem('ru_payment_email', email);
       window.location.href = payData.paymentUrl;
     } else {
-      // For Paddle: call submit.js to create row in Sheets
+      // For Paddle: save to Sheets but show stub message (Paddle pending verification)
       const res = await fetch('/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -536,25 +501,10 @@ async function handleSubmit() {
       });
       if (!res.ok) throw new Error('Server error');
 
-      const priceId = payMethod === 'ils'
-        ? 'pri_01krc27y0y0cy9mfq6rspjn9pq'
-        : 'pri_01kr0pd6xaf86k4e0a37hjce1r';
-
-      btn.disabled = false;
-      const labels = { ru: 'Перейти к оплате · 6 000 ₽', ils: 'לתשלום · ₪240', international: 'Proceed to payment · $80 USD' };
-      btn.textContent = labels[payMethod];
-
-      Paddle.Checkout.open({
-        items: [{ priceId, quantity: 1 }],
-        customer: { email },
-        customData: { name, email, telegram: tg },
-        settings: {
-          displayMode: 'overlay',
-          theme: 'light',
-          locale: 'en',
-          allowLogout: false,
-        },
-      });
+      document.getElementById('formFields').classList.add('hide');
+      document.getElementById('successMsg').classList.add('show');
+      document.querySelector('.success-title').textContent = 'Заявка принята!';
+      document.querySelector('.success-desc').innerHTML = 'Ваша заявка принята.<br>Дождитесь ссылки на оплату — мы свяжемся с вами в ближайшее время.';
     }
 
   } catch (err) {
