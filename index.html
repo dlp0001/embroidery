@@ -481,13 +481,29 @@ async function handleSubmit() {
   btn.disabled = true;
   btn.textContent = 'Отправляем...';
 
+  if (payMethod === 'ru') {
+    const consentData = document.getElementById('consent-data')?.checked;
+    const consentMarketing = document.getElementById('consent-marketing')?.checked;
+    if (!consentData || !consentMarketing) {
+      showToast('Пожалуйста, отметьте оба согласия для продолжения');
+      btn.disabled = false;
+      btn.textContent = 'Перейти к оплате · 6 000 ₽';
+      return;
+    }
+  }
+
   try {
     if (payMethod === 'ru') {
       // For Russia: create-payment-ru.js handles Sheets directly, skip submit.js
       const payRes = await fetch('/api/create-payment-ru', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, telegram: tg }),
+        body: JSON.stringify({
+          name, email, telegram: tg,
+          consentData: document.getElementById('consent-data').checked,
+          consentMarketing: document.getElementById('consent-marketing').checked,
+          userAgent: navigator.userAgent,
+        }),
       });
       const payData = await payRes.json();
       if (!payData.paymentUrl) throw new Error('No payment URL');
