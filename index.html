@@ -201,8 +201,8 @@
     <div class="hero-actions fade-up">
       <a href="#register" class="btn-primary">Присоединиться</a>
       <div class="hero-price-block">
-        <div class="price-main">6 000 ₽ / ₪240 / $80</div>
-        <div class="price-old">7 500 ₽ / ₪300 / $100</div>
+        <div class="price-main">₪240 / $80</div>
+        <div class="price-old">₪300 / $100</div>
         <div class="price-note">Ранняя цена — для первых 20 регистраций</div>
       </div>
     </div>
@@ -491,7 +491,7 @@ async function handleSubmit() {
     console.error(err);
     showToast('Ошибка отправки. Попробуйте ещё раз или напишите нам.');
     btn.disabled = false;
-    const labels = { ru: 'Перейти к оплате · 6 000 ₽', ils: 'לתשלום · ₪240', international: 'Proceed to payment · $80 USD' };
+    const labels = { ils: 'לתשלום · ₪240', international: 'Proceed to payment · $80 USD' };
     btn.textContent = labels[payMethod];
   }
 }
