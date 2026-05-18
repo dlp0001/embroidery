@@ -449,6 +449,7 @@ async function handleSubmit() {
   btn.textContent = 'Отправляем...';
 
   try {
+    // Save to Sheets
     const res = await fetch('/api/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -456,10 +457,26 @@ async function handleSubmit() {
     });
     if (!res.ok) throw new Error('Server error');
 
-    document.getElementById('formFields').classList.add('hide');
-    document.getElementById('successMsg').classList.add('show');
-    document.querySelector('.success-title').textContent = 'Заявка принята!';
-    document.querySelector('.success-desc').innerHTML = 'Ваша заявка принята.<br>Дождитесь ссылки на оплату — мы свяжемся с вами в ближайшее время.';
+    // Open Paddle checkout
+    const priceId = payMethod === 'ils'
+      ? 'pri_01krc27y0y0cy9mfq6rspjn9pq'
+      : 'pri_01kr0pd6xaf86k4e0a37hjce1r';
+
+    btn.disabled = false;
+    const labels = { ils: 'לתשלום · ₪240', international: 'Proceed to payment · $80 USD' };
+    btn.textContent = labels[payMethod];
+
+    Paddle.Checkout.open({
+      items: [{ priceId, quantity: 1 }],
+      customer: { email },
+      customData: { name, email, telegram: tg },
+      settings: {
+        displayMode: 'overlay',
+        theme: 'light',
+        locale: 'en',
+        allowLogout: false,
+      },
+    });
 
   } catch (err) {
     console.error(err);
