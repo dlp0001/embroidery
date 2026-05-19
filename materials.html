@@ -24,7 +24,6 @@
   html { scroll-behavior: smooth; }
   body { background: var(--cream); color: var(--charcoal); font-family: 'Jost', sans-serif; font-weight: 300; line-height: 1.7; overflow-x: hidden; }
 
-  /* NAV */
   nav {
     position: sticky; top: 0; z-index: 100;
     display: flex; justify-content: space-between; align-items: center;
@@ -39,628 +38,545 @@
   .nav-back:hover { color: var(--rose); }
 
   /* HERO */
-  .hero {
-    background: var(--charcoal);
-    padding: 100px 64px 80px;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .hero::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: radial-gradient(ellipse at 70% 50%, rgba(233,30,140,0.12) 0%, transparent 60%),
-                radial-gradient(ellipse at 20% 80%, rgba(122,158,138,0.08) 0%, transparent 50%);
-  }
-
-  .hero-inner {
-    max-width: 1100px;
-    margin: 0 auto;
-    position: relative;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 80px;
-    align-items: center;
-  }
-
-  .hero-label {
-    font-size: 11px;
-    letter-spacing: 0.4em;
-    text-transform: uppercase;
-    color: var(--rose-light);
-    margin-bottom: 20px;
-  }
-
-  .hero-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(40px, 5vw, 64px);
-    font-weight: 300;
-    line-height: 1.1;
-    color: #fff;
-    margin-bottom: 24px;
-  }
-
+  .hero { background: var(--charcoal); padding: 100px 64px 80px; position: relative; overflow: hidden; }
+  .hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 80% 30%, rgba(233,30,140,0.12) 0%, transparent 60%), radial-gradient(ellipse at 10% 80%, rgba(122,158,138,0.08) 0%, transparent 50%); }
+  .hero-inner { max-width: 1100px; margin: 0 auto; position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
+  .hero-label { font-size: 11px; letter-spacing: 0.4em; text-transform: uppercase; color: var(--rose-light); margin-bottom: 20px; }
+  .hero-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(38px, 4.5vw, 60px); font-weight: 300; line-height: 1.1; color: #fff; margin-bottom: 24px; }
   .hero-title em { font-style: italic; color: var(--rose-light); }
+  .hero-desc { font-size: 15px; color: rgba(255,255,255,0.6); line-height: 1.85; max-width: 400px; }
+  .hero-visual { display: flex; justify-content: center; align-items: center; }
+  .hero-hoop { width: 260px; height: 260px; opacity: 0.9; animation: float 5s ease-in-out infinite; }
+  @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 
-  .hero-desc {
-    font-size: 15px;
-    color: rgba(255,255,255,0.6);
-    line-height: 1.85;
-    max-width: 420px;
-  }
-
-  .hero-visual {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-
-  /* Decorative hoop SVG */
-  .hero-hoop {
-    width: 280px;
-    height: 280px;
-    opacity: 0.9;
-    animation: float 5s ease-in-out infinite;
-  }
-
-  @keyframes float {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-12px); }
-  }
-
-  /* INTRO BAR */
-  .intro-bar {
-    background: var(--linen2);
-    padding: 32px 64px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    border-bottom: 1px solid rgba(233,30,140,0.1);
-  }
-
-  .intro-bar-text {
-    font-size: 14px;
-    color: var(--warm-gray);
-    line-height: 1.7;
-    max-width: 900px;
-    margin: 0 auto;
-    text-align: center;
-  }
-
+  /* INTRO */
+  .intro-bar { background: var(--linen2); padding: 28px 64px; border-bottom: 1px solid rgba(233,30,140,0.1); }
+  .intro-bar-text { font-size: 14px; color: var(--warm-gray); line-height: 1.7; max-width: 860px; margin: 0 auto; text-align: center; }
   .intro-bar-text strong { color: var(--charcoal); font-weight: 500; }
 
-  /* SECTIONS */
-  .section {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 80px 64px;
+  /* GLOBAL REGION SWITCHER */
+  .region-switcher {
+    position: sticky; top: 61px; z-index: 90;
+    background: var(--cream);
+    border-bottom: 1px solid rgba(233,30,140,0.12);
+    padding: 0 64px;
+    display: flex;
+    align-items: center;
+    gap: 0;
   }
 
-  .section-label {
-    font-size: 11px;
-    letter-spacing: 0.4em;
-    text-transform: uppercase;
+  .region-label {
+    font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase;
+    color: var(--warm-gray); margin-right: 24px; white-space: nowrap;
+    padding: 14px 0;
+  }
+
+  .region-tabs { display: flex; gap: 0; }
+
+  .region-tab {
+    padding: 14px 28px;
+    font-family: 'Jost', sans-serif;
+    font-size: 13px; font-weight: 300;
+    border: none; background: transparent;
+    cursor: pointer;
     color: var(--warm-gray);
-    margin-bottom: 16px;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
   }
 
-  .section-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(28px, 3.5vw, 44px);
-    font-weight: 300;
-    color: var(--charcoal);
-    margin-bottom: 48px;
-    line-height: 1.15;
+  .region-tab:hover { color: var(--charcoal); }
+
+  .region-tab.active {
+    color: var(--rose);
+    border-bottom-color: var(--rose);
+    font-weight: 500;
   }
 
+  /* CONTENT */
+  .content { max-width: 1100px; margin: 0 auto; padding: 72px 64px; }
+
+  .section-label { font-size: 11px; letter-spacing: 0.4em; text-transform: uppercase; color: var(--warm-gray); margin-bottom: 16px; }
+  .section-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(30px, 3.5vw, 46px); font-weight: 300; color: var(--charcoal); margin-bottom: 48px; line-height: 1.15; }
   .section-title em { font-style: italic; color: var(--rose); }
 
-  /* CATEGORY DIVIDER */
-  .category {
-    margin-bottom: 80px;
-  }
+  /* ITEM */
+  .items-list { display: flex; flex-direction: column; gap: 2px; margin-bottom: 80px; }
 
-  .category-header {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    margin-bottom: 36px;
-    padding-bottom: 20px;
-    border-bottom: 1px solid rgba(233,30,140,0.15);
-  }
+  .item { border: 1px solid rgba(200,168,112,0.2); transition: border-color 0.2s, box-shadow 0.2s; }
+  .item:hover { border-color: var(--rose-light); box-shadow: 0 4px 24px rgba(233,30,140,0.06); }
 
-  .category-num {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 48px;
-    font-weight: 300;
-    color: var(--rose-light);
-    line-height: 1;
-    flex-shrink: 0;
-  }
+  .item-main { display: grid; grid-template-columns: 220px 1fr; }
 
-  .category-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 28px;
-    font-weight: 400;
-    color: var(--charcoal);
-  }
-
-  /* ITEMS GRID */
-  .items-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 24px;
-  }
-
-  .item-card {
-    background: var(--cream);
-    border: 1px solid rgba(200,168,112,0.2);
-    padding: 28px;
-    transition: all 0.3s;
-    position: relative;
-  }
-
-  .item-card:hover {
-    border-color: var(--rose-light);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 32px rgba(233,30,140,0.08);
-  }
-
-  .item-icon {
-    font-size: 32px;
-    margin-bottom: 14px;
-    display: block;
-  }
-
-  .item-name {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 20px;
-    font-weight: 400;
-    color: var(--charcoal);
-    margin-bottom: 8px;
-  }
-
-  .item-desc {
-    font-size: 13.5px;
-    color: var(--warm-gray);
-    line-height: 1.8;
-    margin-bottom: 14px;
-  }
-
-  .item-tip {
-    font-size: 12px;
-    color: var(--rose);
-    letter-spacing: 0.05em;
-    display: flex;
-    align-items: flex-start;
-    gap: 6px;
-    line-height: 1.5;
-  }
-
-  .item-tip::before {
-    content: '✦';
-    flex-shrink: 0;
-    margin-top: 1px;
-  }
-
-  /* FEATURED ITEM (wide) */
-  .item-card.wide {
-    grid-column: span 2;
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: 24px;
-    align-items: start;
-  }
-
-  /* OPTIONAL SECTION */
-  .optional-section {
+  .item-left {
+    padding: 28px 32px;
+    border-right: 1px solid rgba(200,168,112,0.2);
     background: var(--linen);
-    padding: 80px 64px;
+    display: flex; flex-direction: column; justify-content: center; gap: 8px;
   }
 
-  .optional-inner { max-width: 1100px; margin: 0 auto; }
+  .item-icon { font-size: 26px; }
+  .item-name { font-family: 'Cormorant Garamond', serif; font-size: 21px; font-weight: 400; color: var(--charcoal); }
 
-  .optional-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 20px;
+  .item-right { padding: 28px 36px; }
+
+  .item-desc { font-size: 14px; color: var(--warm-gray); line-height: 1.85; }
+
+  /* LINKS TABS per item */
+  .item-links {
+    border-top: 1px solid rgba(200,168,112,0.15);
+    margin-top: 16px;
   }
 
-  .optional-item {
-    background: #fff;
-    border-left: 3px solid var(--gold);
-    padding: 20px 24px;
-    display: flex;
-    gap: 14px;
-    align-items: flex-start;
+  .item-links-panels { padding: 14px 0 4px; }
+
+  .links-panel { display: none; flex-direction: column; gap: 7px; }
+  .links-panel.active { display: flex; }
+
+  .links-panel a {
+    font-size: 13px; color: var(--rose); text-decoration: none;
+    display: flex; align-items: center; gap: 6px;
+    transition: opacity 0.15s;
   }
 
-  .optional-icon { font-size: 24px; flex-shrink: 0; }
-  .optional-name { font-family: 'Cormorant Garamond', serif; font-size: 18px; color: var(--charcoal); margin-bottom: 4px; }
-  .optional-desc { font-size: 13px; color: var(--warm-gray); line-height: 1.6; }
+  .links-panel a:hover { opacity: 0.75; }
+
+  .links-panel a::before { content: '→'; flex-shrink: 0; }
+
+  .links-empty {
+    font-size: 13px; color: var(--warm-gray); font-style: italic;
+  }
+
+  .links-search {
+    font-size: 12px; color: var(--warm-gray); margin-top: 8px;
+    padding: 6px 10px; background: rgba(245,240,250,0.8); 
+    display: inline-block;
+  }
+
+  .links-search strong { color: var(--charcoal); font-weight: 400; }
 
   /* NOTE BOX */
-  .note-section {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 60px 64px;
-  }
-
-  .note-box {
-    background: var(--charcoal);
-    padding: 48px 56px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 48px;
-    align-items: center;
-  }
-
-  .note-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 32px;
-    font-weight: 300;
-    color: #fff;
-    margin-bottom: 16px;
-    line-height: 1.2;
-  }
-
+  .note-box-wrap { background: var(--charcoal); padding: 80px 64px; }
+  .note-box { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+  .note-title { font-family: 'Cormorant Garamond', serif; font-size: 36px; font-weight: 300; color: #fff; margin-bottom: 16px; line-height: 1.2; }
   .note-title em { font-style: italic; color: var(--rose-light); }
-
-  .note-text {
-    font-size: 14px;
-    color: rgba(255,255,255,0.6);
-    line-height: 1.85;
-  }
-
-  .note-list {
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  .note-list li {
-    display: flex;
-    gap: 12px;
-    align-items: flex-start;
-    font-size: 14px;
-    color: rgba(255,255,255,0.7);
-    line-height: 1.6;
-  }
-
-  .note-list li::before {
-    content: '→';
-    color: var(--rose-light);
-    flex-shrink: 0;
-    margin-top: 1px;
-  }
+  .note-text { font-size: 14px; color: rgba(255,255,255,0.6); line-height: 1.85; }
+  .note-list { list-style: none; display: flex; flex-direction: column; gap: 14px; }
+  .note-list li { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; color: rgba(255,255,255,0.7); line-height: 1.6; }
+  .note-list li::before { content: '→'; color: var(--rose-light); flex-shrink: 0; }
 
   /* CTA */
-  .cta-section {
-    background: linear-gradient(135deg, #fce8f0 0%, #f5f0fa 50%, #ede8fa 100%);
-    padding: 80px 64px;
-    text-align: center;
-  }
-
-  .cta-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(28px, 4vw, 44px);
-    font-weight: 300;
-    color: var(--charcoal);
-    margin-bottom: 16px;
-  }
-
+  .cta-section { background: linear-gradient(135deg, #fce8f0 0%, #f5f0fa 50%, #ede8fa 100%); padding: 80px 64px; text-align: center; }
+  .cta-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(28px, 4vw, 44px); font-weight: 300; color: var(--charcoal); margin-bottom: 12px; }
   .cta-sub { font-size: 15px; color: var(--warm-gray); margin-bottom: 36px; }
-
-  .btn-cta {
-    display: inline-block;
-    background: var(--rose);
-    color: #fff;
-    padding: 16px 48px;
-    font-family: 'Jost', sans-serif;
-    font-size: 12px;
-    letter-spacing: 0.25em;
-    text-transform: uppercase;
-    text-decoration: none;
-    transition: background 0.2s;
-  }
-
+  .btn-cta { display: inline-block; background: var(--rose); color: #fff; padding: 16px 48px; font-family: 'Jost', sans-serif; font-size: 12px; letter-spacing: 0.25em; text-transform: uppercase; text-decoration: none; transition: background 0.2s; }
   .btn-cta:hover { background: var(--rose-dark); }
 
-  /* FOOTER */
-  footer {
-    background: #1a1a2e;
-    padding: 40px 64px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 16px;
-  }
-
+  footer { background: #1a1a2e; padding: 40px 64px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
   .footer-logo { font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 300; color: #fff; }
   .footer-copy { font-size: 11px; color: rgba(255,255,255,0.25); }
 
-  /* ANIMATIONS */
   .fade-up { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
   .fade-up.visible { opacity: 1; transform: translateY(0); }
 
   @media (max-width: 860px) {
     nav { padding: 16px 24px; }
-    .hero { padding: 64px 28px 56px; }
+    .hero { padding: 64px 28px; }
     .hero-inner { grid-template-columns: 1fr; gap: 40px; }
     .hero-visual { display: none; }
-    .intro-bar { padding: 24px 28px; }
-    .section, .note-section { padding: 60px 28px; }
-    .optional-section { padding: 60px 28px; }
+    .intro-bar { padding: 20px 28px; }
+    .region-switcher { padding: 0 24px; top: 57px; overflow-x: auto; }
+    .region-label { display: none; }
+    .content { padding: 48px 24px; }
+    .item-main { grid-template-columns: 1fr; }
+    .item-left { border-right: none; border-bottom: 1px solid rgba(200,168,112,0.2); }
+    .note-box-wrap { padding: 60px 28px; }
+    .note-box { grid-template-columns: 1fr; gap: 32px; }
     .cta-section { padding: 60px 28px; }
-    .item-card.wide { grid-column: span 1; grid-template-columns: 1fr; }
-    .note-box { grid-template-columns: 1fr; gap: 28px; padding: 32px 28px; }
     footer { padding: 32px 24px; flex-direction: column; align-items: flex-start; }
   }
 </style>
 </head>
 <body>
 
-<!-- NAV -->
 <nav>
   <a href="index.html" class="nav-logo">Re.Create.Art · <span>Варя Перлина</span></a>
   <a href="index.html" class="nav-back">← На главную</a>
 </nav>
 
-<!-- HERO -->
 <section class="hero">
   <div class="hero-inner">
     <div>
       <div class="hero-label">Курс по вышивке · Подготовка</div>
       <h1 class="hero-title">Всё, что нужно<br>для <em>старта</em></h1>
-      <p class="hero-desc">
-        Список материалов и инструментов, которые понадобятся на курсе. 
-        Здесь только самое необходимое — без лишнего. 
-        Всё можно найти онлайн и заказать заранее.
-      </p>
+      <p class="hero-desc">Список материалов и инструментов для курса — только самое необходимое.</p>
     </div>
     <div class="hero-visual">
-      <svg class="hero-hoop" viewBox="0 0 280 280" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="140" cy="150" r="110" fill="none" stroke="#c8a870" stroke-width="12"/>
-        <circle cx="140" cy="150" r="94" fill="rgba(245,240,250,0.08)"/>
-        <rect x="128" y="28" width="24" height="30" rx="4" fill="#c8a870"/>
-        <rect x="132" y="18" width="16" height="14" rx="3" fill="#b89458"/>
-        <line x1="134" y1="24" x2="146" y2="24" stroke="#9a7840" stroke-width="1.5" stroke-linecap="round"/>
-        <!-- Stitches -->
-        <line x1="90" y1="110" x2="115" y2="135" stroke="#e91e8c" stroke-width="2" stroke-linecap="round"/>
-        <line x1="115" y1="110" x2="90" y2="135" stroke="#e91e8c" stroke-width="2" stroke-linecap="round"/>
-        <line x1="165" y1="110" x2="190" y2="135" stroke="#7a9e8a" stroke-width="2" stroke-linecap="round"/>
-        <line x1="190" y1="110" x2="165" y2="135" stroke="#7a9e8a" stroke-width="2" stroke-linecap="round"/>
-        <line x1="90" y1="165" x2="115" y2="190" stroke="#7a9e8a" stroke-width="2" stroke-linecap="round"/>
-        <line x1="115" y1="165" x2="90" y2="190" stroke="#7a9e8a" stroke-width="2" stroke-linecap="round"/>
-        <line x1="165" y1="165" x2="190" y2="190" stroke="#e91e8c" stroke-width="2" stroke-linecap="round"/>
-        <line x1="190" y1="165" x2="165" y2="190" stroke="#e91e8c" stroke-width="2" stroke-linecap="round"/>
-        <!-- Central flower -->
-        <ellipse cx="140" cy="138" rx="7" ry="12" fill="#f9d0e8" opacity="0.9"/>
-        <ellipse cx="140" cy="162" rx="7" ry="12" fill="#f9d0e8" opacity="0.9"/>
-        <ellipse cx="128" cy="150" rx="12" ry="7" fill="#f9d0e8" opacity="0.9"/>
-        <ellipse cx="152" cy="150" rx="12" ry="7" fill="#f9d0e8" opacity="0.9"/>
-        <circle cx="140" cy="150" r="9" fill="#e91e8c"/>
-        <circle cx="140" cy="150" r="5" fill="#c4107a"/>
-        <!-- Dots -->
-        <circle cx="140" cy="60" r="2.5" fill="#c8a870" opacity="0.5"/>
-        <circle cx="230" cy="150" r="2.5" fill="#c8a870" opacity="0.5"/>
-        <circle cx="140" cy="240" r="2.5" fill="#c8a870" opacity="0.5"/>
-        <circle cx="50" cy="150" r="2.5" fill="#c8a870" opacity="0.5"/>
+      <svg class="hero-hoop" viewBox="0 0 260 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="130" cy="140" r="105" fill="none" stroke="#c8a870" stroke-width="11"/>
+        <circle cx="130" cy="140" r="89" fill="rgba(245,240,250,0.07)"/>
+        <rect x="119" y="23" width="22" height="28" rx="4" fill="#c8a870"/>
+        <rect x="123" y="13" width="14" height="13" rx="3" fill="#b89458"/>
+        <line x1="85" y1="105" x2="108" y2="128" stroke="#e91e8c" stroke-width="2" stroke-linecap="round"/>
+        <line x1="108" y1="105" x2="85" y2="128" stroke="#e91e8c" stroke-width="2" stroke-linecap="round"/>
+        <line x1="152" y1="105" x2="175" y2="128" stroke="#7a9e8a" stroke-width="2" stroke-linecap="round"/>
+        <line x1="175" y1="105" x2="152" y2="128" stroke="#7a9e8a" stroke-width="2" stroke-linecap="round"/>
+        <line x1="85" y1="152" x2="108" y2="175" stroke="#7a9e8a" stroke-width="2" stroke-linecap="round"/>
+        <line x1="108" y1="152" x2="85" y2="175" stroke="#7a9e8a" stroke-width="2" stroke-linecap="round"/>
+        <line x1="152" y1="152" x2="175" y2="175" stroke="#e91e8c" stroke-width="2" stroke-linecap="round"/>
+        <line x1="175" y1="152" x2="152" y2="175" stroke="#e91e8c" stroke-width="2" stroke-linecap="round"/>
+        <ellipse cx="130" cy="128" rx="7" ry="12" fill="#f9d0e8" opacity="0.9"/>
+        <ellipse cx="130" cy="152" rx="7" ry="12" fill="#f9d0e8" opacity="0.9"/>
+        <ellipse cx="118" cy="140" rx="12" ry="7" fill="#f9d0e8" opacity="0.9"/>
+        <ellipse cx="142" cy="140" rx="12" ry="7" fill="#f9d0e8" opacity="0.9"/>
+        <circle cx="130" cy="140" r="9" fill="#e91e8c"/>
+        <circle cx="130" cy="140" r="5" fill="#c4107a"/>
+        <circle cx="130" cy="55" r="2.5" fill="#c8a870" opacity="0.5"/>
+        <circle cx="215" cy="140" r="2.5" fill="#c8a870" opacity="0.5"/>
+        <circle cx="130" cy="225" r="2.5" fill="#c8a870" opacity="0.5"/>
+        <circle cx="45" cy="140" r="2.5" fill="#c8a870" opacity="0.5"/>
       </svg>
     </div>
   </div>
 </section>
 
-<!-- INTRO BAR -->
 <div class="intro-bar">
   <p class="intro-bar-text">
-    <strong>Не торопитесь покупать всё сразу.</strong> 
-    Начните с самого необходимого — пяльцы, ткань, нитки и иглы. 
-    Остальное можно добавлять по мере необходимости. 
-    Ссылки на проверенные магазины — в чате курса после оплаты.
+    <strong>Не торопитесь покупать всё сразу.</strong>
+    Начните с самого необходимого — пяльцы, иголки, нитки и ткань.
   </p>
 </div>
 
-<!-- MATERIALS -->
-<div class="section">
+<!-- GLOBAL REGION SWITCHER -->
+<div class="region-switcher">
+  <span class="region-label">Где купить:</span>
+  <div class="region-tabs">
+    <button class="region-tab active" data-region="ru" onclick="switchRegion('ru')">🇷🇺 Россия</button>
+    <button class="region-tab" data-region="il" onclick="switchRegion('il')">🇮🇱 Израиль</button>
+    <button class="region-tab" data-region="world" onclick="switchRegion('world')">🌍 Везде</button>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- ИНСТРУМЕНТЫ -->
   <div class="section-label fade-up">Раздел первый</div>
+  <h2 class="section-title fade-up">Основные <em>инструменты</em></h2>
+
+  <div class="items-list">
+
+    <div class="item fade-up">
+      <div class="item-main">
+        <div class="item-left">
+          <span class="item-icon">⭕</span>
+          <div class="item-name">Пяльцы</div>
+        </div>
+        <div class="item-right">
+          <p class="item-desc">Лучше всего пяльцы из бука (не бамбука!), размер от 18 до 22 см в диаметре. Для вышивания на рукавах, карманах и детской одежде понадобятся маленькие пяльцы от 7 до 10 см — и они будут скорее всего из бамбука.</p>
+          <div class="item-links">
+            <div class="item-links-panels">
+              <div class="links-panel active" data-region="ru">
+                <a href="https://www.wildberries.ru/catalog/188580342/detail.aspx" target="_blank">Wildberries — пяльцы из бука</a>
+                <a href="https://www.wildberries.ru/catalog/341367743/detail.aspx" target="_blank">Wildberries — пяльцы разных размеров</a>
+                <div class="links-search">🔍 Поисковый запрос: <strong>«пяльцы для вышивания бук»</strong></div>
+              </div>
+              <div class="links-panel" data-region="il">
+                <a href="https://share.temu.com/8lYLuzfBCpB" target="_blank">Temu — embroidery hoops</a>
+                <a href="https://www.amazon.com/OwnMy-Embroidery-Decorative-Display-Ornaments/dp/B0GJBXZK67" target="_blank">Amazon — OwnMy beechwood hoops set</a>
+              </div>
+              <div class="links-panel" data-region="world">
+                <a href="https://www.amazon.com/OwnMy-Embroidery-Decorative-Display-Ornaments/dp/B0GJBXZK67" target="_blank">Amazon — OwnMy beechwood hoops set</a>
+                <div class="links-search">🔍 Search: <strong>"embroidery hoop beech wood 3 to 6 inch"</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="item fade-up">
+      <div class="item-main">
+        <div class="item-left">
+          <span class="item-icon">🪡</span>
+          <div class="item-name">Иголки</div>
+        </div>
+        <div class="item-right">
+          <p class="item-desc">Я использую иголки для слабовидящих, потому что мне так удобнее — их легче вдевать. Можно попробовать и другие иглы с нитковдевателем. Часто иглы для вышивания — это для вышивания крестиком, они толстые и не подходят для вышивания на трикотаже, потому что оставляют дырки.</p>
+          <div class="item-links">
+            <div class="item-links-panels">
+              <div class="links-panel active" data-region="ru">
+                <a href="https://www.wildberries.ru/catalog/363199781/detail.aspx" target="_blank">Wildberries — иголки для слабовидящих</a>
+                <div class="links-search">🔍 Поисковый запрос: <strong>«иголки для слабовидящих самовдеваемые»</strong></div>
+              </div>
+              <div class="links-panel" data-region="il">
+                <a href="https://share.temu.com/95FNdGzn8HB" target="_blank">Temu — self-threading needles</a>
+              </div>
+              <div class="links-panel" data-region="world">
+                <a href="https://www.amazon.com/GarfxG-Self-Threading-Embroidery-Accessories/dp/B0D9NFS4XH" target="_blank">Amazon — self-threading embroidery needles</a>
+                <div class="links-search">🔍 Search: <strong>"self threading needles"</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="item fade-up">
+      <div class="item-main">
+        <div class="item-left">
+          <span class="item-icon">✂️</span>
+          <div class="item-name">Ножницы</div>
+        </div>
+        <div class="item-right">
+          <p class="item-desc">Специальных ножниц не нужно, но хорошие острые ножницы точно понадобятся. Для ниток и выпарывания можно использовать маникюрные ножницы.</p>
+          <div class="item-links">
+            <div class="item-links-panels">
+              <div class="links-panel active" data-region="ru">
+                <a href="https://www.wildberries.ru/catalog/831266880/detail.aspx" target="_blank">Wildberries — ножницы снипперы</a>
+                <div class="links-search">🔍 Поисковый запрос: <strong>«ножницы снипперы»</strong></div>
+              </div>
+              <div class="links-panel" data-region="il">
+                <a href="https://share.temu.com/iI4fxbTjUIB" target="_blank">Temu — thread snips</a>
+              </div>
+              <div class="links-panel" data-region="world">
+                <a href="https://a.co/d/07FS4fWt" target="_blank">Amazon — U-shaped thread snips</a>
+                <div class="links-search">🔍 Search: <strong>"U-Shaped Thread Snips"</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="item fade-up">
+      <div class="item-main">
+        <div class="item-left">
+          <span class="item-icon">🖊️</span>
+          <div class="item-name">Перенос рисунка</div>
+        </div>
+        <div class="item-right">
+          <p class="item-desc">Я часто переношу линером / фломастером / гелевой ручкой, но они не всегда отстирываются. Поэтому можно использовать водорастворимую канву и терморучку, которая исчезает при нагревании.</p>
+          <div class="item-links">
+            <div class="item-links-panels">
+              <div class="links-panel active" data-region="ru">
+                <a href="https://www.wildberries.ru/catalog/210548920/detail.aspx" target="_blank">Wildberries — канва водорастворимая</a>
+                <a href="https://www.wildberries.ru/catalog/198496792/detail.aspx" target="_blank">Wildberries — ручка термоисчезающая</a>
+                <div class="links-search">🔍 Поисковый запрос: <strong>«Канва для вышивания водорастворимая»</strong></div>
+                <div class="links-search">🔍 Поисковый запрос: <strong>«Ручка для ткани термоисчезающая»</strong></div>
+              </div>
+              <div class="links-panel" data-region="il">
+                <a href="https://share.temu.com/JUsrld7FJ8B" target="_blank">Temu — water soluble fabric</a>
+                <a href="https://share.temu.com/XZZvI3DtnYB" target="_blank">Temu — heat erasable pens</a>
+              </div>
+              <div class="links-panel" data-region="world">
+                <a href="https://a.co/d/0hDuozAi" target="_blank">Amazon — water soluble embroidery fabric</a>
+                <a href="https://a.co/d/0bBJg4tt" target="_blank">Amazon — heat erasable pens</a>
+                <div class="links-search">🔍 Search: <strong>"water soluble embroidery fabric"</strong></div>
+                <div class="links-search">🔍 Search: <strong>"heat erasable pens"</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="item fade-up">
+      <div class="item-main">
+        <div class="item-left">
+          <span class="item-icon">🔥</span>
+          <div class="item-name">Утюг</div>
+        </div>
+        <div class="item-right">
+          <p class="item-desc">Любой. Можно ещё использовать дно нагретой сковородки, если нет утюга под рукой.</p>
+          <div class="item-links">
+            <div class="item-links-panels">
+              <div class="links-panel active" data-region="ru"><p class="links-empty">Подойдёт любой домашний утюг</p></div>
+              <div class="links-panel" data-region="il"><p class="links-empty">Подойдёт любой домашний утюг</p></div>
+              <div class="links-panel" data-region="world"><p class="links-empty">Any household iron will work</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="item fade-up">
+      <div class="item-main">
+        <div class="item-left">
+          <span class="item-icon">💍</span>
+          <div class="item-name">Наперсток</div>
+        </div>
+        <div class="item-right">
+          <p class="item-desc">Я не пользуюсь, но часто может пригодиться — особенно для плотной и грубой ткани.</p>
+          <div class="item-links">
+            <div class="item-links-panels">
+              <div class="links-panel active" data-region="ru">
+                <a href="https://www.wildberries.ru/catalog/213676257/detail.aspx" target="_blank">Wildberries — наперсток силиконовый</a>
+                <div class="links-search">🔍 Поисковый запрос: <strong>«наперсток для шитья и вязания силиконовый»</strong></div>
+              </div>
+              <div class="links-panel" data-region="il">
+                <a href="https://share.temu.com/m5pAj9VsSDB" target="_blank">Temu — silicone thimble</a>
+              </div>
+              <div class="links-panel" data-region="world">
+                <a href="https://a.co/d/0exc3z03" target="_blank">Amazon — silicone thimble fingertip grips</a>
+                <div class="links-search">🔍 Search: <strong>"silicone thimble fingertip grips"</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- МАТЕРИАЛЫ -->
+  <div class="section-label fade-up">Раздел второй</div>
   <h2 class="section-title fade-up">Основные <em>материалы</em></h2>
 
-  <div class="category fade-up">
-    <div class="category-header">
-      <div class="category-num">01</div>
-      <div class="category-title">Пяльцы</div>
-    </div>
-    <div class="items-grid">
-      <div class="item-card">
-        <span class="item-icon">⭕</span>
-        <div class="item-name">Деревянные пяльцы</div>
-        <p class="item-desc">Классические круглые пяльцы с винтовым зажимом. Лучше взять деревянные — они плотнее держат ткань и приятнее в руке.</p>
-        <div class="item-tip">Диаметр 15–20 см — оптимально для начала</div>
-      </div>
-      <div class="item-card">
-        <span class="item-icon">🔵</span>
-        <div class="item-name">Пяльцы на подставке</div>
-        <p class="item-desc">Необязательно на старте, но очень удобно — обе руки свободны. Можно добавить позже, когда почувствуете что хочется комфорта.</p>
-        <div class="item-tip">Отличный вариант для длительных сессий</div>
-      </div>
-    </div>
-  </div>
+  <div class="items-list">
 
-  <div class="category fade-up">
-    <div class="category-header">
-      <div class="category-num">02</div>
-      <div class="category-title">Ткань</div>
-    </div>
-    <div class="items-grid">
-      <div class="item-card wide">
-        <span class="item-icon" style="font-size:40px; margin-top:4px;">🧶</span>
-        <div>
-          <div class="item-name">Хлопковая ткань (муслин или кружевная бязь)</div>
-          <p class="item-desc">Лучший выбор для начинающих — плотный хлопок молочного или белого цвета. Нитка хорошо ложится, ошибки легко исправлять, ткань не тянется.</p>
-          <div class="item-tip">Минимум 30×30 см на одну работу. Возьмите с запасом.</div>
+    <div class="item fade-up">
+      <div class="item-main">
+        <div class="item-left">
+          <span class="item-icon">🎨</span>
+          <div class="item-name">Нитки</div>
+        </div>
+        <div class="item-right">
+          <p class="item-desc">На самом деле — любые мулине. Есть известные производители типа DMC, но никакого смысла переплачивать нет. На первое время нужен какой-то средний набор с основными цветами. Старайтесь выбирать приятные вам цвета, чтобы они вас радовали — иначе то, что будет получаться, вам не будет нравиться. Но мы поговорим ещё об этом на курсе.</p>
+          <div class="item-links">
+            <div class="item-links-panels">
+              <div class="links-panel active" data-region="ru">
+                <a href="https://www.wildberries.ru/catalog/181359372/detail.aspx" target="_blank">Wildberries — нитки мулине</a>
+                <div class="links-search">🔍 Поисковый запрос: <strong>«нитки мулине»</strong></div>
+              </div>
+              <div class="links-panel" data-region="il">
+                <a href="https://share.temu.com/s0neI63JTGB" target="_blank">Temu — embroidery floss</a>
+              </div>
+              <div class="links-panel" data-region="world">
+                <a href="https://a.co/d/00WLLgEO" target="_blank">Amazon — embroidery floss</a>
+                <div class="links-search">🔍 Search: <strong>"embroidery floss"</strong></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="item-card">
-        <span class="item-icon">🌿</span>
-        <div class="item-name">Лён</div>
-        <p class="item-desc">Красивая фактура, натуральный вид. Немного сложнее в работе чем хлопок, но результат очень живой и органичный.</p>
-        <div class="item-tip">Попробуйте после первых работ на хлопке</div>
-      </div>
     </div>
-  </div>
 
-  <div class="category fade-up">
-    <div class="category-header">
-      <div class="category-num">03</div>
-      <div class="category-title">Нитки</div>
+    <div class="item fade-up">
+      <div class="item-main">
+        <div class="item-left">
+          <span class="item-icon">🧲</span>
+          <div class="item-name">Дублерин</div>
+        </div>
+        <div class="item-right">
+          <p class="item-desc">Понадобится клеевой дублерин — для вышивки на трикотаже: на одежде, на футболках.</p>
+          <div class="item-links">
+            <div class="item-links-panels">
+              <div class="links-panel active" data-region="ru">
+                <a href="#">Aliexpress — клеевой дублерин</a>
+                <a href="#">Леонардо — флизелин клеевой</a>
+              </div>
+              <div class="links-panel" data-region="il">
+                <a href="#">Aliexpress — דובלרין דביק</a>
+              </div>
+              <div class="links-panel" data-region="world">
+                <a href="#">Amazon — fusible interfacing</a>
+                <a href="#">Aliexpress — iron-on interfacing</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="items-grid">
-      <div class="item-card">
-        <span class="item-icon">🎨</span>
-        <div class="item-name">Мулине DMC</div>
-        <p class="item-desc">Стандарт вышивального мира. Шёлковистые, яркие, не линяют. Продаются поштучно — берите цвета которые вас вдохновляют.</p>
-        <div class="item-tip">Начните с 10–15 цветов, которые вам нравятся</div>
-      </div>
-      <div class="item-card">
-        <span class="item-icon">✨</span>
-        <div class="item-name">Мулине Anchor</div>
-        <p class="item-desc">Достойная альтернатива DMC. Чуть другая текстура, богатая палитра. Если не найдёте DMC — смело берите Anchor.</p>
-        <div class="item-tip">Хорошо подходит для насыщенных, плотных работ</div>
-      </div>
-      <div class="item-card">
-        <span class="item-icon">🌙</span>
-        <div class="item-name">Нитки с люрексом</div>
-        <p class="item-desc">Для акцентов и деталей. Немного капризные в работе, но эффект стоит того — добавляют блеск и глубину.</p>
-        <div class="item-tip">Необязательно сразу, добавьте позже для экспериментов</div>
-      </div>
-    </div>
-  </div>
-</div>
 
-<!-- TOOLS -->
-<div style="background: var(--linen); padding: 1px 0;">
-<div class="section">
-  <div class="section-label fade-up">Раздел второй</div>
-  <h2 class="section-title fade-up"><em>Инструменты</em></h2>
+    <div class="item fade-up">
+      <div class="item-main">
+        <div class="item-left">
+          <span class="item-icon">🧶</span>
+          <div class="item-name">На чём вышивать</div>
+        </div>
+        <div class="item-right">
+          <p class="item-desc">Самое простое — вышивать на ткани, которая не тянется. Я использую наволочки (самые простые), скатерть, салфетку, любое полотно, джинсы, рубашки. Важно: если вы хотите вышить на одежде, то она должна нравиться и подходить тому человеку, который будет это носить.</p>
+          <div class="item-links">
+            <div class="item-links-panels">
+              <div class="links-panel active" data-region="ru">
+                <a href="#">IKEA — простые наволочки для вышивки</a>
+                <a href="#">Aliexpress — льняная ткань</a>
+              </div>
+              <div class="links-panel" data-region="il">
+                <a href="#">IKEA IL — ציפיות פשוטות לרקמה</a>
+                <a href="#">Aliexpress — בד פשתן</a>
+              </div>
+              <div class="links-panel" data-region="world">
+                <a href="#">IKEA — plain pillowcases</a>
+                <a href="#">Amazon — linen fabric</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
-  <div class="category fade-up">
-    <div class="category-header">
-      <div class="category-num">04</div>
-      <div class="category-title">Иглы</div>
-    </div>
-    <div class="items-grid">
-      <div class="item-card">
-        <span class="item-icon">🪡</span>
-        <div class="item-name">Иглы для вышивки (embroidery needles)</div>
-        <p class="item-desc">Отличаются от обычных — у них увеличенное ушко для мулине. Продаются наборами разных размеров.</p>
-        <div class="item-tip">Размеры 3–9 — хватит для всех техник на курсе</div>
+    <div class="item fade-up">
+      <div class="item-main">
+        <div class="item-left">
+          <span class="item-icon">📄</span>
+          <div class="item-name">Калька</div>
+        </div>
+        <div class="item-right">
+          <p class="item-desc">Калька, или бумага для выпечки, нужна для приклеивания утюгом дублерина, а также для переноса рисунка на ткань.</p>
+          <div class="item-links">
+            <div class="item-links-panels">
+              <div class="links-panel active" data-region="ru"><p class="links-empty">Любой супермаркет — бумага для выпечки</p></div>
+              <div class="links-panel" data-region="il"><p class="links-empty">כל סופרמרקט — נייר אפייה</p></div>
+              <div class="links-panel" data-region="world"><p class="links-empty">Any supermarket — parchment / baking paper</p></div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div class="item-card">
-        <span class="item-icon">🔮</span>
-        <div class="item-name">Игольница</div>
-        <p class="item-desc">Маленькая, но важная вещь. Иглы не потеряются, всегда под рукой, не поранитесь случайно.</p>
-        <div class="item-tip">Магнитная игольница — особенно удобно</div>
-      </div>
     </div>
-  </div>
 
-  <div class="category fade-up">
-    <div class="category-header">
-      <div class="category-num">05</div>
-      <div class="category-title">Ножницы и прочее</div>
+    <div class="item fade-up">
+      <div class="item-main">
+        <div class="item-left">
+          <span class="item-icon">📋</span>
+          <div class="item-name">Копировальная бумага</div>
+        </div>
+        <div class="item-right">
+          <p class="item-desc">Для переноса рисунка на ткань.</p>
+          <div class="item-links">
+            <div class="item-links-panels">
+              <div class="links-panel active" data-region="ru">
+                <a href="https://www.wildberries.ru/catalog/529113822/detail.aspx" target="_blank">Wildberries — копировальная бумага для ткани</a>
+                <div class="links-search">🔍 Поисковый запрос: <strong>«копировальная бумага для ткани»</strong></div>
+              </div>
+              <div class="links-panel" data-region="il">
+                <a href="https://share.temu.com/C3TZWZM3DFB" target="_blank">Temu — carbon paper for fabric</a>
+              </div>
+              <div class="links-panel" data-region="world">
+                <a href="https://a.co/d/08ZspbSc" target="_blank">Amazon — carbon paper for tracing</a>
+                <div class="links-search">🔍 Search: <strong>"carbon paper for tracing"</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="items-grid">
-      <div class="item-card">
-        <span class="item-icon">✂️</span>
-        <div class="item-name">Маленькие острые ножницы</div>
-        <p class="item-desc">Специальные ножницы для вышивки с тонкими острыми лезвиями. Позволяют обрезать нить точно у ткани, не задевая работу.</p>
-        <div class="item-tip">Это важно! Обычные ножницы не подойдут</div>
-      </div>
-      <div class="item-card">
-        <span class="item-icon">🖊️</span>
-        <div class="item-name">Термоисчезающий маркер</div>
-        <p class="item-desc">Для переноса рисунка на ткань. Исчезает от тепла или воды — не оставляет следов на готовой работе.</p>
-        <div class="item-tip">Проверьте на кусочке ткани перед использованием</div>
-      </div>
-      <div class="item-card">
-        <span class="item-icon">💡</span>
-        <div class="item-name">Хорошее освещение</div>
-        <p class="item-desc">Не инструмент в прямом смысле, но критически важно. Вышивать при плохом свете — быстро устают глаза и теряется точность.</p>
-        <div class="item-tip">Лампа с дневным светом — лучший выбор</div>
-      </div>
-    </div>
-  </div>
-</div>
-</div>
 
-<!-- OPTIONAL -->
-<div class="optional-section">
-  <div class="optional-inner">
-    <div class="section-label fade-up">Необязательно, но приятно</div>
-    <h2 class="section-title fade-up">Для <em>комфорта</em></h2>
-    <div class="optional-grid">
-      <div class="optional-item fade-up">
-        <span class="optional-icon">🧲</span>
-        <div>
-          <div class="optional-name">Органайзер для ниток</div>
-          <p class="optional-desc">Бобины или картонные держатели — нитки не запутаются и всегда под рукой</p>
-        </div>
-      </div>
-      <div class="optional-item fade-up">
-        <span class="optional-icon">📐</span>
-        <div>
-          <div class="optional-name">Копировальная бумага</div>
-          <p class="optional-desc">Для переноса сложных узоров на ткань без маркера</p>
-        </div>
-      </div>
-      <div class="optional-item fade-up">
-        <span class="optional-icon">🔍</span>
-        <div>
-          <div class="optional-name">Увеличительное стекло</div>
-          <p class="optional-desc">Для мелкой работы и схем — глаза устают меньше</p>
-        </div>
-      </div>
-      <div class="optional-item fade-up">
-        <span class="optional-icon">🧴</span>
-        <div>
-          <div class="optional-name">Крахмал или спрей</div>
-          <p class="optional-desc">Для натяжки и фиксации ткани в пяльцах — работа лежит ровнее</p>
-        </div>
-      </div>
-      <div class="optional-item fade-up">
-        <span class="optional-icon">📌</span>
-        <div>
-          <div class="optional-name">Булавки с шарами</div>
-          <p class="optional-desc">Для закрепления ткани и разметки — удобнее обычных булавок</p>
-        </div>
-      </div>
-      <div class="optional-item fade-up">
-        <span class="optional-icon">🖼️</span>
-        <div>
-          <div class="optional-name">Рамки для оформления</div>
-          <p class="optional-desc">Готовую работу красиво оформить прямо в пяльцах или под стекло</p>
-        </div>
-      </div>
-    </div>
   </div>
 </div>
 
 <!-- NOTE BOX -->
-<div class="note-section">
+<div class="note-box-wrap">
   <div class="note-box fade-up">
     <div>
-      <div class="note-title">Где <em>купить</em>?</div>
-      <p class="note-text">После оплаты курса вы получите подробный список ссылок на проверенные магазины — для Израиля, России и международной доставки. Всё уже собрано, не нужно искать самостоятельно.</p>
+      <div class="note-title">Примерные <em>направления</em> поиска</div>
+      <p class="note-text">Если что-то закончилось или не доставляется в ваш регион — можно использовать аналоги. Ищите по поисковым запросам, которые указаны в каждом разделе.</p>
     </div>
     <ul class="note-list">
-      <li>Ссылки на магазины для покупателей из Израиля</li>
-      <li>Варианты с международной доставкой (AliExpress, Amazon)</li>
-      <li>Рекомендации по брендам от Вари лично</li>
-      <li>Примерный бюджет на старт — от 30–50₪</li>
+      <li>Проверенные ссылки для Израиля, России и международной доставки</li>
+      <li>Конкретные товары и бренды от Вари лично</li>
+      <li>Примерный бюджет на старт</li>
+      <li>Всё обновляется перед каждым курсом</li>
     </ul>
   </div>
 </div>
@@ -672,22 +588,33 @@
   <a href="index.html#register" class="btn-cta">Записаться на курс</a>
 </section>
 
-<!-- FOOTER -->
 <footer>
   <div class="footer-logo">Re.Create.Art · Варя Перлина</div>
   <div class="footer-copy">© 2026 Варя Перлина</div>
 </footer>
 
 <script>
+function switchRegion(region) {
+  // Update tabs
+  document.querySelectorAll('.region-tab').forEach(tab => {
+    tab.classList.toggle('active', tab.dataset.region === region);
+  });
+  // Update all link panels
+  document.querySelectorAll('.links-panel').forEach(panel => {
+    panel.classList.toggle('active', panel.dataset.region === region);
+  });
+}
+
+// Scroll animations
 const obs = new IntersectionObserver(entries => {
   entries.forEach((e, i) => {
     if (e.isIntersecting) {
-      e.target.style.transitionDelay = `${i * 0.06}s`;
+      e.target.style.transitionDelay = `${i * 0.05}s`;
       e.target.classList.add('visible');
       obs.unobserve(e.target);
     }
   });
-}, { threshold: 0.1 });
+}, { threshold: 0.08 });
 document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
 </script>
 </body>
