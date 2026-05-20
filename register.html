@@ -7,7 +7,7 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+<script src="https://app.lemonsqueezy.com/js/lemon.js" defer></script>
 <!-- Yandex.Metrika counter -->
 <script type="text/javascript">
     (function(m,e,t,r,i,k,a){
@@ -22,270 +22,72 @@
 <!-- /Yandex.Metrika counter -->
 <style>
   :root {
-    --cream: #ffffff;
-    --linen: #f5f0fa;
-    --rose: #e91e8c;
-    --rose-dark: #c4107a;
-    --rose-light: #f9d0e8;
-    --charcoal: #1a1a2e;
-    --warm-gray: #666666;
+    --cream: #ffffff; --linen: #f5f0fa; --rose: #e91e8c; --rose-dark: #c4107a;
+    --rose-light: #f9d0e8; --charcoal: #1a1a2e; --warm-gray: #666666;
   }
-
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
-  body {
-    background: linear-gradient(135deg, #fce8f0 0%, #f5f0fa 50%, #ede8fa 100%);
-    min-height: 100vh;
-    color: var(--charcoal);
-    font-family: 'Jost', sans-serif;
-    font-weight: 300;
-    line-height: 1.7;
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* NAV */
-  nav {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px 52px;
-    background: rgba(255,255,255,0.85);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(233,30,140,0.12);
-  }
-
+  body { background: linear-gradient(135deg, #fce8f0 0%, #f5f0fa 50%, #ede8fa 100%); min-height: 100vh; color: var(--charcoal); font-family: 'Jost', sans-serif; font-weight: 300; line-height: 1.7; display: flex; flex-direction: column; }
+  nav { display: flex; justify-content: space-between; align-items: center; padding: 20px 52px; background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(233,30,140,0.12); }
   .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 17px; color: var(--charcoal); letter-spacing: 0.06em; text-decoration: none; }
   .nav-logo span { color: var(--rose); }
   .nav-back { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm-gray); text-decoration: none; transition: color 0.2s; }
   .nav-back:hover { color: var(--rose); }
-
-  /* MAIN */
-  .main {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 60px 24px;
-  }
-
-  .wrapper {
-    width: 100%;
-    max-width: 580px;
-  }
-
-  .page-label {
-    font-size: 11px;
-    letter-spacing: 0.4em;
-    text-transform: uppercase;
-    color: var(--warm-gray);
-    text-align: center;
-    margin-bottom: 16px;
-  }
-
-  .page-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(32px, 5vw, 48px);
-    font-weight: 300;
-    color: var(--charcoal);
-    text-align: center;
-    margin-bottom: 8px;
-    line-height: 1.15;
-  }
-
-  .page-sub {
-    font-size: 15px;
-    color: var(--warm-gray);
-    text-align: center;
-    margin-bottom: 40px;
-  }
-
-  /* FORM CARD */
-  .form-card {
-    background: #fff;
-    padding: 52px 48px;
-    box-shadow: 0 8px 48px rgba(30,28,26,0.08);
-  }
-
+  .main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 60px 24px; }
+  .wrapper { width: 100%; max-width: 580px; }
+  .page-label { font-size: 11px; letter-spacing: 0.4em; text-transform: uppercase; color: var(--warm-gray); text-align: center; margin-bottom: 16px; }
+  .page-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(32px, 5vw, 48px); font-weight: 300; color: var(--charcoal); text-align: center; margin-bottom: 8px; line-height: 1.15; }
+  .page-sub { font-size: 15px; color: var(--warm-gray); text-align: center; margin-bottom: 40px; }
+  .form-card { background: #fff; padding: 52px 48px; box-shadow: 0 8px 48px rgba(30,28,26,0.08); }
   .form-group { margin-bottom: 24px; }
-
-  .form-label {
-    display: block;
-    font-size: 11px;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-    color: var(--warm-gray);
-    margin-bottom: 8px;
-  }
-
-  .form-input {
-    width: 100%;
-    padding: 13px 0;
-    border: none;
-    border-bottom: 1.5px solid rgba(180,160,140,0.4);
-    background: transparent;
-    font-family: 'Jost', sans-serif;
-    font-size: 15px;
-    color: var(--charcoal);
-    outline: none;
-    transition: border-color 0.3s;
-  }
-
+  .form-label { display: block; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--warm-gray); margin-bottom: 8px; }
+  .form-input { width: 100%; padding: 13px 0; border: none; border-bottom: 1.5px solid rgba(180,160,140,0.4); background: transparent; font-family: 'Jost', sans-serif; font-size: 15px; color: var(--charcoal); outline: none; transition: border-color 0.3s; }
   .form-input:focus { border-bottom-color: var(--rose); }
   .form-input::placeholder { color: rgba(122,112,104,0.4); }
-
-  /* Payment toggle */
-  .payment-toggle {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 28px;
-  }
-
+  .payment-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 28px; }
   .payment-option { position: relative; }
   .payment-option input[type="radio"] { position: absolute; opacity: 0; width: 0; height: 0; }
-
-  .payment-label {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    padding: 18px 12px;
-    border: 1.5px solid rgba(200,168,112,0.3);
-    cursor: pointer;
-    transition: all 0.2s;
-    text-align: center;
-    min-height: 90px;
-  }
-
+  .payment-label { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 18px 12px; border: 1.5px solid rgba(200,168,112,0.3); cursor: pointer; transition: all 0.2s; text-align: center; min-height: 90px; }
   .payment-label:hover { border-color: var(--rose-light); }
   .payment-option input:checked + .payment-label { border-color: var(--rose); background: rgba(233,30,140,0.04); }
-
   .payment-flag { font-size: 24px; }
   .payment-name { font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--charcoal); font-weight: 500; }
   .payment-sub { font-size: 11px; color: var(--warm-gray); }
-
-  .payment-info {
-    background: var(--linen);
-    border-left: 3px solid var(--rose);
-    padding: 18px 20px;
-    margin-bottom: 28px;
-    display: none;
-    font-size: 14px;
-    color: var(--warm-gray);
-    line-height: 1.75;
-  }
-
+  .payment-info { background: var(--linen); border-left: 3px solid var(--rose); padding: 18px 20px; margin-bottom: 28px; display: none; font-size: 14px; color: var(--warm-gray); line-height: 1.75; }
   .payment-info.active { display: block; }
   .payment-info strong { color: var(--charcoal); font-weight: 500; }
-
-  .btn-submit {
-    width: 100%;
-    padding: 18px;
-    background: var(--rose);
-    color: #fff;
-    border: none;
-    font-family: 'Jost', sans-serif;
-    font-size: 12px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: background 0.3s;
-  }
-
+  .btn-submit { width: 100%; padding: 18px; background: var(--rose); color: #fff; border: none; font-family: 'Jost', sans-serif; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: background 0.3s; }
   .btn-submit:hover { background: var(--rose-dark); }
   .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
-
-  .form-note {
-    text-align: center;
-    font-size: 11px;
-    color: var(--warm-gray);
-    margin-top: 14px;
-    line-height: 1.6;
-  }
-
-  /* Success */
+  .form-note { text-align: center; font-size: 11px; color: var(--warm-gray); margin-top: 14px; line-height: 1.6; }
   .success-msg { display: none; text-align: center; padding: 32px 0; }
   .success-msg.show { display: block; }
   .form-fields.hide { display: none; }
-
-  .success-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 34px;
-    font-weight: 300;
-    color: var(--charcoal);
-    margin-bottom: 12px;
-    margin-top: 20px;
-  }
-
+  .success-title { font-family: 'Cormorant Garamond', serif; font-size: 34px; font-weight: 300; color: var(--charcoal); margin-bottom: 12px; margin-top: 20px; }
   .success-desc { font-size: 15px; color: var(--warm-gray); line-height: 1.7; }
-
-  /* TOAST */
-  .toast {
-    position: fixed;
-    top: 24px; right: 24px;
-    background: var(--charcoal);
-    color: #fff;
-    padding: 14px 22px;
-    font-size: 14px;
-    z-index: 9999;
-    transform: translateY(-80px);
-    opacity: 0;
-    transition: all 0.4s;
-    border-left: 3px solid var(--rose);
-    max-width: 300px;
-  }
-
+  .toast { position: fixed; top: 24px; right: 24px; background: var(--charcoal); color: #fff; padding: 14px 22px; font-size: 14px; z-index: 9999; transform: translateY(-80px); opacity: 0; transition: all 0.4s; border-left: 3px solid var(--rose); max-width: 300px; }
   .toast.show { transform: translateY(0); opacity: 1; }
-
-  /* FOOTER */
-  footer {
-    background: #1a1a2e;
-    padding: 32px 52px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 16px;
-  }
-
+  footer { background: #1a1a2e; padding: 32px 52px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
   .footer-logo { font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 300; color: #fff; }
   .footer-links { display: flex; gap: 24px; flex-wrap: wrap; }
   .footer-links a { font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: rgba(255,255,255,0.35); text-decoration: none; transition: color 0.2s; }
   .footer-links a:hover { color: var(--rose-light); }
   .footer-copy { font-size: 11px; color: rgba(255,255,255,0.2); width: 100%; }
-
-  /* Paddle mobile fix */
-  .paddle-frame, iframe[name^="paddle"] { max-width: 100vw !important; width: 100% !important; }
-
-  @media (max-width: 600px) {
-    nav { padding: 16px 20px; }
-    .form-card { padding: 32px 22px; }
-    footer { padding: 28px 20px; flex-direction: column; align-items: flex-start; }
-  }
+  @media (max-width: 600px) { nav { padding: 16px 20px; } .form-card { padding: 32px 22px; } footer { padding: 28px 20px; flex-direction: column; align-items: flex-start; } }
 </style>
 </head>
 <body>
-
 <div class="toast" id="toast"></div>
-
-<!-- NAV -->
 <nav>
   <a href="index.html" class="nav-logo">Re.Create.Art · <span>Варя Перлина</span></a>
   <a href="index.html" class="nav-back">← На главную</a>
 </nav>
-
-<!-- MAIN -->
 <div class="main">
   <div class="wrapper">
     <div class="page-label">Оформление</div>
     <h1 class="page-title">Присоединиться<br>к курсу</h1>
     <p class="page-sub">Два шага: оставьте контакты и выберите удобный способ оплаты.</p>
-
     <div class="form-card">
-
-      <!-- SUCCESS -->
       <div class="success-msg" id="successMsg">
         <div style="display:flex;justify-content:center;">
           <svg width="160" height="160" viewBox="0 0 680 320" role="img" xmlns="http://www.w3.org/2000/svg">
@@ -318,24 +120,12 @@
               <circle cx="0" cy="0" r="10" fill="#e91e8c"/>
               <circle cx="0" cy="0" r="6" fill="#c4107a"/>
               <circle cx="-2" cy="-2" r="2" fill="#f9d0e8" opacity="0.6"/>
-              <circle cx="0" cy="-90" r="2.5" fill="#c8a870" opacity="0.6"/>
-              <circle cx="64" cy="-64" r="2.5" fill="#c8a870" opacity="0.6"/>
-              <circle cx="90" cy="0" r="2.5" fill="#c8a870" opacity="0.6"/>
-              <circle cx="64" cy="64" r="2.5" fill="#c8a870" opacity="0.6"/>
-              <circle cx="0" cy="90" r="2.5" fill="#c8a870" opacity="0.6"/>
-              <circle cx="-64" cy="64" r="2.5" fill="#c8a870" opacity="0.6"/>
-              <circle cx="-90" cy="0" r="2.5" fill="#c8a870" opacity="0.6"/>
-              <circle cx="-64" cy="-64" r="2.5" fill="#c8a870" opacity="0.6"/>
             </g>
           </svg>
         </div>
-        <div class="success-title">Заявка принята!</div>
-        <p class="success-desc">
-          Ваша заявка принята.<br>Дождитесь ссылки на оплату — мы свяжемся с вами в ближайшее время.
-        </p>
+        <div class="success-title">Оплата прошла!</div>
+        <p class="success-desc">Спасибо! Письмо с доступом к курсу отправлено на вашу почту.</p>
       </div>
-
-      <!-- FORM -->
       <div class="form-fields" id="formFields">
         <div class="form-group">
           <label class="form-label" for="name">Ваше имя</label>
@@ -349,7 +139,6 @@
           <label class="form-label" for="tg">Имя пользователя в Telegram</label>
           <input class="form-input" type="text" id="tg" placeholder="например, @username">
         </div>
-
         <div style="margin-bottom:20px">
           <div class="form-label">Способ оплаты</div>
           <div class="payment-toggle">
@@ -358,7 +147,7 @@
               <label class="payment-label" for="pay-ils">
                 <span class="payment-flag">🇮🇱</span>
                 <span class="payment-name">ישראל</span>
-                <span class="payment-sub">₪240</span>
+                <span class="payment-sub">₪300</span>
               </label>
             </div>
             <div class="payment-option">
@@ -366,28 +155,22 @@
               <label class="payment-label" for="pay-int">
                 <span class="payment-flag">🌍</span>
                 <span class="payment-name">Other</span>
-                <span class="payment-sub">$80</span>
+                <span class="payment-sub">$100</span>
               </label>
             </div>
           </div>
         </div>
-
         <div class="payment-info active" id="info-ils">
-          <p><strong>תשלום בשקלים:</strong> לאחר שליחת הבקשה, יפתח חלון תשלום מאובטח של <strong>Paddle</strong> — ניתן לשלם בכרטיס אשראי ישראלי.<br>מחיר: <strong>₪240</strong><br><span style="font-size:12px">מחיר מוקדם ל-20 הנרשמים הראשונים</span></p>
+          <p><strong>תשלום בשקלים:</strong> לאחר שליחת הבקשה, תועברו לעמוד תשלום מאובטח.<br>מחיר: <strong>₪300</strong></p>
         </div>
         <div class="payment-info" id="info-int">
-          <p><strong>International payment:</strong> after submitting your application, a secure <strong>Paddle</strong> payment window will open — Visa, Mastercard, PayPal and more.<br>Price: <strong>$80 USD</strong><br><span style="font-size:12px">Early bird price for the first 20 registrations</span></p>
+          <p><strong>International payment:</strong> after submitting, you'll be redirected to a secure payment page.<br>Price: <strong>$100 USD</strong></p>
         </div>
-
-        <button class="btn-submit" id="submitBtn" onclick="handleSubmit()">לתשלום · ₪240</button>
-        <p class="form-note">Минимальная цена курса для первых 20 регистраций</p>
+        <button class="btn-submit" id="submitBtn" onclick="handleSubmit()">לתשלום · ₪300</button>
       </div>
-
     </div>
   </div>
 </div>
-
-<!-- FOOTER -->
 <footer>
   <div class="footer-logo">Re.Create.Art · Варя Перлина</div>
   <div class="footer-links">
@@ -397,42 +180,29 @@
   </div>
   <div class="footer-copy">© 2026 Варя Перлина</div>
 </footer>
-
 <script>
-Paddle.Initialize({
-  token: 'live_75ba2553f1232e36cc5897322da',
-  eventCallback: async function(event) {
-    console.log('paddle event:', event.name);
-    if (event.name === 'checkout.completed') {
-      const transactionId = event.data?.transaction_id;
-      const checkoutData = event.data;
-      if (transactionId) {
-        await fetch('/api/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: checkoutData?.custom_data?.name || '',
-            email: checkoutData?.customer?.email || checkoutData?.custom_data?.email || '',
-            telegram: checkoutData?.custom_data?.telegram || '',
-            paymentMethod: 'paddle',
-            transactionId,
-          }),
-        });
-      }
-      document.getElementById('formFields').classList.add('hide');
-      document.getElementById('successMsg').classList.add('show');
-    }
-  }
-});
+// Lemon Squeezy variant IDs
+const VARIANT_ILS = '1071928';
+const VARIANT_USD = '1071928'; // TODO: replace with USD variant when created
+
+const LS_STORE_ID = '377594';
 
 document.querySelectorAll('input[name="payment"]').forEach(radio => {
   radio.addEventListener('change', () => {
     const val = document.querySelector('input[name="payment"]:checked').value;
     document.getElementById('info-ils').classList.toggle('active', val === 'ils');
     document.getElementById('info-int').classList.toggle('active', val === 'international');
-    const labels = { ils: 'לתשלום · ₪240', international: 'Proceed to payment · $80 USD' };
+    const labels = { ils: 'לתשלום · ₪300', international: 'Proceed to payment · $100 USD' };
     document.getElementById('submitBtn').textContent = labels[val];
   });
+});
+
+// Listen for Lemon Squeezy checkout events
+window.addEventListener('message', function(e) {
+  if (e.data && e.data.event === 'Checkout.Success') {
+    document.getElementById('formFields').classList.add('hide');
+    document.getElementById('successMsg').classList.add('show');
+  }
 });
 
 async function handleSubmit() {
@@ -457,32 +227,31 @@ async function handleSubmit() {
     });
     if (!res.ok) throw new Error('Server error');
 
-    // Open Paddle checkout
-    const priceId = payMethod === 'ils'
-      ? 'pri_01krc27y0y0cy9mfq6rspjn9pq'
-      : 'pri_01kr0pd6xaf86k4e0a37hjce1r';
+    // Create Lemon Squeezy checkout via API
+    const variantId = payMethod === 'ils' ? VARIANT_ILS : VARIANT_USD;
+    const checkoutRes = await fetch('/api/create-checkout-ls', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ variantId, email, name, telegram: tg }),
+    });
+    const checkoutData = await checkoutRes.json();
+
+    if (checkoutData.checkoutUrl) {
+      // Open Lemon Squeezy checkout overlay
+      window.LemonSqueezy.Url.Open(checkoutData.checkoutUrl);
+    } else {
+      throw new Error('No checkout URL');
+    }
 
     btn.disabled = false;
-    const labels = { ils: 'לתשלום · ₪240', international: 'Proceed to payment · $80 USD' };
+    const labels = { ils: 'לתשלום · ₪300', international: 'Proceed to payment · $100 USD' };
     btn.textContent = labels[payMethod];
-
-    Paddle.Checkout.open({
-      items: [{ priceId, quantity: 1 }],
-      customer: { email },
-      customData: { name, email, telegram: tg },
-      settings: {
-        displayMode: 'overlay',
-        theme: 'light',
-        locale: 'en',
-        allowLogout: false,
-      },
-    });
 
   } catch (err) {
     console.error(err);
     showToast('Ошибка отправки. Попробуйте ещё раз или напишите нам.');
     btn.disabled = false;
-    const labels = { ils: 'לתשלום · ₪240', international: 'Proceed to payment · $80 USD' };
+    const labels = { ils: 'לתשלום · ₪300', international: 'Proceed to payment · $100 USD' };
     btn.textContent = labels[payMethod];
   }
 }
