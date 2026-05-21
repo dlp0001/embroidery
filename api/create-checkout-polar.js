@@ -3,11 +3,14 @@ const POLAR_ACCESS_TOKEN = process.env.POLAR_ACCESS_TOKEN;
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { productId, email, name, telegram } = req.body;
+  const { productId, email, name, telegram, customerIp } = req.body;
 
   if (!productId || !email) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
+
+  // Get customer IP for currency detection
+  const ipAddress = customerIp || req.headers['x-forwarded-for']?.split(',')[0]?.trim() || '';
 
   try {
     const response = await fetch('https://api.polar.sh/v1/checkouts', {
@@ -20,6 +23,7 @@ module.exports = async function handler(req, res) {
         products: [productId],
         customer_email: email,
         customer_name: name,
+        customer_ip_address: ipAddress,
         success_url: 'https://re-create.art/register?success=true',
         metadata: {
           telegram,
