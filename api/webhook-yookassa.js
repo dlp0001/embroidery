@@ -79,7 +79,7 @@ function emailHtml() {
             <a href="https://t.me/+1MeRoRhGoiI2ODJi" style="color:#e91e8c;font-size:14px;text-decoration:none;">→ Открыть чат</a>
           </div>
         </div>
-        <p style="font-size:15px;color:#444;line-height:1.85;margin:0 0 18px;">Совсем скоро там появится полный список всех материалов и инструментов, которые понадобятся для курса, — и можно будет постепенно собрать всё необходимое к старту.</p>
+        <p style="font-size:15px;color:#444;line-height:1.85;margin:0 0 18px;">Полный список всех материалов и инструментов, которые понадобятся для курса, доступен по ссылке <a href="https://www.re-create.art/materials" style="color:#e91e8c;text-decoration:none;">re-create.art/materials</a> — можно постепенно собрать всё необходимое к старту.</p>
         <p style="font-size:15px;color:#444;line-height:1.85;margin:0 0 32px;">Впереди много красивого, уютного и вдохновляющего — и мне уже не терпится всё это начать вместе ✨</p>
         <div style="border-top:1px solid #f0e0e8;padding-top:24px;">
           <div style="font-size:17px;font-weight:300;color:#1a1a2e;margin-bottom:4px;">Варя Перлина</div>
