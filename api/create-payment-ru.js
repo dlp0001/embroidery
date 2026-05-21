@@ -34,7 +34,7 @@ module.exports = async function handler(req, res) {
         'Idempotence-Key': idempotenceKey,
       },
       body: JSON.stringify({
-        amount: { value: '6000.00', currency: 'RUB' },
+        amount: { value: '7500.00', currency: 'RUB' },
         confirmation: {
           type: 'redirect',
           return_url: 'https://re-create.art/?success=true',
@@ -46,7 +46,7 @@ module.exports = async function handler(req, res) {
           items: [{
             description: 'Онлайн курс по вышивке «Как вышить в современном мире»',
             quantity: '1.00',
-            amount: { value: '6000.00', currency: 'RUB' },
+            amount: { value: '7500.00', currency: 'RUB' },
             vat_code: 1,
             payment_mode: 'full_payment',
             payment_subject: 'service',
@@ -82,7 +82,7 @@ module.exports = async function handler(req, res) {
           'ЮKassa (Россия)',                      // E - Способ оплаты
           'ожидает оплаты',                       // F - Статус
           payment.id,                             // G - Payment ID
-          '6000',                                 // H - Сумма
+          '7500',                                 // H - Сумма
           'RUB',                                  // I - Валюта
           consentData ? 'да' : 'нет',             // J - Согласие на ПД
           '1.0',                                  // K - Версия документа ПД
