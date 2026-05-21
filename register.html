@@ -7,7 +7,6 @@
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="https://app.lemonsqueezy.com/js/lemon.js" defer></script>
 <!-- Yandex.Metrika counter -->
 <script type="text/javascript">
     (function(m,e,t,r,i,k,a){
@@ -59,7 +58,6 @@
   .btn-submit { width: 100%; padding: 18px; background: var(--rose); color: #fff; border: none; font-family: 'Jost', sans-serif; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: background 0.3s; }
   .btn-submit:hover { background: var(--rose-dark); }
   .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
-  .form-note { text-align: center; font-size: 11px; color: var(--warm-gray); margin-top: 14px; line-height: 1.6; }
   .success-msg { display: none; text-align: center; padding: 32px 0; }
   .success-msg.show { display: block; }
   .form-fields.hide { display: none; }
@@ -181,11 +179,9 @@
   <div class="footer-copy">© 2026 Варя Перлина</div>
 </footer>
 <script>
-// Lemon Squeezy variant IDs
-const VARIANT_ILS = '1071928';
-const VARIANT_USD = '1071928'; // TODO: replace with USD variant when created
-
-const LS_STORE_ID = '377594';
+// Polar product IDs
+const PRODUCT_ILS = 'a52165c2-0af5-49b5-ae7a-417465898358';
+const PRODUCT_USD = 'a52165c2-0af5-49b5-ae7a-417465898358'; // TODO: replace with USD product when created
 
 document.querySelectorAll('input[name="payment"]').forEach(radio => {
   radio.addEventListener('change', () => {
@@ -197,13 +193,12 @@ document.querySelectorAll('input[name="payment"]').forEach(radio => {
   });
 });
 
-// Listen for Lemon Squeezy checkout events
-window.addEventListener('message', function(e) {
-  if (e.data && e.data.event === 'Checkout.Success') {
-    document.getElementById('formFields').classList.add('hide');
-    document.getElementById('successMsg').classList.add('show');
-  }
-});
+// Show success if redirected back from Polar
+if (window.location.search.includes('success=true')) {
+  document.getElementById('formFields').classList.add('hide');
+  document.getElementById('successMsg').classList.add('show');
+  window.history.replaceState({}, '', '/register');
+}
 
 async function handleSubmit() {
   const name  = document.getElementById('name').value.trim();
@@ -227,25 +222,21 @@ async function handleSubmit() {
     });
     if (!res.ok) throw new Error('Server error');
 
-    // Create Lemon Squeezy checkout via API
-    const variantId = payMethod === 'ils' ? VARIANT_ILS : VARIANT_USD;
-    const checkoutRes = await fetch('/api/create-checkout-ls', {
+    // Create Polar checkout
+    const productId = payMethod === 'ils' ? PRODUCT_ILS : PRODUCT_USD;
+    const checkoutRes = await fetch('/api/create-checkout-polar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ variantId, email, name, telegram: tg }),
+      body: JSON.stringify({ productId, email, name, telegram: tg }),
     });
     const checkoutData = await checkoutRes.json();
 
     if (checkoutData.checkoutUrl) {
-      // Open Lemon Squeezy checkout overlay
-      window.LemonSqueezy.Url.Open(checkoutData.checkoutUrl);
+      // Redirect to Polar checkout
+      window.location.href = checkoutData.checkoutUrl;
     } else {
       throw new Error('No checkout URL');
     }
-
-    btn.disabled = false;
-    const labels = { ils: 'לתשלום · ₪300', international: 'Proceed to payment · $100 USD' };
-    btn.textContent = labels[payMethod];
 
   } catch (err) {
     console.error(err);
