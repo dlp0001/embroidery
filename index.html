@@ -8,7 +8,6 @@
 <link rel="shortcut icon" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
 
 <style>
   :root {
@@ -202,8 +201,6 @@
       <a href="#register" class="btn-primary">Присоединиться</a>
       <div class="hero-price-block">
         <div class="price-main">₪240 / $80</div>
-        <div class="price-old">₪300 / $100</div>
-        <div class="price-note">Ранняя цена — для первых 20 регистраций</div>
       </div>
     </div>
   </div>
@@ -393,48 +390,20 @@
               </label>
             </div>
           </div>
+        </div>
         <div class="payment-info active" id="info-ils">
-          <p><strong>תשלום בשקלים:</strong> לאחר שליחת הבקשה, יפתח חלון תשלום מאובטח של <strong>Paddle</strong> — ניתן לשלם בכרטיס אשראי ישראלי.<br>מחיר: <strong>₪240</strong><br><span style="font-size:12px">מחיר מוקדם ל-20 הנרשמים הראשונים</span></p>
+          <p><strong>תשלום בשקלים:</strong> לאחר שליחת הבקשה, תועברו לעמוד תשלום מאובטח.<br>מחיר: <strong>₪240</strong></p>
         </div>
         <div class="payment-info" id="info-int">
-          <p><strong>International payment:</strong> after submitting your application, a secure <strong>Paddle</strong> payment window will open — Visa, Mastercard, PayPal and more.<br>Price: <strong>$80 USD</strong><br><span style="font-size:12px">Early bird price for the first 20 registrations</span></p>
+          <p><strong>International payment:</strong> after submitting, you'll be redirected to a secure payment page.<br>Price: <strong>$80 USD</strong></p>
         </div>
         <button class="btn-submit" id="submitBtn" onclick="handleSubmit()">לתשלום · ₪240</button>
-        <p class="form-note">Минимальная цена курса для первых 20 регистраций</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- FOOTER -->
-
 <script>
-Paddle.Initialize({
-  token: 'live_75ba2553f1232e36cc5897322da',
-  eventCallback: async function(event) {
-    console.log('paddle event:', event.name);
-    if (event.name === 'checkout.completed') {
-      const transactionId = event.data?.transaction_id;
-      const checkoutData = event.data;
-      if (transactionId) {
-        await fetch('/api/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: checkoutData?.custom_data?.name || '',
-            email: checkoutData?.customer?.email || checkoutData?.custom_data?.email || '',
-            telegram: checkoutData?.custom_data?.telegram || '',
-            paymentMethod: 'paddle',
-            transactionId,
-          }),
-        });
-      }
-      document.getElementById('formFields').classList.add('hide');
-      document.getElementById('successMsg').classList.add('show');
-    }
-  }
-});
-
 document.querySelectorAll('input[name="payment"]').forEach(radio => {
   radio.addEventListener('change', () => {
     const val = document.querySelector('input[name="payment"]:checked').value;
@@ -459,7 +428,6 @@ async function handleSubmit() {
   btn.textContent = 'Отправляем...';
 
   try {
-    // Save to Sheets and show stub message
     const res = await fetch('/api/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -469,9 +437,8 @@ async function handleSubmit() {
 
     document.getElementById('formFields').classList.add('hide');
     document.getElementById('successMsg').classList.add('show');
-      document.querySelector('.success-title').textContent = 'Заявка принята!';
-      document.querySelector('.success-desc').innerHTML = 'Ваша заявка принята.<br>Дождитесь ссылки на оплату — мы свяжемся с вами в ближайшее время.';
-    }
+    document.querySelector('.success-title').textContent = 'Заявка принята!';
+    document.querySelector('.success-desc').innerHTML = 'Ваша заявка принята.<br>Дождитесь ссылки на оплату — мы свяжемся с вами в ближайшее время.';
 
   } catch (err) {
     console.error(err);
