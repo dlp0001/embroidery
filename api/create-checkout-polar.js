@@ -10,14 +10,14 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const response = await fetch('https://api.polar.sh/v1/checkouts/custom', {
+    const response = await fetch('https://api.polar.sh/v1/checkouts', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${POLAR_ACCESS_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        product_id: productId,
+        products: [productId],
         customer_email: email,
         customer_name: name,
         success_url: 'https://re-create.art/register?success=true',
