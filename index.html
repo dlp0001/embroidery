@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Варя Перлина · Онлайн мини-курс по вышивке</title>
+<title>Варя Перлина · Онлайн-курс по вышивке</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="shortcut icon" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -189,7 +189,7 @@
 <!-- HERO -->
 <section class="hero">
   <div class="hero-left">
-    <div class="hero-pretitle fade-up">Онлайн мини-курс · Старт 2 июня</div>
+    <div class="hero-pretitle fade-up">Онлайн-курс · Видеоуроки</div>
     <h1 class="hero-title fade-up">Как вышить</h1>
     <div class="hero-title-italic fade-up">в современном мире</div>
     <p class="hero-desc fade-up">
@@ -209,7 +209,7 @@
   </div>
   <div class="hero-right">
     <img src="photo2.jpg" alt="Вышивка в пяльцах — работа Вари Перлиной">
-    <div class="hero-badge">Старт 2 июня 2026</div>
+    <div class="hero-badge">Доступ сразу после оплаты</div>
   </div>
 </section>
 
@@ -230,13 +230,13 @@
     </div>
     <div class="program-item fade-up">
       <div class="program-num">03</div>
-      <div class="program-item-title">Регулярные задания и тёплый чат</div>
-      <p class="program-item-desc">Это не просто курс, а пространство, где приятно быть. В чате будем делиться процессом, работами, эмоциями и поддерживать друг друга. Плюс регулярные задания для постановки руки, развития насмотренности и поиска своего стиля.</p>
+      <div class="program-item-title">Практические задания и сообщество</div>
+      <p class="program-item-desc">К каждому уроку прилагаются практические задания для постановки руки и развития насмотренности. Вы также получите доступ к закрытому сообществу, где участники делятся работами и вдохновением.</p>
     </div>
     <div class="program-item fade-up">
       <div class="program-num">04</div>
       <div class="program-item-title">Результат</div>
-      <p class="program-item-desc">За 4 недели у вас останутся не только готовые вышивки, но и ощущение: «я правда это могу». Вы поймёте, какой стиль и формат откликается именно вам, и найдёте внутреннюю опору — продолжать, пробовать новое и замечать красоту вокруг.</p>
+      <p class="program-item-desc">После прохождения курса у вас останутся не только готовые вышивки, но и ощущение: «я правда это могу». Вы поймёте, какой стиль и формат откликается именно вам, и найдёте внутреннюю опору — продолжать, пробовать новое и замечать красоту вокруг.</p>
     </div>
   </div>
 </div>
@@ -250,11 +250,11 @@
       <ul class="inside-list">
         <li class="fade-up">
           <div class="inside-check"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>
-          <div class="inside-list-text"><strong>4 видеоурока по 60–120 минут</strong>Предварительное расписание: 2, 9, 16 и 30 июня, начало в 21:00 (московское время GMT+3)</div>
+          <div class="inside-list-text"><strong>4 видеоурока по 60–120 минут</strong>Записанные уроки в HD-качестве, доступные в любое удобное время</div>
         </li>
         <li class="fade-up">
           <div class="inside-check"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>
-          <div class="inside-list-text"><strong>Тёплый общий чат</strong>где делимся работами, процессом и эмоциями, получаем поддержку и обратную связь</div>
+          <div class="inside-list-text"><strong>Закрытое сообщество участников</strong>где можно делиться работами, вдохновением и получать поддержку</div>
         </li>
         <li class="fade-up">
           <div class="inside-check"><svg viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3"/></svg></div>
@@ -281,13 +281,13 @@
   <div class="req-grid">
     <div class="req-item fade-up">
       <div class="req-icon">🎥</div>
-      <div class="req-title">Доступ к Zoom</div>
-      <p class="req-desc">Чат курса, видеоуроки и обратная связь.</p>
+      <div class="req-title">Устройство для просмотра</div>
+      <p class="req-desc">Компьютер, планшет или телефон для просмотра видеоуроков.</p>
     </div>
     <div class="req-item fade-up">
       <div class="req-icon">✈️</div>
       <div class="req-title">Аккаунт в Telegram</div>
-      <p class="req-desc">Чат потока, обратная связь и материалы.</p>
+      <p class="req-desc">Доступ к закрытому сообществу и дополнительным материалам.</p>
     </div>
     <div class="req-item fade-up">
       <div class="req-icon">🧵</div>
@@ -375,7 +375,7 @@
         </div>
         <div style="margin-bottom:20px">
           <div class="form-label">Способ оплаты</div>
-          <div class="payment-toggle" style="grid-template-columns: 1fr 1fr;">
+          <div class="payment-toggle" id="paymentToggle" style="grid-template-columns: 1fr 1fr;">
             <div class="payment-option">
               <input type="radio" name="payment" id="pay-ils" value="ils" checked>
               <label class="payment-label" for="pay-ils">
@@ -393,7 +393,6 @@
               </label>
             </div>
           </div>
-        </div>
         <div class="payment-info active" id="info-ils">
           <p><strong>תשלום בשקלים:</strong> לאחר שליחת הבקשה, יפתח חלון תשלום מאובטח של <strong>Paddle</strong> — ניתן לשלם בכרטיס אשראי ישראלי.<br>מחיר: <strong>₪240</strong><br><span style="font-size:12px">מחיר מוקדם ל-20 הנרשמים הראשונים</span></p>
         </div>
@@ -460,29 +459,16 @@ async function handleSubmit() {
   btn.textContent = 'Отправляем...';
 
   try {
-    if (payMethod === 'ru') {
-      // For Russia: create-payment-ru.js handles Sheets directly, skip submit.js
-      const payRes = await fetch('/api/create-payment-ru', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, telegram: tg }),
-      });
-      const payData = await payRes.json();
-      if (!payData.paymentUrl) throw new Error('No payment URL');
-      localStorage.setItem('ru_payment_id', payData.paymentId);
-      localStorage.setItem('ru_payment_email', email);
-      window.location.href = payData.paymentUrl;
-    } else {
-      // For Paddle: save to Sheets but show stub message (Paddle pending verification)
-      const res = await fetch('/api/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, telegram: tg, paymentMethod: payMethod }),
-      });
-      if (!res.ok) throw new Error('Server error');
+    // Save to Sheets and show stub message
+    const res = await fetch('/api/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, telegram: tg, paymentMethod: payMethod }),
+    });
+    if (!res.ok) throw new Error('Server error');
 
-      document.getElementById('formFields').classList.add('hide');
-      document.getElementById('successMsg').classList.add('show');
+    document.getElementById('formFields').classList.add('hide');
+    document.getElementById('successMsg').classList.add('show');
       document.querySelector('.success-title').textContent = 'Заявка принята!';
       document.querySelector('.success-desc').innerHTML = 'Ваша заявка принята.<br>Дождитесь ссылки на оплату — мы свяжемся с вами в ближайшее время.';
     }
@@ -513,34 +499,6 @@ const obs = new IntersectionObserver(entries => {
   });
 }, { threshold: 0.1 });
 document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
-
-// Show success message if redirected after payment
-if (window.location.search.includes('success=true')) {
-  // Clean up URL
-  window.history.replaceState({}, '', '/');
-
-  const paymentId = localStorage.getItem('ru_payment_id');
-
-  document.getElementById('register').scrollIntoView({ behavior: 'smooth' });
-
-  if (paymentId) {
-    localStorage.removeItem('ru_payment_id');
-    localStorage.removeItem('ru_payment_email');
-
-    fetch(`/api/check-payment-ru?paymentId=${paymentId}`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.status === 'succeeded') {
-          setTimeout(() => {
-            document.getElementById('formFields').classList.add('hide');
-            document.getElementById('successMsg').classList.add('show');
-          }, 800);
-        }
-        // If not succeeded — show form as usual
-      })
-      .catch(() => {});
-  }
-}
 </script>
 
 <!-- FOOTER -->
@@ -548,16 +506,7 @@ if (window.location.search.includes('success=true')) {
   <div class="footer-logo">Re.Create.Art · Варя Перлина</div>
   <div class="footer-links-wrap">
     <div class="footer-link-group">
-      <div class="footer-link-label">Для покупателей из России</div>
-      <div class="footer-links">
-        <a href="agreement.html">Пользовательское соглашение</a>
-        <a href="privacy-ru.html">Политика конфиденциальности</a>
-        <a href="consent-data.html">Согласие на обработку данных</a>
-        <a href="consent-marketing.html">Согласие на рассылку</a>
-      </div>
-    </div>
-    <div class="footer-link-group">
-      <div class="footer-link-label">International</div>
+      <div class="footer-link-label">Legal</div>
       <div class="footer-links">
         <a href="terms.html">Terms &amp; Conditions</a>
         <a href="refunds.html">Refund Policy</a>
