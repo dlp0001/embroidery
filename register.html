@@ -145,7 +145,7 @@
               <label class="payment-label" for="pay-ils">
                 <span class="payment-flag">🇮🇱</span>
                 <span class="payment-name">ישראל</span>
-                <span class="payment-sub">₪300</span>
+                <span class="payment-sub">₪240</span>
               </label>
             </div>
             <div class="payment-option">
@@ -153,18 +153,18 @@
               <label class="payment-label" for="pay-int">
                 <span class="payment-flag">🌍</span>
                 <span class="payment-name">Other</span>
-                <span class="payment-sub">$100</span>
+                <span class="payment-sub">$80</span>
               </label>
             </div>
           </div>
         </div>
         <div class="payment-info active" id="info-ils">
-          <p><strong>תשלום בשקלים:</strong> לאחר שליחת הבקשה, תועברו לעמוד תשלום מאובטח.<br>מחיר: <strong>₪300</strong></p>
+          <p><strong>תשלום בשקלים:</strong> לאחר שליחת הבקשה, תועברו לעמוד תשלום מאובטח.<br>מחיר: <strong>₪240</strong></p>
         </div>
         <div class="payment-info" id="info-int">
-          <p><strong>International payment:</strong> after submitting, you'll be redirected to a secure payment page.<br>Price: <strong>$100 USD</strong></p>
+          <p><strong>International payment:</strong> after submitting, you'll be redirected to a secure payment page.<br>Price: <strong>$80 USD</strong></p>
         </div>
-        <button class="btn-submit" id="submitBtn" onclick="handleSubmit()">לתשלום · ₪300</button>
+        <button class="btn-submit" id="submitBtn" onclick="handleSubmit()">לתשלום · ₪240</button>
       </div>
     </div>
   </div>
@@ -180,15 +180,15 @@
 </footer>
 <script>
 // Polar product IDs
-const PRODUCT_ILS = 'a52165c2-0af5-49b5-ae7a-417465898358';
-const PRODUCT_USD = 'a52165c2-0af5-49b5-ae7a-417465898358'; // TODO: replace with USD product when created
+const PRODUCT_ILS = '9a062759-d397-4b1a-ba4b-78e667f9e873';
+const PRODUCT_USD = '9a062759-d397-4b1a-ba4b-78e667f9e873'; // TODO: replace with USD product when created
 
 document.querySelectorAll('input[name="payment"]').forEach(radio => {
   radio.addEventListener('change', () => {
     const val = document.querySelector('input[name="payment"]:checked').value;
     document.getElementById('info-ils').classList.toggle('active', val === 'ils');
     document.getElementById('info-int').classList.toggle('active', val === 'international');
-    const labels = { ils: 'לתשלום · ₪300', international: 'Proceed to payment · $100 USD' };
+    const labels = { ils: 'לתשלום · ₪240', international: 'Proceed to payment · $80 USD' };
     document.getElementById('submitBtn').textContent = labels[val];
   });
 });
@@ -242,7 +242,7 @@ async function handleSubmit() {
     console.error(err);
     showToast('Ошибка отправки. Попробуйте ещё раз или напишите нам.');
     btn.disabled = false;
-    const labels = { ils: 'לתשלום · ₪300', international: 'Proceed to payment · $100 USD' };
+    const labels = { ils: 'לתשלום · ₪240', international: 'Proceed to payment · $80 USD' };
     btn.textContent = labels[payMethod];
   }
 }
