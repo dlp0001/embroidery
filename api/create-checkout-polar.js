@@ -24,7 +24,7 @@ module.exports = async function handler(req, res) {
         customer_email: email,
         customer_name: name,
         customer_ip_address: ipAddress,
-        success_url: 'https://re-create.art/register?success=true',
+        success_url: 'https://re-create.art/?success=true',
         metadata: {
           telegram,
           name,
