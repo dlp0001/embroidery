@@ -83,7 +83,7 @@
 <div class="main">
   <div class="wrapper">
     <div class="page-label">Оформление</div>
-    <h1 class="page-title">Присоединиться<br>к курсу</h1>
+    <h1 class="page-title">Присоединиться к курсу<br>по специальной цене</h1>
     <p class="page-sub">Два шага: оставьте контакты и выберите удобный способ оплаты.</p>
     <div class="form-card">
       <div class="success-msg" id="successMsg">
@@ -215,10 +215,12 @@ async function handleSubmit() {
 
   try {
     // Save to Sheets
+    const amounts = { ils: '240', international: '80' };
+    const currencies = { ils: 'ILS', international: 'USD' };
     const res = await fetch('/api/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, email, telegram: tg, paymentMethod: payMethod }),
+      body: JSON.stringify({ name, email, telegram: tg, paymentMethod: payMethod, amount: amounts[payMethod], currency: currencies[payMethod] }),
     });
     if (!res.ok) throw new Error('Server error');
 

@@ -666,10 +666,12 @@ async function handleSubmit() {
       window.location.href = payData.paymentUrl;
     } else {
       // ILS/USD: save to Sheets, create Polar checkout
+      const amounts = { ils: '300', international: '100' };
+      const currencies = { ils: 'ILS', international: 'USD' };
       const res = await fetch('/api/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, telegram: tg, paymentMethod: payMethod }),
+        body: JSON.stringify({ name, email, telegram: tg, paymentMethod: payMethod, amount: amounts[payMethod], currency: currencies[payMethod] }),
       });
       if (!res.ok) throw new Error('Server error');
 
