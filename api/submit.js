@@ -13,10 +13,14 @@ async function getSheet() {
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { name, email, telegram, paymentMethod, transactionId } = req.body;
+  const { name, email, telegram, paymentMethod, transactionId, amount, currency } = req.body;
 
   // Get IP from request headers
   const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress || '';
+
+  // Determine amount and currency - use passed values or defaults
+  const rowAmount = amount || (paymentMethod === 'ils' ? '300' : '100');
+  const rowCurrency = currency || (paymentMethod === 'ils' ? 'ILS' : 'USD');
 
   if (!name || !email || !telegram || !paymentMethod) {
     return res.status(400).json({ error: 'Missing required fields' });
@@ -62,12 +66,12 @@ module.exports = async function handler(req, res) {
             email,                                         // C - Email
             telegram,                                      // D - Telegram
             paymentMethod === 'ils'
-              ? 'Paddle (Израиль · ₪)'
-              : 'Paddle (International · $)',              // E - Способ оплаты
+              ? 'Polar (Израиль · ₪)'
+              : 'Polar (International · $)',              // E - Способ оплаты
             'ожидает оплаты',                              // F - Статус
             '',                                            // G - Payment ID (заполнится позже)
-            paymentMethod === 'ils' ? '240' : '80',        // H - Сумма
-            paymentMethod === 'ils' ? 'ILS' : 'USD',       // I - Валюта
+            rowAmount,                                     // H - Сумма
+            rowCurrency,                                   // I - Валюта
             '',                                            // J - Согласие на ПД
             '',                                            // K - Версия ПД
             '',                                            // L - Согласие на рассылку
