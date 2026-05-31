@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Полезные фразы на иврите · Re.Create.Art</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<!-- Yandex.Metrika counter -->
+<script type="text/javascript">
+    (function(m,e,t,r,i,k,a){
+        m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+        m[i].l=1*new Date();
+        for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+        k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+    })(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=109255577', 'ym');
+    ym(109255577, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/109255577" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+<!-- /Yandex.Metrika counter -->
+<style>
+  :root {
+    --cream: #ffffff;
+    --linen: #f5f0fa;
+    --linen2: #fce8f0;
+    --rose: #e91e8c;
+    --rose-dark: #c4107a;
+    --rose-light: #f9d0e8;
+    --charcoal: #1a1a2e;
+    --warm-gray: #666666;
+    --gold: #c8a870;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { background: var(--cream); color: var(--charcoal); font-family: 'Jost', sans-serif; font-weight: 300; line-height: 1.7; overflow-x: hidden; }
+
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 20px 52px;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(233,30,140,0.12);
+  }
+  .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 17px; color: var(--charcoal); letter-spacing: 0.06em; text-decoration: none; }
+  .nav-logo span { color: var(--rose); }
+  .nav-back { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm-gray); text-decoration: none; transition: color 0.2s; }
+  .nav-back:hover { color: var(--rose); }
+
+  /* HERO */
+  .hero { background: var(--charcoal); padding: 100px 64px 80px; position: relative; overflow: hidden; }
+  .hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 80% 30%, rgba(233,30,140,0.12) 0%, transparent 60%), radial-gradient(ellipse at 10% 80%, rgba(122,158,138,0.08) 0%, transparent 50%); }
+  .hero-inner { max-width: 1100px; margin: 0 auto; position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
+  .hero-label { font-size: 11px; letter-spacing: 0.4em; text-transform: uppercase; color: var(--rose-light); margin-bottom: 20px; }
+  .hero-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(38px, 4.5vw, 60px); font-weight: 300; line-height: 1.1; color: #fff; margin-bottom: 24px; }
+  .hero-title em { font-style: italic; color: var(--rose-light); }
+  .hero-desc { font-size: 15px; color: rgba(255,255,255,0.6); line-height: 1.85; max-width: 420px; }
+  .hero-visual { display: flex; justify-content: center; align-items: center; }
+
+  /* Flag icon */
+  .hero-flag { font-size: 120px; opacity: 0.8; animation: float 5s ease-in-out infinite; }
+  @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
+  /* CONTENT */
+  .content { max-width: 1100px; margin: 0 auto; padding: 72px 64px; }
+
+  .section-label { font-size: 11px; letter-spacing: 0.4em; text-transform: uppercase; color: var(--warm-gray); margin-bottom: 16px; }
+  .section-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(30px, 3.5vw, 46px); font-weight: 300; color: var(--charcoal); margin-bottom: 48px; line-height: 1.15; }
+  .section-title em { font-style: italic; color: var(--rose); }
+
+  /* VOCAB TABLE */
+  .vocab-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 2px;
+    margin-bottom: 64px;
+  }
+
+  .vocab-table th {
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    color: var(--warm-gray);
+    font-weight: 400;
+    padding: 12px 20px;
+    text-align: left;
+    background: var(--linen);
+  }
+
+  .vocab-table th:nth-child(2) { text-align: right; direction: rtl; }
+
+  .vocab-table td {
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(200,168,112,0.15);
+    font-size: 15px;
+    vertical-align: middle;
+    transition: background 0.2s;
+  }
+
+  .vocab-table tr:hover td { background: rgba(245,240,250,0.5); }
+
+  .vocab-table td:first-child {
+    color: var(--charcoal);
+    font-weight: 400;
+  }
+
+  .vocab-table td:nth-child(2) {
+    text-align: right;
+    direction: rtl;
+    font-size: 18px;
+    color: var(--charcoal);
+    font-weight: 400;
+  }
+
+  .vocab-table td:nth-child(3) {
+    color: var(--rose);
+    font-size: 13px;
+    font-style: italic;
+  }
+
+  /* PHRASE CARDS */
+  .phrases-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-bottom: 64px;
+  }
+
+  .phrase-card {
+    border: 1px solid rgba(200,168,112,0.2);
+    padding: 24px 32px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .phrase-card:hover {
+    border-color: var(--rose-light);
+    box-shadow: 0 4px 24px rgba(233,30,140,0.06);
+  }
+
+  .phrase-he {
+    font-size: 20px;
+    direction: rtl;
+    text-align: right;
+    color: var(--charcoal);
+    font-weight: 400;
+    margin-bottom: 8px;
+    line-height: 1.5;
+  }
+
+  .phrase-translit {
+    font-size: 13px;
+    color: var(--rose);
+    font-style: italic;
+    margin-bottom: 6px;
+  }
+
+  .phrase-ru {
+    font-size: 14px;
+    color: var(--warm-gray);
+    line-height: 1.6;
+  }
+
+  /* CATEGORY HEADER */
+  .category-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 28px;
+    margin-top: 56px;
+  }
+
+  .category-header:first-child { margin-top: 0; }
+
+  .category-icon { font-size: 24px; }
+
+  .category-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 26px;
+    font-weight: 400;
+    color: var(--charcoal);
+  }
+
+  .category-line {
+    flex: 1;
+    height: 1px;
+    background: rgba(200,168,112,0.3);
+  }
+
+  /* USEFUL WORDS */
+  .words-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+    margin-bottom: 64px;
+  }
+
+  .word-chip {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    background: var(--linen);
+    border-left: 3px solid var(--gold);
+    transition: border-color 0.2s;
+  }
+
+  .word-chip:hover { border-color: var(--rose); }
+
+  .word-ru {
+    font-size: 13px;
+    color: var(--warm-gray);
+    min-width: 80px;
+  }
+
+  .word-he {
+    font-size: 16px;
+    color: var(--charcoal);
+    font-weight: 400;
+    direction: rtl;
+  }
+
+  .word-translit {
+    font-size: 11px;
+    color: var(--rose);
+    font-style: italic;
+  }
+
+  /* CTA */
+  .cta-section {
+    background: linear-gradient(135deg, #fce8f0 0%, #f5f0fa 50%, #ede8fa 100%);
+    padding: 80px 64px; text-align: center;
+  }
+  .cta-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(28px, 4vw, 44px); font-weight: 300; color: var(--charcoal); margin-bottom: 12px;
+  }
+  .cta-sub { font-size: 15px; color: var(--warm-gray); margin-bottom: 36px; }
+  .btn-cta {
+    display: inline-block; background: var(--rose); color: #fff;
+    padding: 16px 48px; font-family: 'Jost', sans-serif;
+    font-size: 12px; letter-spacing: 0.25em; text-transform: uppercase;
+    text-decoration: none; transition: background 0.2s;
+  }
+  .btn-cta:hover { background: var(--rose-dark); }
+
+  footer { background: #1a1a2e; padding: 40px 64px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+  .footer-logo { font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 300; color: #fff; }
+  .footer-copy { font-size: 11px; color: rgba(255,255,255,0.25); }
+
+  .fade-up { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .fade-up.visible { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 860px) {
+    nav { padding: 16px 24px; }
+    .hero { padding: 64px 28px; }
+    .hero-inner { grid-template-columns: 1fr; gap: 40px; }
+    .hero-visual { display: none; }
+    .content { padding: 48px 24px; }
+    .vocab-table td, .vocab-table th { padding: 10px 12px; }
+    .vocab-table td:nth-child(2) { font-size: 16px; }
+    .phrase-card { padding: 18px 20px; }
+    .words-grid { grid-template-columns: 1fr; }
+    .cta-section { padding: 60px 28px; }
+    footer { padding: 32px 24px; flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="nav-logo">Re.Create.Art · <span>Варя Перлина</span></a>
+  <a href="materials.html" class="nav-back">← Материалы</a>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-inner">
+    <div>
+      <div class="hero-label">Курс по вышивке · Подсказки</div>
+      <h1 class="hero-title">Полезные фразы<br>на <em>иврите</em></h1>
+      <p class="hero-desc">Для тех, кто живёт в Израиле и хочет купить материалы для вышивки в обычном магазине. Словарик, фразы и подсказки — чтобы не растеряться у прилавка.</p>
+    </div>
+    <div class="hero-visual">
+      <div class="hero-flag">🇮🇱</div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- СЛОВАРИК -->
+  <div class="section-label fade-up">Словарик</div>
+  <h2 class="section-title fade-up">Основные <em>слова</em></h2>
+
+  <table class="vocab-table fade-up">
+    <thead>
+      <tr>
+        <th>По-русски</th>
+        <th>עברית</th>
+        <th>Транслитерация</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Вышивать</td><td>לִרְקוֹם</td><td>лирком</td></tr>
+      <tr><td>Вышивка</td><td>רִקְמָה</td><td>рикма</td></tr>
+      <tr><td>Пяльцы</td><td>חִישׁוּק רִקְמָה</td><td>хишук рикма</td></tr>
+      <tr><td>Нитки</td><td>חוּטִים</td><td>хутим</td></tr>
+      <tr><td>Нитки мулине</td><td>חוּטֵי מוּלִינֶה</td><td>хутей мулине</td></tr>
+      <tr><td>Тонкие нитки</td><td>חוּטִים דַּקִּים</td><td>хутим даким</td></tr>
+      <tr><td>Толстые нитки</td><td>חוּטִים עָבִים</td><td>хутим авим</td></tr>
+      <tr><td>Иголка</td><td>מַחַט</td><td>махат</td></tr>
+      <tr><td>Иголка для вышивания</td><td>מַחַט לְרִקְמָה</td><td>махат ле-рикма</td></tr>
+      <tr><td>Иголка потоньше</td><td>מַחַט דַּקָּה יוֹתֵר</td><td>махат дака йотер</td></tr>
+      <tr><td>Дублерин / флизелин</td><td>בַּד חִיזּוּק / פְלִיזֶלִין</td><td>бад хизук / флизелин</td></tr>
+      <tr><td>Приклеить утюгом</td><td>לְהַדְבִּיק בַּמַּגְהֵץ</td><td>леадбик ба-магhец</td></tr>
+      <tr><td>Хлопковое полотно</td><td>בַּד כּוּתְנָה</td><td>бад кутна</td></tr>
+      <tr><td>Более плотный</td><td>צָפוּף יוֹתֵר</td><td>цафуф йотер</td></tr>
+      <tr><td>Менее плотный</td><td>פָּחוֹת צָפוּף</td><td>пахот цафуф</td></tr>
+    </tbody>
+  </table>
+
+  <!-- ФРАЗЫ -->
+  <div class="section-label fade-up">Фразы для магазина</div>
+  <h2 class="section-title fade-up">Что <em>сказать</em> продавцу</h2>
+
+  <!-- Общие вопросы -->
+  <div class="category-header fade-up">
+    <span class="category-icon">💬</span>
+    <span class="category-title">Общие вопросы</span>
+    <span class="category-line"></span>
+  </div>
+  <div class="phrases-grid fade-up">
+    <div class="phrase-card">
+      <div class="phrase-he">שלום, אני מחפשת ציוד לרקמה.</div>
+      <div class="phrase-translit">Шалом, ани мехапесет циуд ле-рикма.</div>
+      <div class="phrase-ru">Здравствуйте, я ищу товары для вышивания.</div>
+    </div>
+    <div class="phrase-card">
+      <div class="phrase-he">איפה יש חומרים לרקמה?</div>
+      <div class="phrase-translit">Эйфо еш хомарим ле-рикма?</div>
+      <div class="phrase-ru">Где находятся материалы для вышивки?</div>
+    </div>
+    <div class="phrase-card">
+      <div class="phrase-he">תוכלו לעזור לי?</div>
+      <div class="phrase-translit">Тухлу лаазор ли?</div>
+      <div class="phrase-ru">Не могли бы вы мне помочь?</div>
+    </div>
+  </div>
+
+  <!-- Ткани -->
+  <div class="category-header fade-up">
+    <span class="category-icon">🧶</span>
+    <span class="category-title">Ткани</span>
+    <span class="category-line"></span>
+  </div>
+  <div class="phrases-grid fade-up">
+    <div class="phrase-card">
+      <div class="phrase-he">אני מחפשת בד לרקמה.</div>
+      <div class="phrase-translit">Ани мехапесет бад ле-рикма.</div>
+      <div class="phrase-ru">Я ищу ткань для вышивания.</div>
+    </div>
+    <div class="phrase-card">
+      <div class="phrase-he">יש לכם בד כותנה?</div>
+      <div class="phrase-translit">Еш лахем бад кутна?</div>
+      <div class="phrase-ru">У вас есть хлопковая ткань?</div>
+    </div>
+    <div class="phrase-card">
+      <div class="phrase-he">אני צריכה בד צפוף יותר.</div>
+      <div class="phrase-translit">Ани цриха бад цафуф йотер.</div>
+      <div class="phrase-ru">Мне нужна более плотная ткань.</div>
+    </div>
+    <div class="phrase-card">
+      <div class="phrase-he">יש משהו פחות צפוף?</div>
+      <div class="phrase-translit">Еш машеху пахот цафуф?</div>
+      <div class="phrase-ru">Есть что-нибудь менее плотное?</div>
+    </div>
+    <div class="phrase-card">
+      <div class="phrase-he">אפשר לראות את הבד הזה?</div>
+      <div class="phrase-translit">Эфшар лирот эт hа-бад hазе?</div>
+      <div class="phrase-ru">Можно посмотреть эту ткань?</div>
+    </div>
+  </div>
+
+  <!-- Нитки -->
+  <div class="category-header fade-up">
+    <span class="category-icon">🧵</span>
+    <span class="category-title">Нитки</span>
+    <span class="category-line"></span>
+  </div>
+  <div class="phrases-grid fade-up">
+    <div class="phrase-card">
+      <div class="phrase-he">אני מחפשת חוטי מולינה.</div>
+      <div class="phrase-translit">Ани мехапесет хутей мулине.</div>
+      <div class="phrase-ru">Я ищу нитки мулине.</div>
+    </div>
+    <div class="phrase-card">
+      <div class="phrase-he">יש לכם את הצבע הזה?</div>
+      <div class="phrase-translit">Еш лахем эт hа-цева hазе?</div>
+      <div class="phrase-ru">У вас есть такой цвет?</div>
+    </div>
+    <div class="phrase-card">
+      <div class="phrase-he">אני צריכה חוטים דקים יותר.</div>
+      <div class="phrase-translit">Ани цриха хутим даким йотер.</div>
+      <div class="phrase-ru">Мне нужны более тонкие нитки.</div>
+    </div>
+    <div class="phrase-card">
+      <div class="phrase-he">אני צריכה חוטים עבים יותר.</div>
+      <div class="phrase-translit">Ани цриха хутим авим йотер.</div>
+      <div class="phrase-ru">Мне нужны более толстые нитки.</div>
+    </div>
+  </div>
+
+  <!-- Иглы и принадлежности -->
+  <div class="category-header fade-up">
+    <span class="category-icon">🪡</span>
+    <span class="category-title">Иглы и принадлежности</span>
+    <span class="category-line"></span>
+  </div>
+  <div class="phrases-grid fade-up">
+    <div class="phrase-card">
+      <div class="phrase-he">אני מחפשת מחט לרקמה.</div>
+      <div class="phrase-translit">Ани мехапесет махат ле-рикма.</div>
+      <div class="phrase-ru">Я ищу иглу для вышивания.</div>
+    </div>
+    <div class="phrase-card">
+      <div class="phrase-he">יש מחט דקה יותר?</div>
+      <div class="phrase-translit">Еш махат дака йотер?</div>
+      <div class="phrase-ru">Есть игла потоньше?</div>
+    </div>
+    <div class="phrase-card">
+      <div class="phrase-he">יש לכם חישוק לרקמה?</div>
+      <div class="phrase-translit">Еш лахем хишук ле-рикма?</div>
+      <div class="phrase-ru">У вас есть пяльцы?</div>
+    </div>
+    <div class="phrase-card">
+      <div class="phrase-he">באיזה גודל יש?</div>
+      <div class="phrase-translit">Бе-эйзе годель еш?</div>
+      <div class="phrase-ru">Какие размеры есть?</div>
+    </div>
+  </div>
+
+  <!-- Флизелин -->
+  <div class="category-header fade-up">
+    <span class="category-icon">🩹</span>
+    <span class="category-title">Флизелин и укрепляющие материалы</span>
+    <span class="category-line"></span>
+  </div>
+  <div class="phrases-grid fade-up">
+    <div class="phrase-card">
+      <div class="phrase-he">אני מחפשת פליזלין.</div>
+      <div class="phrase-translit">Ани мехапесет флизелин.</div>
+      <div class="phrase-ru">Я ищу флизелин.</div>
+    </div>
+    <div class="phrase-card">
+      <div class="phrase-he">זה נדבק במגהץ?</div>
+      <div class="phrase-translit">Зе нидбак бе-магhец?</div>
+      <div class="phrase-ru">Это приклеивается утюгом?</div>
+    </div>
+    <div class="phrase-card">
+      <div class="phrase-he">אני צריכה בד חיזוק.</div>
+      <div class="phrase-translit">Ани цриха бад хизук.</div>
+      <div class="phrase-ru">Мне нужен укрепляющий материал.</div>
+    </div>
+  </div>
+
+  <!-- Покупка ткани -->
+  <div class="category-header fade-up">
+    <span class="category-icon">✂️</span>
+    <span class="category-title">Покупка ткани</span>
+    <span class="category-line"></span>
+  </div>
+  <p class="fade-up" style="font-size:14px; color:var(--warm-gray); margin-bottom:20px;">В Израиле ткань обычно продают метражом:</p>
+  <div class="phrases-grid fade-up">
+    <div class="phrase-card">
+      <div class="phrase-he">כמה זה עולה למטר?</div>
+      <div class="phrase-translit">Кама зе оле ле-метер?</div>
+      <div class="phrase-ru">Сколько это стоит за метр?</div>
+    </div>
+    <div class="phrase-card">
+      <div class="phrase-he">אני רוצה חצי מטר.</div>
+      <div class="phrase-translit">Ани роца хацИ метер.</div>
+      <div class="phrase-ru">Мне нужно полметра.</div>
+    </div>
+    <div class="phrase-card">
+      <div class="phrase-he">אני רוצה מטר אחד.</div>
+      <div class="phrase-translit">Ани роца метер эхад.</div>
+      <div class="phrase-ru">Мне нужен один метр.</div>
+    </div>
+    <div class="phrase-card">
+      <div class="phrase-he">אפשר לחתוך לי?</div>
+      <div class="phrase-translit">Эфшар лахтох ли?</div>
+      <div class="phrase-ru">Можете мне отрезать?</div>
+    </div>
+  </div>
+
+  <!-- Полезные слова -->
+  <div class="section-label fade-up" style="margin-top:56px;">Бонус</div>
+  <h2 class="section-title fade-up">Полезные <em>слова</em></h2>
+
+  <div class="words-grid fade-up">
+    <div class="word-chip">
+      <span class="word-ru">цвет</span>
+      <span class="word-he">צֶבַע</span>
+      <span class="word-translit">цева</span>
+    </div>
+    <div class="word-chip">
+      <span class="word-ru">оттенок</span>
+      <span class="word-he">גּוֹן</span>
+      <span class="word-translit">гон</span>
+    </div>
+    <div class="word-chip">
+      <span class="word-ru">размер</span>
+      <span class="word-he">גּוֹדֶל</span>
+      <span class="word-translit">годель</span>
+    </div>
+    <div class="word-chip">
+      <span class="word-ru">упаковка</span>
+      <span class="word-he">אֲרִיזָה</span>
+      <span class="word-translit">ариза</span>
+    </div>
+    <div class="word-chip">
+      <span class="word-ru">набор для вышивания</span>
+      <span class="word-he">עֶרְכָּה לְרִקְמָה</span>
+      <span class="word-translit">эрка ле-рикма</span>
+    </div>
+    <div class="word-chip">
+      <span class="word-ru">вышивка крестиком</span>
+      <span class="word-he">רִקְמַת צְלָבִים</span>
+      <span class="word-translit">рикмат цлавим</span>
+    </div>
+    <div class="word-chip">
+      <span class="word-ru">шитьё</span>
+      <span class="word-he">תְּפִירָה</span>
+      <span class="word-translit">тфира</span>
+    </div>
+    <div class="word-chip">
+      <span class="word-ru">швейная машина</span>
+      <span class="word-he">מְכוֹנַת תְּפִירָה</span>
+      <span class="word-translit">мехонат тфира</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- CTA -->
+<section class="cta-section">
+  <h2 class="cta-title">Готовы начать?</h2>
+  <p class="cta-sub">Присоединяйтесь к курсу — и мы поможем со всеми вопросами :)</p>
+  <a href="index.html#register" class="btn-cta">Записаться на курс</a>
+</section>
+
+<footer>
+  <div class="footer-logo">Re.Create.Art · Варя Перлина</div>
+  <div class="footer-copy">© 2026 Варя Перлина</div>
+</footer>
+
+<script>
+const obs = new IntersectionObserver(entries => {
+  entries.forEach((e, i) => {
+    if (e.isIntersecting) {
+      e.target.style.transitionDelay = `${i * 0.05}s`;
+      e.target.classList.add('visible');
+      obs.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.08 });
+document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
+</script>
+</body>
+</html>
