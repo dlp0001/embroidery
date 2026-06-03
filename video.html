@@ -173,6 +173,16 @@
     margin-left: auto;
   }
 
+  .video-loading {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    background: #000;
+    color: rgba(255,255,255,0.4);
+    font-size: 14px;
+    letter-spacing: 0.1em;
+  }
+
   /* CTA */
   .cta-section {
     background: linear-gradient(135deg, #fce8f0 0%, #f5f0fa 50%, #ede8fa 100%);
@@ -251,8 +261,8 @@
         <div class="video-date">2 июня 2026</div>
       </div>
     </div>
-    <div class="video-player">
-      <iframe src="https://player.mediadelivery.net/embed/675652/cf9e8d57-1ca3-4d42-9409-e616d71744b5?autoplay=false&loop=false&muted=false&preload=true&responsive=true" loading="lazy" allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture;fullscreen;" allowfullscreen="true"></iframe>
+    <div class="video-player" id="player-lesson1">
+      <div class="video-loading">Загрузка видео...</div>
     </div>
     <div class="video-desc">
       Первый урок курса: разбираем все материалы и инструменты, которые понадобятся для вышивки. Какие пяльцы выбрать, какие нитки использовать, на чём вышивать и как не переплачивать.
@@ -293,6 +303,28 @@
 </footer>
 
 <script>
+// Load videos with server-generated tokens
+const videos = [
+  { id: 'cf9e8d57-1ca3-4d42-9409-e616d71744b5', player: 'player-lesson1' },
+];
+
+videos.forEach(async (v) => {
+  try {
+    const res = await fetch('/api/bunny-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videoId: v.id }),
+    });
+    const data = await res.json();
+    if (data.embedUrl) {
+      const container = document.getElementById(v.player);
+      container.innerHTML = `<iframe src="${data.embedUrl}" loading="lazy" allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture;fullscreen;" allowfullscreen="true"></iframe>`;
+    }
+  } catch (err) {
+    console.error('Failed to load video:', err);
+  }
+});
+
 const obs = new IntersectionObserver(entries => {
   entries.forEach((e, i) => {
     if (e.isIntersecting) {
