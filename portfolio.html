@@ -70,10 +70,11 @@
   }
   .hero-title em { font-style: italic; color: var(--rose-light); display: block; }
   .hero-tagline {
-    font-size: 16px; color: rgba(255,255,255,0.7);
+    font-size: clamp(18px, 1.8vw, 22px);
+    color: rgba(255,255,255,0.8);
     font-style: italic;
     font-family: 'Cormorant Garamond', serif;
-    margin-top: 32px; max-width: 480px; line-height: 1.6;
+    margin-top: 32px; max-width: 560px; line-height: 1.55;
   }
   .hero-roles {
     display: flex; flex-wrap: wrap; gap: 10px;
@@ -311,7 +312,7 @@
     <div>
       <div class="hero-label">Портфолио</div>
       <h1 class="hero-title">Варя <em>Перлина</em></h1>
-      <p class="hero-tagline">«Адвокат детской креативности» — графический дизайнер, иллюстратор, художница и педагог визуальных искусств. И невероятная мама.</p>
+      <p class="hero-tagline">«Адвокат детской креативности» — графический дизайнер, иллюстратор, художница и педагог визуальных искусств. И принимающая мама троих творческих детей.</p>
       <div class="hero-roles">
         <span class="hero-role">Дизайнер</span>
         <span class="hero-role">Иллюстратор</span>
@@ -345,25 +346,6 @@
 
   <div class="projects">
 
-    <a href="https://studiofasad.com" target="_blank" class="project-card fade-up">
-      <div class="project-image"><img src="fasad.jpg" alt="ФАСАД — детская студия архитектуры и дизайна"></div>
-      <div class="project-body">
-        <div class="project-tag">Студия для детей · Москва</div>
-        <div class="project-title">ФАСАД</div>
-        <p class="project-desc">Соосновательница детской студии архитектуры и дизайна — место, где дети учатся думать как создатели пространств и форм.</p>
-        <span class="project-link">studiofasad.com →</span>
-      </div>
-    </a>
-
-    <a href="https://britishdesign.ru/about/tutors/228628/" target="_blank" class="project-card fade-up">
-      <div class="project-body">
-        <div class="project-tag">Образование · БВШД</div>
-        <div class="project-title">Британская Высшая Школа Дизайна</div>
-        <p class="project-desc">Куратор подростковых образовательных программ и педагог визуальных искусств в одной из ведущих дизайн-школ.</p>
-        <span class="project-link">Профиль на сайте БВШД →</span>
-      </div>
-    </a>
-
     <div class="project-card fade-up">
       <div class="project-image"><img src="studio.jpg" alt="Студия Свободного Творчества — занятие с детьми"></div>
       <div class="project-body">
@@ -383,26 +365,6 @@
       </div>
     </a>
 
-    <a href="https://www.ozon.ru/product/kniga-drama-fri-dramafree-2067791594/" target="_blank" class="project-card fade-up">
-      <div class="project-image"><img src="drama-free.jpg" alt="Иллюстрация Вари Перлиной в книге Drama Free"></div>
-      <div class="project-body">
-        <div class="project-tag">Иллюстрация · Книга</div>
-        <div class="project-title">Drama Free</div>
-        <p class="project-desc">Иллюстрации к книге — одна из работ Вари как художницы и иллюстратора. Сочетание текстуры, света и характера, узнаваемое в каждом штрихе.</p>
-        <span class="project-link">Посмотреть на OZON →</span>
-      </div>
-    </a>
-
-    <a href="https://www.ozon.ru/product/nabor-avtorskih-otkrytok-33-narisovannyh-retsepta-691098218" target="_blank" class="project-card fade-up">
-      <div class="project-image"><img src="recipe-cards.jpg" alt="33 нарисованных рецепта — набор авторских открыток Вари Перлиной"></div>
-      <div class="project-body">
-        <div class="project-tag">Авторский проект · Книги</div>
-        <div class="project-title">33 нарисованных рецепта</div>
-        <p class="project-desc">Набор авторских открыток — иллюстрированные рецепты, нарисованные от руки. Каждая открытка как маленькое произведение искусства.</p>
-        <span class="project-link">Посмотреть на OZON →</span>
-      </div>
-    </a>
-
     <a href="https://magenmishpacha.com/obuchayushhij-online-kurs-speczialist-po-detsko-roditelskim-otnosheniyam/" target="_blank" class="project-card fade-up">
       <div class="project-body">
         <div class="project-tag">Консультант · Сертификат</div>
@@ -411,14 +373,6 @@
         <span class="project-link">Подробнее о курсе →</span>
       </div>
     </a>
-
-    <div class="project-card fade-up">
-      <div class="project-body">
-        <div class="project-tag">Спикер · Конференции</div>
-        <div class="project-title">Выступления и мероприятия</div>
-        <p class="project-desc">Спикер и ведущий профильных конференций и мероприятий о детском творчестве, образовании в дизайне и визуальных искусствах.</p>
-      </div>
-    </div>
 
     <div class="project-card camps-card fade-up">
       <div class="project-body" style="padding: 44px 40px;">
@@ -436,6 +390,53 @@
         </div>
       </div>
     </div>
+
+    <a href="https://www.ozon.ru/product/nabor-avtorskih-otkrytok-33-narisovannyh-retsepta-691098218" target="_blank" class="project-card fade-up">
+      <div class="project-image"><img src="recipe-cards.jpg" alt="33 нарисованных рецепта — набор авторских открыток Вари Перлиной"></div>
+      <div class="project-body">
+        <div class="project-tag">Авторский проект · Книги</div>
+        <div class="project-title">33 нарисованных рецепта</div>
+        <p class="project-desc">Набор авторских открыток — иллюстрированные рецепты, нарисованные от руки. Каждая открытка как маленькое произведение искусства.</p>
+        <span class="project-link">Посмотреть на OZON →</span>
+      </div>
+    </a>
+
+    <div class="project-card fade-up">
+      <div class="project-body">
+        <div class="project-tag">Спикер · Конференции</div>
+        <div class="project-title">Выступления и мероприятия</div>
+        <p class="project-desc">Спикер и ведущий профильных конференций и мероприятий о детском творчестве, образовании в дизайне и визуальных искусствах.</p>
+      </div>
+    </div>
+
+    <a href="https://britishdesign.ru/about/tutors/228628/" target="_blank" class="project-card fade-up">
+      <div class="project-body">
+        <div class="project-tag">Образование · БВШД</div>
+        <div class="project-title">Британская Высшая Школа Дизайна</div>
+        <p class="project-desc">Куратор подростковых образовательных программ и педагог визуальных искусств в одной из ведущих дизайн-школ.</p>
+        <span class="project-link">Профиль на сайте БВШД →</span>
+      </div>
+    </a>
+
+    <a href="https://studiofasad.com" target="_blank" class="project-card fade-up">
+      <div class="project-image"><img src="fasad.jpg" alt="ФАСАД — детская студия архитектуры и дизайна"></div>
+      <div class="project-body">
+        <div class="project-tag">Студия для детей · Москва</div>
+        <div class="project-title">ФАСАД</div>
+        <p class="project-desc">Соосновательница детской студии архитектуры и дизайна — место, где дети учатся думать как создатели пространств и форм.</p>
+        <span class="project-link">studiofasad.com →</span>
+      </div>
+    </a>
+
+    <a href="https://www.ozon.ru/product/kniga-drama-fri-dramafree-2067791594/" target="_blank" class="project-card fade-up">
+      <div class="project-image"><img src="drama-free.jpg" alt="Иллюстрация Вари Перлиной в книге Drama Free"></div>
+      <div class="project-body">
+        <div class="project-tag">Иллюстрация · Книга</div>
+        <div class="project-title">Drama Free</div>
+        <p class="project-desc">Иллюстрации к книге — одна из работ Вари как художницы и иллюстратора. Сочетание текстуры, света и характера, узнаваемое в каждом штрихе.</p>
+        <span class="project-link">Посмотреть на OZON →</span>
+      </div>
+    </a>
 
   </div>
 </div>
@@ -482,7 +483,7 @@
 
     <a href="https://youtu.be/r-i8bbotgmA" target="_blank" class="media-card fade-up">
       <span class="media-type">Видео</span>
-      <div class="media-title">Интервью на YouTube</div>
+      <div class="media-title">Интервью с Таней Либерман</div>
       <div class="media-source">YouTube</div>
     </a>
   </div>
