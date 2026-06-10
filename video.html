@@ -21,37 +21,88 @@
 <!-- /Yandex.Metrika counter -->
 <style>
   :root {
-    --cream: #ffffff;
-    --linen: #f5f0fa;
-    --linen2: #fce8f0;
-    --rose: #e91e8c;
-    --rose-dark: #c4107a;
-    --rose-light: #f9d0e8;
-    --charcoal: #1a1a2e;
-    --warm-gray: #666666;
-    --gold: #c8a870;
+    --cream: #ffffff; --linen: #f5f0fa; --linen2: #fce8f0;
+    --rose: #e91e8c; --rose-dark: #c4107a; --rose-light: #f9d0e8;
+    --charcoal: #1a1a2e; --warm-gray: #666666; --gold: #c8a870;
   }
-
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
   body { background: var(--cream); color: var(--charcoal); font-family: 'Jost', sans-serif; font-weight: 300; line-height: 1.7; overflow-x: hidden; }
 
-  nav {
-    position: sticky; top: 0; z-index: 100;
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 20px 52px;
-    background: rgba(255,255,255,0.95);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid rgba(233,30,140,0.12);
-  }
+  nav { position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; padding: 20px 52px; background: rgba(255,255,255,0.95); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(233,30,140,0.12); }
   .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 17px; color: var(--charcoal); letter-spacing: 0.06em; text-decoration: none; }
   .nav-logo span { color: var(--rose); }
   .nav-back { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm-gray); text-decoration: none; transition: color 0.2s; }
   .nav-back:hover { color: var(--rose); }
 
+  /* AUTH GATE */
+  .auth-gate {
+    position: fixed; inset: 0; z-index: 500;
+    background: linear-gradient(135deg, #fce8f0 0%, #f5f0fa 50%, #ede8fa 100%);
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.4s;
+  }
+  .auth-gate.hidden { opacity: 0; pointer-events: none; }
+  .auth-box {
+    background: #fff; padding: 56px 52px; max-width: 440px; width: 100%;
+    box-shadow: 0 8px 48px rgba(30,28,26,0.08); text-align: center;
+  }
+  .auth-logo {
+    font-family: 'Cormorant Garamond', serif; font-size: 18px;
+    color: var(--charcoal); letter-spacing: 3px; opacity: 0.4; margin-bottom: 4px;
+  }
+  .auth-brand {
+    font-family: 'Cormorant Garamond', serif; font-size: 15px;
+    color: var(--rose); letter-spacing: 2px; margin-bottom: 32px;
+  }
+  .auth-title {
+    font-family: 'Cormorant Garamond', serif; font-size: 32px;
+    font-weight: 300; color: var(--charcoal); margin-bottom: 8px;
+  }
+  .auth-sub {
+    font-size: 14px; color: var(--warm-gray); margin-bottom: 32px; line-height: 1.6;
+  }
+  .auth-input {
+    width: 100%; padding: 14px 0; border: none;
+    border-bottom: 1.5px solid rgba(180,160,140,0.4);
+    background: transparent; font-family: 'Jost', sans-serif;
+    font-size: 16px; color: var(--charcoal); outline: none;
+    text-align: center; letter-spacing: 0.5px; transition: border-color 0.3s;
+  }
+  .auth-input:focus { border-bottom-color: var(--rose); }
+  .auth-input::placeholder { color: rgba(122,112,104,0.35); }
+  .auth-input.code {
+    font-family: 'Courier New', monospace; font-size: 28px;
+    letter-spacing: 8px; font-weight: 700;
+  }
+  .auth-btn {
+    width: 100%; padding: 16px; margin-top: 24px;
+    background: var(--rose); color: #fff; border: none;
+    font-family: 'Jost', sans-serif; font-size: 12px;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    cursor: pointer; transition: background 0.2s;
+  }
+  .auth-btn:hover { background: var(--rose-dark); }
+  .auth-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .auth-error {
+    margin-top: 16px; font-size: 13px; color: #d44;
+    min-height: 20px;
+  }
+  .auth-back {
+    margin-top: 16px; font-size: 12px; color: var(--warm-gray);
+    cursor: pointer; text-decoration: underline;
+  }
+  .auth-logout {
+    position: fixed; bottom: 20px; right: 20px; z-index: 200;
+    font-size: 11px; color: var(--warm-gray); background: rgba(255,255,255,0.9);
+    padding: 8px 16px; cursor: pointer; border: 1px solid rgba(200,168,112,0.2);
+    font-family: 'Jost', sans-serif; transition: color 0.2s;
+  }
+  .auth-logout:hover { color: var(--rose); }
+
   /* HERO */
   .hero { background: var(--charcoal); padding: 100px 64px 80px; position: relative; overflow: hidden; }
-  .hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 80% 30%, rgba(233,30,140,0.12) 0%, transparent 60%), radial-gradient(ellipse at 10% 80%, rgba(122,158,138,0.08) 0%, transparent 50%); }
+  .hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 80% 30%, rgba(233,30,140,0.12) 0%, transparent 60%); }
   .hero-inner { max-width: 1100px; margin: 0 auto; position: relative; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
   .hero-label { font-size: 11px; letter-spacing: 0.4em; text-transform: uppercase; color: var(--rose-light); margin-bottom: 20px; }
   .hero-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(38px, 4.5vw, 60px); font-weight: 300; line-height: 1.1; color: #fff; margin-bottom: 24px; }
@@ -61,145 +112,27 @@
   .hero-icon { font-size: 120px; opacity: 0.8; animation: float 5s ease-in-out infinite; }
   @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
 
-  /* CONTENT */
   .content { max-width: 1100px; margin: 0 auto; padding: 72px 64px; }
-
   .section-label { font-size: 11px; letter-spacing: 0.4em; text-transform: uppercase; color: var(--warm-gray); margin-bottom: 16px; }
   .section-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(30px, 3.5vw, 46px); font-weight: 300; color: var(--charcoal); margin-bottom: 48px; line-height: 1.15; }
   .section-title em { font-style: italic; color: var(--rose); }
 
-  /* VIDEO CARD */
-  .video-card {
-    border: 1px solid rgba(200,168,112,0.2);
-    margin-bottom: 40px;
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
-
-  .video-card:hover {
-    border-color: var(--rose-light);
-    box-shadow: 0 4px 32px rgba(233,30,140,0.08);
-  }
-
-  .video-header {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    padding: 24px 32px;
-    background: var(--linen);
-    border-bottom: 1px solid rgba(200,168,112,0.15);
-  }
-
-  .video-num {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 42px;
-    font-weight: 300;
-    color: var(--rose-light);
-    line-height: 1;
-  }
-
+  .video-card { border: 1px solid rgba(200,168,112,0.2); margin-bottom: 40px; transition: border-color 0.2s, box-shadow 0.2s; }
+  .video-card:hover { border-color: var(--rose-light); box-shadow: 0 4px 32px rgba(233,30,140,0.08); }
+  .video-header { display: flex; align-items: center; gap: 20px; padding: 24px 32px; background: var(--linen); border-bottom: 1px solid rgba(200,168,112,0.15); }
+  .video-num { font-family: 'Cormorant Garamond', serif; font-size: 42px; font-weight: 300; color: var(--rose-light); line-height: 1; }
   .video-meta { flex: 1; }
+  .video-title { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 400; color: var(--charcoal); margin-bottom: 4px; }
+  .video-date { font-size: 12px; color: var(--warm-gray); letter-spacing: 0.1em; }
+  .video-player { position: relative; padding-top: 56.25%; background: #000; }
+  .video-player iframe { border: 0; position: absolute; top: 0; left: 0; height: 100%; width: 100%; }
+  .video-loading { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; color: rgba(255,255,255,0.4); font-size: 14px; }
+  .video-desc { padding: 20px 32px; font-size: 14px; color: var(--warm-gray); line-height: 1.85; border-top: 1px solid rgba(200,168,112,0.15); }
 
-  .video-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 24px;
-    font-weight: 400;
-    color: var(--charcoal);
-    margin-bottom: 4px;
-  }
-
-  .video-date {
-    font-size: 12px;
-    color: var(--warm-gray);
-    letter-spacing: 0.1em;
-  }
-
-  .video-player {
-    position: relative;
-    padding-top: 56.25%;
-    background: #000;
-  }
-
-  .video-player iframe {
-    border: 0;
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    width: 100%;
-  }
-
-  .video-desc {
-    padding: 20px 32px;
-    font-size: 14px;
-    color: var(--warm-gray);
-    line-height: 1.85;
-    border-top: 1px solid rgba(200,168,112,0.15);
-  }
-
-  /* UPCOMING */
-  .upcoming-card {
-    border: 1px dashed rgba(200,168,112,0.3);
-    padding: 32px;
-    display: flex;
-    align-items: center;
-    gap: 24px;
-    margin-bottom: 16px;
-    opacity: 0.7;
-  }
-
-  .upcoming-num {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 36px;
-    font-weight: 300;
-    color: rgba(200,168,112,0.4);
-    line-height: 1;
-    min-width: 50px;
-  }
-
-  .upcoming-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: 20px;
-    font-weight: 400;
-    color: var(--warm-gray);
-  }
-
-  .upcoming-badge {
-    font-size: 10px;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: var(--rose);
-    background: rgba(233,30,140,0.08);
-    padding: 4px 12px;
-    margin-left: auto;
-  }
-
-  .video-loading {
-    position: absolute;
-    top: 0; left: 0; width: 100%; height: 100%;
-    display: flex; align-items: center; justify-content: center;
-    background: #000;
-    color: rgba(255,255,255,0.4);
-    font-size: 14px;
-    letter-spacing: 0.1em;
-  }
-
-  /* CTA */
-  .cta-section {
-    background: linear-gradient(135deg, #fce8f0 0%, #f5f0fa 50%, #ede8fa 100%);
-    padding: 80px 64px; text-align: center;
-  }
-  .cta-title {
-    font-family: 'Cormorant Garamond', serif;
-    font-size: clamp(28px, 4vw, 44px); font-weight: 300; color: var(--charcoal); margin-bottom: 12px;
-  }
-  .cta-sub { font-size: 15px; color: var(--warm-gray); margin-bottom: 36px; }
-  .btn-cta {
-    display: inline-block; background: var(--rose); color: #fff;
-    padding: 16px 48px; font-family: 'Jost', sans-serif;
-    font-size: 12px; letter-spacing: 0.25em; text-transform: uppercase;
-    text-decoration: none; transition: background 0.2s;
-  }
-  .btn-cta:hover { background: var(--rose-dark); }
+  .upcoming-card { border: 1px dashed rgba(200,168,112,0.3); padding: 32px; display: flex; align-items: center; gap: 24px; margin-bottom: 16px; opacity: 0.7; }
+  .upcoming-num { font-family: 'Cormorant Garamond', serif; font-size: 36px; font-weight: 300; color: rgba(200,168,112,0.4); line-height: 1; min-width: 50px; }
+  .upcoming-title { font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 400; color: var(--warm-gray); }
+  .upcoming-badge { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--rose); background: rgba(233,30,140,0.08); padding: 4px 12px; margin-left: auto; }
 
   footer { background: #1a1a2e; padding: 40px 64px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
   .footer-logo { font-family: 'Cormorant Garamond', serif; font-size: 17px; font-weight: 300; color: #fff; }
@@ -214,19 +147,48 @@
     .hero-inner { grid-template-columns: 1fr; gap: 40px; }
     .hero-visual { display: none; }
     .content { padding: 48px 24px; }
-    .video-header { padding: 18px 20px; gap: 14px; }
-    .video-header .video-num { font-size: 32px; }
-    .video-header .video-title { font-size: 20px; }
+    .video-header { padding: 18px 20px; }
     .video-desc { padding: 16px 20px; }
     .upcoming-card { padding: 20px; flex-wrap: wrap; }
     .upcoming-badge { margin-left: 0; }
-    .cta-section { padding: 60px 28px; }
+    .auth-box { padding: 40px 28px; margin: 0 16px; }
     footer { padding: 32px 24px; flex-direction: column; align-items: flex-start; }
   }
 </style>
 </head>
 <body>
 
+<!-- AUTH GATE (disabled — set display:none) -->
+<div class="auth-gate" id="authGate" style="display:none;">
+  <div class="auth-box">
+    <div class="auth-logo">Re.Create.Art</div>
+    <div class="auth-brand">Варя Перлина</div>
+
+    <!-- Step 1: Email -->
+    <div id="authStep1">
+      <div class="auth-title">Записи уроков</div>
+      <p class="auth-sub">Введите email, который вы использовали при оплате курса</p>
+      <input class="auth-input" type="email" id="authEmail" placeholder="example@mail.com" onkeydown="if(event.key==='Enter') authSendCode()">
+      <button class="auth-btn" id="authSendBtn" onclick="authSendCode()">Получить код</button>
+      <div class="auth-error" id="authError1"></div>
+    </div>
+
+    <!-- Step 2: Code -->
+    <div id="authStep2" style="display:none;">
+      <div class="auth-title">Введите код</div>
+      <p class="auth-sub">Мы отправили 6-значный код на вашу почту</p>
+      <input class="auth-input code" type="text" id="authCode" placeholder="000000" maxlength="6" inputmode="numeric" onkeydown="if(event.key==='Enter') authVerifyCode()">
+      <button class="auth-btn" id="authVerifyBtn" onclick="authVerifyCode()">Войти</button>
+      <div class="auth-error" id="authError2"></div>
+      <div class="auth-back" onclick="authBackToEmail()">← Другой email</div>
+    </div>
+  </div>
+</div>
+
+<!-- LOGOUT BUTTON (shown when authenticated) -->
+<div class="auth-logout" id="logoutBtn" style="display:none;" onclick="authLogout()">Выйти</div>
+
+<!-- NAV -->
 <nav>
   <a href="index.html" class="nav-logo">Re.Create.Art · <span>Варя Перлина</span></a>
   <a href="index.html" class="nav-back">← На главную</a>
@@ -248,7 +210,6 @@
 
 <!-- CONTENT -->
 <div class="content">
-
   <div class="section-label fade-up">Записи эфиров</div>
   <h2 class="section-title fade-up">Смотрите в удобное <em>время</em></h2>
 
@@ -269,33 +230,35 @@
     </div>
   </div>
 
-  <!-- UPCOMING -->
-  <div class="upcoming-card fade-up">
-    <div class="upcoming-num">02</div>
-    <div class="upcoming-title">Урок 2</div>
-    <div class="upcoming-badge">Скоро</div>
+  <!-- УРОК 2 -->
+  <div class="video-card fade-up">
+    <div class="video-header">
+      <div class="video-num">02</div>
+      <div class="video-meta">
+        <div class="video-title">Стежки, цвет и буквы</div>
+        <div class="video-date">9 июня 2026</div>
+      </div>
+    </div>
+    <div class="video-player" id="player-lesson2">
+      <div class="video-loading">Загрузка видео...</div>
+    </div>
+    <div class="video-desc">
+      Второй урок курса: учимся переносить рисунок на ткань, разбираем разные типы и направления вышивки, говорим о подборе цветов и вышиваем буквы.
+    </div>
   </div>
 
+  <!-- UPCOMING -->
   <div class="upcoming-card fade-up">
     <div class="upcoming-num">03</div>
     <div class="upcoming-title">Урок 3</div>
     <div class="upcoming-badge">Скоро</div>
   </div>
-
   <div class="upcoming-card fade-up">
     <div class="upcoming-num">04</div>
     <div class="upcoming-title">Урок 4</div>
     <div class="upcoming-badge">Скоро</div>
   </div>
-
 </div>
-
-<!-- CTA -->
-<section class="cta-section">
-  <h2 class="cta-title">Ещё не на курсе?</h2>
-  <p class="cta-sub">Присоединяйтесь — и получите доступ ко всем записям и материалам</p>
-  <a href="index.html#register" class="btn-cta">Записаться на курс</a>
-</section>
 
 <footer>
   <div class="footer-logo">Re.Create.Art · Варя Перлина</div>
@@ -303,28 +266,188 @@
 </footer>
 
 <script>
-// Load videos with server-generated tokens
-const videos = [
-  { id: 'cf9e8d57-1ca3-4d42-9409-e616d71744b5', player: 'player-lesson1' },
-];
+// ── AUTH DISABLED — just load videos directly ──
+loadVideos();
 
-videos.forEach(async (v) => {
+// ── AUTH STATE (kept for future use) ──
+let authChallenge = '';
+let authExpires = 0;
+let authEmailValue = '';
+
+// ── AUTH SESSION CHECK (disabled) ──
+async function _authCheckSession() {
+  const email = localStorage.getItem('auth_email');
+  const session = localStorage.getItem('auth_session');
+  const expires = localStorage.getItem('auth_expires');
+
+  if (email && session && expires) {
+    try {
+      const res = await fetch('/api/auth-check-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, session, sessionExpires: parseInt(expires) }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        authSuccess();
+        return;
+      }
+    } catch(e) {}
+    localStorage.removeItem('auth_email');
+    localStorage.removeItem('auth_session');
+    localStorage.removeItem('auth_expires');
+  }
+  document.getElementById('authGate').style.display = 'flex';
+}
+
+// ── STEP 1: SEND CODE ──
+async function authSendCode() {
+  const email = document.getElementById('authEmail').value.trim();
+  if (!email) { showAuthError(1, 'Введите email'); return; }
+
+  const btn = document.getElementById('authSendBtn');
+  btn.disabled = true;
+  btn.textContent = 'Отправляем...';
+  showAuthError(1, '');
+
   try {
-    const res = await fetch('/api/bunny-token', {
+    const res = await fetch('/api/auth-send-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ videoId: v.id }),
+      body: JSON.stringify({ email }),
     });
     const data = await res.json();
-    if (data.embedUrl) {
-      const container = document.getElementById(v.player);
-      container.innerHTML = `<iframe src="${data.embedUrl}" loading="lazy" allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture;fullscreen;" allowfullscreen="true"></iframe>`;
-    }
-  } catch (err) {
-    console.error('Failed to load video:', err);
-  }
-});
 
+    if (!res.ok) {
+      if (data.error === 'not_found') {
+        showAuthError(1, 'Этот email не найден среди оплативших курс');
+      } else if (data.error === 'rate_limit') {
+        showAuthError(1, 'Подождите минуту перед повторной отправкой');
+      } else {
+        showAuthError(1, data.message || 'Ошибка, попробуйте позже');
+      }
+      btn.disabled = false;
+      btn.textContent = 'Получить код';
+      return;
+    }
+
+    // Save challenge and move to step 2
+    authChallenge = data.challenge;
+    authExpires = data.expires;
+    authEmailValue = email;
+
+    document.getElementById('authStep1').style.display = 'none';
+    document.getElementById('authStep2').style.display = 'block';
+    document.getElementById('authCode').focus();
+
+  } catch (err) {
+    showAuthError(1, 'Ошибка соединения, попробуйте позже');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Получить код';
+}
+
+// ── STEP 2: VERIFY CODE ──
+async function authVerifyCode() {
+  const code = document.getElementById('authCode').value.trim();
+  if (!code || code.length !== 6) { showAuthError(2, 'Введите 6-значный код'); return; }
+
+  const btn = document.getElementById('authVerifyBtn');
+  btn.disabled = true;
+  btn.textContent = 'Проверяем...';
+  showAuthError(2, '');
+
+  try {
+    const res = await fetch('/api/auth-verify-code', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: authEmailValue,
+        code,
+        challenge: authChallenge,
+        challengeExpires: authExpires,
+      }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showAuthError(2, data.message || 'Неверный код');
+      btn.disabled = false;
+      btn.textContent = 'Войти';
+      return;
+    }
+
+    // Save session
+    localStorage.setItem('auth_email', data.email);
+    localStorage.setItem('auth_session', data.session);
+    localStorage.setItem('auth_expires', data.sessionExpires);
+
+    authSuccess();
+
+  } catch (err) {
+    showAuthError(2, 'Ошибка соединения');
+    btn.disabled = false;
+    btn.textContent = 'Войти';
+  }
+}
+
+// ── SUCCESS ──
+function authSuccess() {
+  const gate = document.getElementById('authGate');
+  gate.classList.add('hidden');
+  setTimeout(() => gate.style.display = 'none', 400);
+  document.getElementById('logoutBtn').style.display = 'block';
+  loadVideos();
+}
+
+// ── BACK TO EMAIL ──
+function authBackToEmail() {
+  document.getElementById('authStep2').style.display = 'none';
+  document.getElementById('authStep1').style.display = 'block';
+  document.getElementById('authCode').value = '';
+  showAuthError(2, '');
+}
+
+// ── LOGOUT ──
+function authLogout() {
+  localStorage.removeItem('auth_email');
+  localStorage.removeItem('auth_session');
+  localStorage.removeItem('auth_expires');
+  location.reload();
+}
+
+// ── ERROR DISPLAY ──
+function showAuthError(step, msg) {
+  document.getElementById('authError' + step).textContent = msg;
+}
+
+// ── LOAD VIDEOS ──
+function loadVideos() {
+  const videos = [
+    { id: 'cf9e8d57-1ca3-4d42-9409-e616d71744b5', player: 'player-lesson1' },
+    { id: '4c3a4029-1fcd-4709-bc65-f78476954f12', player: 'player-lesson2' },
+  ];
+
+  videos.forEach(async (v) => {
+    try {
+      const res = await fetch('/api/bunny-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoId: v.id }),
+      });
+      const data = await res.json();
+      if (data.embedUrl) {
+        document.getElementById(v.player).innerHTML =
+          `<iframe src="${data.embedUrl}" loading="lazy" allow="accelerometer;gyroscope;autoplay;encrypted-media;picture-in-picture;fullscreen;" allowfullscreen="true"></iframe>`;
+      }
+    } catch (err) {
+      console.error('Video load error:', err);
+    }
+  });
+}
+
+// ── ANIMATIONS ──
 const obs = new IntersectionObserver(entries => {
   entries.forEach((e, i) => {
     if (e.isIntersecting) {
