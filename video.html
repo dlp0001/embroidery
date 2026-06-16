@@ -247,12 +247,24 @@
     </div>
   </div>
 
-  <!-- UPCOMING -->
-  <div class="upcoming-card fade-up">
-    <div class="upcoming-num">03</div>
-    <div class="upcoming-title">Урок 3</div>
-    <div class="upcoming-badge">Скоро</div>
+  <!-- УРОК 3 -->
+  <div class="video-card fade-up">
+    <div class="video-header">
+      <div class="video-num">03</div>
+      <div class="video-meta">
+        <div class="video-title">Рисуем и вышиваем</div>
+        <div class="video-date">16 июня 2026</div>
+      </div>
+    </div>
+    <div class="video-player" id="player-lesson3">
+      <div class="video-loading">Загрузка видео...</div>
+    </div>
+    <div class="video-desc">
+      Третий урок курса: весь процесс вышивки от А до Я — от идеи и эскиза до финального стежка.
+    </div>
   </div>
+
+  <!-- UPCOMING -->
   <div class="upcoming-card fade-up">
     <div class="upcoming-num">04</div>
     <div class="upcoming-title">Урок 4</div>
@@ -427,6 +439,7 @@ function loadVideos() {
   const videos = [
     { id: 'cf9e8d57-1ca3-4d42-9409-e616d71744b5', player: 'player-lesson1' },
     { id: '4c3a4029-1fcd-4709-bc65-f78476954f12', player: 'player-lesson2' },
+    { id: 'caab21c4-915d-4517-b439-8705531ebd44', player: 'player-lesson3' },
   ];
 
   videos.forEach(async (v) => {
