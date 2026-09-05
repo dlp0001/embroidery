@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap">
+  <style>
+    body { margin: 0; background: #ffffff; color: #1a1a2e; font-family: 'Jost', system-ui, sans-serif; font-weight: 300; line-height: 1.6; }
+    a { color: #e91e8c; text-decoration: none; }
+    a:hover { color: #c4107a; }
+    .app { width: 390px; min-height: 900px; display: flex; flex-direction: column; background: #ffffff; }
+    .top { padding: 20px 20px 14px; }
+    .kicker { font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: #666666; margin-bottom: 6px; }
+    .h1 { font-family: 'Cormorant Garamond', serif; font-size: 30px; font-weight: 400; color: #1a1a2e; line-height: 1.1; }
+    .sub { font-size: 13px; color: #666666; margin-top: 3px; }
+    .body { flex-grow: 1; padding: 0 20px 24px; }
+    .lbl { font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: #666666; margin: 20px 0 12px; }
+    .card { border: 1px solid rgba(233,30,140,0.14); padding: 16px 18px; margin-bottom: 10px; }
+    .card-lin { border: 1px solid rgba(233,30,140,0.14); background: #f5f0fa; padding: 16px 18px; margin-bottom: 10px; }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+    .when { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #666666; margin-bottom: 6px; }
+    .what { font-family: 'Cormorant Garamond', serif; font-size: 21px; font-weight: 400; color: #1a1a2e; }
+    .btn { padding: 12px 20px; background: #e91e8c; color: #ffffff; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap; min-height: 44px; display: flex; align-items: center; }
+    .btn-quiet { padding: 12px 20px; border: 1.5px solid rgba(26,26,46,0.15); color: #1a1a2e; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap; min-height: 44px; display: flex; align-items: center; }
+    .btn-wide { width: 100%; justify-content: center; padding: 18px; background: #e91e8c; color: #ffffff; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; display: flex; min-height: 44px; align-items: center; }
+    .tag { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; padding: 5px 11px; white-space: nowrap; }
+    .tag-ok { color: #666666; background: #f5f0fa; }
+    .tag-due { color: #c4107a; background: rgba(233,30,140,0.09); }
+    .mark { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 68px; padding: 12px 4px; border-bottom: 1px solid rgba(233,30,140,0.10); }
+    .nm { font-family: 'Cormorant Garamond', serif; font-size: 23px; font-weight: 400; color: #1a1a2e; }
+    .nm-off { font-family: 'Cormorant Garamond', serif; font-size: 23px; font-weight: 400; color: rgba(26,26,46,0.35); }
+    .money { font-size: 12.5px; color: #666666; margin-top: 2px; }
+    .money-due { font-size: 12.5px; color: #c4107a; margin-top: 2px; }
+    .money-off { font-size: 12.5px; color: rgba(26,26,46,0.3); margin-top: 2px; }
+    .dot-on { width: 34px; height: 34px; border: 2px solid #e91e8c; background: #e91e8c; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .dot-off { width: 34px; height: 34px; border: 2px solid rgba(26,26,46,0.18); flex-shrink: 0; }
+    .dot-alt { width: 34px; height: 34px; border: 2px solid #e91e8c; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 11px; letter-spacing: 0.06em; color: #e91e8c; }
+    .bar { border-top: 1px solid rgba(233,30,140,0.12); padding: 14px 20px 22px; background: #ffffff; }
+    .tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid rgba(233,30,140,0.12); }
+    .tab { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 0 20px; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: #666666; }
+    .tab svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  </style>
+</helmet>
+
+<div class="app">
+  <div class="top">
+    <div class="kicker">11 марта · Младшие</div>
+    <div class="h1">Ноам</div>
+    <div class="sub">Нет действующего абонемента</div>
+  </div>
+  <div class="body">
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="border: 1.5px solid #e91e8c; background: rgba(233,30,140,0.05); padding: 15px 18px; min-height: 44px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+        <div>
+          <div style="font-size: 15px; color: #1a1a2e;">Был</div>
+          <div style="font-size: 12px; color: #666666; margin-top: 2px;">Спишется с абонемента или уйдёт в долг</div>
+        </div>
+        <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:none; stroke:#e91e8c; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round;"><path d="M4 12.5 L9.5 18 L20 6"></path></svg>
+      </div>
+      <div style="border: 1.5px solid rgba(26,26,46,0.12); background: #ffffff; padding: 15px 18px; min-height: 44px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+        <div>
+          <div style="font-size: 15px; color: #1a1a2e;">Не был</div>
+          <div style="font-size: 12px; color: #666666; margin-top: 2px;">Ничего не списывается</div>
+        </div>
+      </div>
+      <div style="border: 1.5px solid rgba(26,26,46,0.12); background: #ffffff; padding: 15px 18px; min-height: 44px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+        <div>
+          <div style="font-size: 15px; color: #1a1a2e;">Болеет</div>
+          <div style="font-size: 12px; color: #666666; margin-top: 2px;">Занятие не сгорает и не оплачивается</div>
+        </div>
+      </div>
+      <div style="border: 1.5px solid rgba(26,26,46,0.12); background: #ffffff; padding: 15px 18px; min-height: 44px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+        <div>
+          <div style="font-size: 15px; color: #1a1a2e;">Пробное</div>
+          <div style="font-size: 12px; color: #666666; margin-top: 2px;">Бесплатно, без списания</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="lbl">Деньги</div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <div style="border: 1.5px solid rgba(26,26,46,0.12); background: #ffffff; padding: 15px 18px; min-height: 44px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+        <div>
+          <div style="font-size: 15px; color: #1a1a2e;">Принять наличными [60] ₪</div>
+          <div style="font-size: 12px; color: #666666; margin-top: 2px;">Закроет долг за это занятие сразу</div>
+        </div>
+      </div>
+      <div style="border: 1.5px solid #e91e8c; background: rgba(233,30,140,0.05); padding: 15px 18px; min-height: 44px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+        <div>
+          <div style="font-size: 15px; color: #1a1a2e;">Оставить в долг</div>
+          <div style="font-size: 12px; color: #666666; margin-top: 2px;">Родитель увидит и оплатит картой</div>
+        </div>
+        <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:none; stroke:#e91e8c; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round;"><path d="M4 12.5 L9.5 18 L20 6"></path></svg>
+      </div>
+    </div>
+
+    <div style="margin-top: 22px; padding: 16px 18px; background: #f5f0fa; border-left: 3px solid #e91e8c; font-size: 13px; color: #666666; line-height: 1.7;">Обычно сюда заходить не нужно. Деньги считаются сами: есть абонемент — спишется с него, нет — уйдёт в долг.</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

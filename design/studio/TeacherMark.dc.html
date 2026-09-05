@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap">
+  <style>
+    body { margin: 0; background: #ffffff; color: #1a1a2e; font-family: 'Jost', system-ui, sans-serif; font-weight: 300; line-height: 1.6; }
+    a { color: #e91e8c; text-decoration: none; }
+    a:hover { color: #c4107a; }
+    .app { width: 390px; min-height: 940px; display: flex; flex-direction: column; background: #ffffff; }
+    .top { padding: 20px 20px 14px; }
+    .kicker { font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: #666666; margin-bottom: 6px; }
+    .h1 { font-family: 'Cormorant Garamond', serif; font-size: 30px; font-weight: 400; color: #1a1a2e; line-height: 1.1; }
+    .sub { font-size: 13px; color: #666666; margin-top: 3px; }
+    .body { flex-grow: 1; padding: 0 20px 24px; }
+    .lbl { font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: #666666; margin: 20px 0 12px; }
+    .card { border: 1px solid rgba(233,30,140,0.14); padding: 16px 18px; margin-bottom: 10px; }
+    .card-lin { border: 1px solid rgba(233,30,140,0.14); background: #f5f0fa; padding: 16px 18px; margin-bottom: 10px; }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+    .when { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #666666; margin-bottom: 6px; }
+    .what { font-family: 'Cormorant Garamond', serif; font-size: 21px; font-weight: 400; color: #1a1a2e; }
+    .btn { padding: 12px 20px; background: #e91e8c; color: #ffffff; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap; min-height: 44px; display: flex; align-items: center; }
+    .btn-quiet { padding: 12px 20px; border: 1.5px solid rgba(26,26,46,0.15); color: #1a1a2e; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap; min-height: 44px; display: flex; align-items: center; }
+    .btn-wide { width: 100%; justify-content: center; padding: 18px; background: #e91e8c; color: #ffffff; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; display: flex; min-height: 44px; align-items: center; }
+    .tag { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; padding: 5px 11px; white-space: nowrap; }
+    .tag-ok { color: #666666; background: #f5f0fa; }
+    .tag-due { color: #c4107a; background: rgba(233,30,140,0.09); }
+    .mark { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 68px; padding: 12px 4px; border-bottom: 1px solid rgba(233,30,140,0.10); }
+    .nm { font-family: 'Cormorant Garamond', serif; font-size: 23px; font-weight: 400; color: #1a1a2e; }
+    .nm-off { font-family: 'Cormorant Garamond', serif; font-size: 23px; font-weight: 400; color: rgba(26,26,46,0.35); }
+    .money { font-size: 12.5px; color: #666666; margin-top: 2px; }
+    .money-due { font-size: 12.5px; color: #c4107a; margin-top: 2px; }
+    .money-off { font-size: 12.5px; color: rgba(26,26,46,0.3); margin-top: 2px; }
+    .dot-on { width: 34px; height: 34px; border: 2px solid #e91e8c; background: #e91e8c; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .dot-off { width: 34px; height: 34px; border: 2px solid rgba(26,26,46,0.18); flex-shrink: 0; }
+    .dot-alt { width: 34px; height: 34px; border: 2px solid #e91e8c; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 11px; letter-spacing: 0.06em; color: #e91e8c; }
+    .bar { border-top: 1px solid rgba(233,30,140,0.12); padding: 14px 20px 22px; background: #ffffff; }
+    .tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid rgba(233,30,140,0.12); }
+    .tab { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 0 20px; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: #666666; }
+    .tab svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  </style>
+</helmet>
+
+<div class="app">
+  <div class="top">
+    <div class="kicker">11 марта · 16:30</div>
+    <div class="h1">Младшие</div>
+    <div class="sub">Все отмечены как пришедшие. Снимите тех, кого не было.</div>
+  </div>
+  <div class="body">
+    <div class="mark">
+      <div>
+        <div class="nm">Мия</div>
+        <div class="money">Спишется с абонемента</div>
+      </div>
+      <div class="dot-on"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:none; stroke:#ffffff; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round;"><path d="M4 12.5 L9.5 18 L20 6"></path></svg></div>
+    </div>
+    <div class="mark">
+      <div>
+        <div class="nm">Ноам</div>
+        <div class="money-due">[60] ₪ в долг · нет абонемента</div>
+      </div>
+      <div class="dot-on"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:none; stroke:#ffffff; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round;"><path d="M4 12.5 L9.5 18 L20 6"></path></svg></div>
+    </div>
+    <div class="mark">
+      <div>
+        <div class="nm">Софи</div>
+        <div class="money">Пробное, бесплатно</div>
+      </div>
+      <div class="dot-alt">П</div>
+    </div>
+    <div class="mark">
+      <div>
+        <div class="nm-off">Лёва</div>
+        <div class="money-off">Не был, ничего не спишется</div>
+      </div>
+      <div class="dot-off"></div>
+    </div>
+    <div class="mark">
+      <div>
+        <div class="nm">Даниэль</div>
+        <div class="money">Болеет, занятие не сгорает</div>
+      </div>
+      <div class="dot-alt">Б</div>
+    </div>
+    <div class="mark">
+      <div>
+        <div class="nm">Тамар</div>
+        <div class="money">Спишется с абонемента</div>
+      </div>
+      <div class="dot-on"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:none; stroke:#ffffff; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round;"><path d="M4 12.5 L9.5 18 L20 6"></path></svg></div>
+    </div>
+    <div class="mark">
+      <div>
+        <div class="nm">Йонатан</div>
+        <div class="money">Оплачено наличными [60] ₪</div>
+      </div>
+      <div class="dot-on"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:none; stroke:#ffffff; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round;"><path d="M4 12.5 L9.5 18 L20 6"></path></svg></div>
+    </div>
+    <div class="mark">
+      <div>
+        <div class="nm">Ари</div>
+        <div class="money">Спишется с абонемента</div>
+      </div>
+      <div class="dot-on"><svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:none; stroke:#ffffff; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round;"><path d="M4 12.5 L9.5 18 L20 6"></path></svg></div>
+    </div>
+    <div style="margin-top: 18px; font-size: 12px; color: #666666; line-height: 1.6;">Нажмите на имя, чтобы поставить болезнь, пробное или принять наличные.</div>
+  </div>
+  <div class="bar">
+    <div class="btn-wide">Сохранить · 6 пришли</div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap">
+  <style>
+    body { margin: 0; background: #ffffff; color: #1a1a2e; font-family: 'Jost', system-ui, sans-serif; font-weight: 300; line-height: 1.6; }
+    a { color: #e91e8c; text-decoration: none; }
+    a:hover { color: #c4107a; }
+    .app { width: 390px; min-height: 844px; display: flex; flex-direction: column; background: #ffffff; }
+    .top { padding: 20px 20px 14px; }
+    .kicker { font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: #666666; margin-bottom: 6px; }
+    .h1 { font-family: 'Cormorant Garamond', serif; font-size: 30px; font-weight: 400; color: #1a1a2e; line-height: 1.1; }
+    .sub { font-size: 13px; color: #666666; margin-top: 3px; }
+    .body { flex-grow: 1; padding: 0 20px 24px; }
+    .lbl { font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: #666666; margin: 20px 0 12px; }
+    .card { border: 1px solid rgba(233,30,140,0.14); padding: 16px 18px; margin-bottom: 10px; }
+    .card-lin { border: 1px solid rgba(233,30,140,0.14); background: #f5f0fa; padding: 16px 18px; margin-bottom: 10px; }
+    .row { display: flex; justify-content: space-between; align-items: center; gap: 14px; }
+    .when { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: #666666; margin-bottom: 6px; }
+    .what { font-family: 'Cormorant Garamond', serif; font-size: 21px; font-weight: 400; color: #1a1a2e; }
+    .btn { padding: 12px 20px; background: #e91e8c; color: #ffffff; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap; min-height: 44px; display: flex; align-items: center; }
+    .btn-quiet { padding: 12px 20px; border: 1.5px solid rgba(26,26,46,0.15); color: #1a1a2e; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap; min-height: 44px; display: flex; align-items: center; }
+    .btn-wide { width: 100%; justify-content: center; padding: 18px; background: #e91e8c; color: #ffffff; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; display: flex; min-height: 44px; align-items: center; }
+    .tag { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; padding: 5px 11px; white-space: nowrap; }
+    .tag-ok { color: #666666; background: #f5f0fa; }
+    .tag-due { color: #c4107a; background: rgba(233,30,140,0.09); }
+    .mark { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 68px; padding: 12px 4px; border-bottom: 1px solid rgba(233,30,140,0.10); }
+    .nm { font-family: 'Cormorant Garamond', serif; font-size: 23px; font-weight: 400; color: #1a1a2e; }
+    .nm-off { font-family: 'Cormorant Garamond', serif; font-size: 23px; font-weight: 400; color: rgba(26,26,46,0.35); }
+    .money { font-size: 12.5px; color: #666666; margin-top: 2px; }
+    .money-due { font-size: 12.5px; color: #c4107a; margin-top: 2px; }
+    .money-off { font-size: 12.5px; color: rgba(26,26,46,0.3); margin-top: 2px; }
+    .dot-on { width: 34px; height: 34px; border: 2px solid #e91e8c; background: #e91e8c; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .dot-off { width: 34px; height: 34px; border: 2px solid rgba(26,26,46,0.18); flex-shrink: 0; }
+    .dot-alt { width: 34px; height: 34px; border: 2px solid #e91e8c; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 11px; letter-spacing: 0.06em; color: #e91e8c; }
+    .bar { border-top: 1px solid rgba(233,30,140,0.12); padding: 14px 20px 22px; background: #ffffff; }
+    .tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid rgba(233,30,140,0.12); }
+    .tab { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 0 20px; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: #666666; }
+    .tab svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  </style>
+</helmet>
+
+<div class="app">
+  <div class="top">
+    <div class="kicker">Re.Create.Art · Преподаватель</div>
+    <div class="h1">Долги</div>
+    <div class="sub">[7] семей на [1 240] ₪</div>
+  </div>
+  <div class="body">
+    <div class="card">
+      <div class="row">
+        <div>
+          <div class="what">Анна</div>
+          <div class="sub">Мия и Лёва · 3 занятия с 11 февраля</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-family:'Cormorant Garamond',serif; font-size: 21px; color: #c4107a;">[180] ₪</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row">
+        <div>
+          <div class="what">Ольга</div>
+          <div class="sub">Тамар · 4 занятия с 4 февраля</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-family:'Cormorant Garamond',serif; font-size: 21px; color: #c4107a;">[240] ₪</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row">
+        <div>
+          <div class="what">Ирина</div>
+          <div class="sub">Ноам · 2 занятия с 25 февраля</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-family:'Cormorant Garamond',serif; font-size: 21px; color: #c4107a;">[120] ₪</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="row">
+        <div>
+          <div class="what">Дина</div>
+          <div class="sub">Ари · 5 занятий с 28 января</div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-family:'Cormorant Garamond',serif; font-size: 21px; color: #c4107a;">[300] ₪</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top: 18px;">
+      <div class="btn-wide">Напомнить всем письмом</div>
+      <div style="font-size: 12px; color: #666666; line-height: 1.7; margin-top: 14px;">Письмо со ссылкой на оплату уйдёт каждому родителю из списка. Текст можно посмотреть до отправки.</div>
+    </div>
+  </div>
+<div class="tabs">
+  <div class="tab"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M8 3v4M16 3v4M3 10h18"></path></svg>Сегодня</div>
+  <div class="tab"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"></circle><path d="M2.8 20c0-3.4 2.8-6.2 6.2-6.2s6.2 2.8 6.2 6.2"></path><circle cx="17.6" cy="9" r="2.4"></circle><path d="M17.6 13.6c2.2 0 3.8 1.8 3.8 4"></path></svg>Группы</div>
+  <div class="tab" style="color: #e91e8c;"><svg viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"></rect><path d="M2 10h20"></path></svg>Долги</div>
+</div>
+</div>
+</x-dc>
+</body>
+</html>
