@@ -46,7 +46,12 @@ async function call<T>(path: string, body: unknown): Promise<T> {
   try {
     data = JSON.parse(text);
   } catch {
-    throw new Error(`payplus: ответ не JSON (${res.status}): ${text.slice(0, 200)}`);
+    // Шлюз PayPlus отвечает текстом, когда запрос отбит до метода.
+    const where = new URL(e.base).host;
+    const hint = text.includes('not-authorize')
+      ? ' Похоже, API не разрешён для этого терминала, либо ключи и платёжная страница от разных терминалов.'
+      : '';
+    throw new Error(`${res.status} «${text.trim().slice(0, 120)}» от ${where}.${hint}`);
   }
   if (!res.ok) {
     const hint = res.status === 403
