@@ -1,8 +1,10 @@
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/session';
+import NotConfigured from '@/components/NotConfigured';
 import LoginForm from './LoginForm';
 
 export default async function LoginPage() {
+  if (!process.env.DATABASE_URL) return <NotConfigured />;
   if (await currentUser()) redirect('/account');
   return (
     <main className="app">
