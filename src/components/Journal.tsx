@@ -38,6 +38,7 @@ export default function Journal({
   const present = Object.values(rows).filter((r) => r.present).length;
   const likely = roster.filter(expected);
   const rest = roster.filter((r) => !expected(r));
+  const split = likely.length > 0 && rest.length > 0;
 
   function moneyFor(r: RosterRow): { text: string; cls: string } {
     const row = rows[r.participant_id];
@@ -97,16 +98,17 @@ export default function Journal({
     <form action={saveJournal}>
       <input type="hidden" name="sessionId" value={sessionId} />
 
+      {/* Заголовки нужны, только когда список действительно разделён */}
       {likely.length > 0 && (
         <>
-          {rest.length > 0 && <div className="lbl" style={{ marginTop: 6 }}>Ждём</div>}
+          {split && <div className="lbl" style={{ marginTop: 6 }}>Ждём</div>}
           {likely.map(line)}
         </>
       )}
 
       {rest.length > 0 && (
         <>
-          <div className="lbl">Остальные</div>
+          {split && <div className="lbl">Остальные</div>}
           {rest.map(line)}
         </>
       )}
