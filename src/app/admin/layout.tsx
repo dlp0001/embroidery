@@ -18,7 +18,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="app">
       {children}
-      <SignOut email={user.email} />
+      <SignOut email={user.email} cross={{ href: '/account', label: 'Мой кабинет' }} />
       <Tabs tabs={TABS} />
     </div>
   );

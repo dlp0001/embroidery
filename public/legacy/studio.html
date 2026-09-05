@@ -21,6 +21,8 @@
   .nav-logo span { color: var(--rose); }
   .nav-back { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm-gray); text-decoration: none; transition: color 0.2s; }
   .nav-back:hover { color: var(--rose); }
+  .nav-cta { font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; padding: 10px 24px; background: var(--rose); color: #fff; text-decoration: none; transition: background 0.2s; }
+  .nav-cta:hover { background: var(--rose-dark); }
   .hero { display: grid; grid-template-columns: 1fr 1fr; min-height: 520px; }
   .hero-left { padding: 90px 64px; display: flex; flex-direction: column; justify-content: center; }
   .hero-pretitle { font-size: 11px; letter-spacing: 0.4em; text-transform: uppercase; color: var(--warm-gray); margin-bottom: 28px; }
@@ -53,7 +55,10 @@
 
 <nav>
   <a href="/" class="nav-logo">Re.Create.Art · <span>Варя Перлина</span></a>
-  <a href="/" class="nav-back">← На главную</a>
+  <div style="display:flex; align-items:center; gap:20px;">
+    <a href="/" class="nav-back">← На главную</a>
+    <a href="/login" class="nav-cta">Кабинет</a>
+  </div>
 </nav>
 
 <section class="hero">
@@ -69,9 +74,10 @@
 </section>
 
 <section class="section">
-  <h2 class="section-title">Страница студии готовится</h2>
-  <p class="section-desc">Здесь появятся расписание групп, условия и запись на пробное занятие. Пока про студию можно спросить письмом — Варя ответит.</p>
-  <a href="mailto:info@re-create.art" class="contact">info@re-create.art</a>
+  <h2 class="section-title">Кабинет студии</h2>
+  <p class="section-desc">Расписание, запись на занятия, посещения и оплата — в личном кабинете. Пароль не нужен: вход по коду на почту.</p>
+  <a href="/login" class="contact">Войти в кабинет</a>
+  <p class="section-desc" style="margin: 36px 0 0; font-size: 14px;">Публичная страница с расписанием и условиями ещё готовится. Пока про студию можно спросить письмом: <a href="mailto:info@re-create.art" style="color: var(--rose); text-decoration: none;">info@re-create.art</a></p>
 </section>
 
 <footer>

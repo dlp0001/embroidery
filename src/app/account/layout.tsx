@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import Tabs, { type Tab } from '@/components/Tabs';
 import SignOut from '@/components/SignOut';
 import NotConfigured from '@/components/NotConfigured';
-import { currentUser } from '@/lib/session';
+import { canTeach, currentUser } from '@/lib/session';
 
 const TABS: Tab[] = [
   { href: '/account', icon: 'week', label: 'Неделя' },
@@ -18,7 +18,10 @@ export default async function AccountLayout({ children }: { children: React.Reac
   return (
     <div className="app">
       {children}
-      <SignOut email={user.email} />
+      <SignOut
+        email={user.email}
+        cross={canTeach(user) ? { href: '/admin/studio', label: 'Журнал преподавателя' } : undefined}
+      />
       <Tabs tabs={TABS} />
     </div>
   );
