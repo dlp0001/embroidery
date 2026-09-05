@@ -11,6 +11,9 @@ const legacy = [
 ];
 
 const nextConfig = {
+  // Проверочная сборка пишет в свою папку, иначе затирает файлы
+  // работающего дев-сервера, и он начинает отдавать 404 и 500.
+  distDir: process.env.BUILD_DIR || '.next',
   async rewrites() {
     return [
       { source: '/', destination: '/legacy/index.html' },

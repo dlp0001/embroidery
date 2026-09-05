@@ -3,7 +3,7 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { startPayment, type Intent } from '@/lib/billing';
-import { requireUser } from '@/lib/session';
+import { isAdmin, requireUser } from '@/lib/session';
 
 /** Адрес сайта берём из запроса, чтобы совпадал и на превью, и на проде. */
 async function origin(): Promise<string> {
@@ -24,6 +24,13 @@ async function go(intent: Intent): Promise<never> {
 
 export async function payDebtAction(): Promise<void> {
   await go({ kind: 'debt' });
+}
+
+/** Проверочный платёж на маленькую сумму. Только для админа. */
+export async function testPaymentAction(): Promise<void> {
+  const user = await requireUser();
+  if (!isAdmin(user)) redirect('/account/pay');
+  await go({ kind: 'test' });
 }
 
 export async function buyPassAction(form: FormData): Promise<void> {

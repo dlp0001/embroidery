@@ -1,8 +1,9 @@
-import { requireUser } from '@/lib/session';
+import { isAdmin, requireUser } from '@/lib/session';
 import { lessonPrice, passBalances, unpaidCharges } from '@/lib/studio';
 import { isConfigured } from '@/lib/payplus';
 import { dayMonth, money, plural } from '@/lib/format';
-import { buyPassAction, payDebtAction } from './actions';
+import { lastTestPayment, TEST_AMOUNT } from '@/lib/billing';
+import { buyPassAction, payDebtAction, testPaymentAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,6 +17,9 @@ export default async function PayPage({
   const user = await requireUser();
   const { error } = await searchParams;
   const online = isConfigured();
+  const admin = isAdmin(user);
+  const lastTest = admin ? await lastTestPayment(user.id) : null;
+  const mode = process.env.PAYPLUS_ENV === 'prod' ? 'боевая' : 'тестовая';
   const [unpaid, passes, price] = await Promise.all([
     unpaidCharges(user.id),
     passBalances(user.id),
@@ -133,6 +137,33 @@ export default async function PayPage({
             Купить можно у Вари на занятии или написав на{' '}
             <a href="mailto:info@re-create.art">info@re-create.art</a>. Оплата картой
             появится, когда подключим банк.
+          </div>
+        )}
+
+        {admin && online && (
+          <div className="card" style={{ borderStyle: 'dashed', marginTop: 24 }}>
+            <div className="what" style={{ marginBottom: 8 }}>Проверка оплаты</div>
+            <p className="hint" style={{ marginBottom: 16 }}>
+              Платёж на {TEST_AMOUNT}&nbsp;₪, который ничего не выдаёт. Нужен, чтобы
+              убедиться, что деньги доходят и подтверждение возвращается.
+              Среда сейчас <strong style={{ color: 'var(--charcoal)' }}>{mode}</strong>
+              {mode === 'боевая' ? ' — деньги настоящие, вернуть можно из кабинета PayPlus.' : '.'}
+            </p>
+            <form action={testPaymentAction}>
+              <button className="btn-quiet" type="submit" style={{ width: '100%' }}>
+                Провести проверочный платёж
+              </button>
+            </form>
+            {lastTest && (
+              <p className="hint" style={{ marginTop: 14 }}>
+                Последняя попытка: {money(lastTest.amount, price.currency)} ·{' '}
+                {lastTest.status === 'paid'
+                  ? 'подтверждение получено, цепочка работает'
+                  : lastTest.status === 'pending'
+                    ? 'ждём подтверждения от PayPlus'
+                    : 'не прошла'}
+              </p>
+            )}
           </div>
         )}
       </div>

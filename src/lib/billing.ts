@@ -4,7 +4,11 @@ import { lessonPrice } from './studio';
 
 export type Intent =
   | { kind: 'debt' }
-  | { kind: 'pass'; lessons: number; months: number };
+  | { kind: 'pass'; lessons: number; months: number }
+  | { kind: 'test' };
+
+/** Сумма проверочного платежа: маленькая, чтобы не жалко было вернуть. */
+export const TEST_AMOUNT = 5;
 
 /**
  * Заводит платёж в состоянии «ждёт» и отдаёт ссылку на страницу PayPlus.
@@ -23,7 +27,11 @@ export async function startPayment(
   let description: string;
   let raw: Record<string, unknown>;
 
-  if (intent.kind === 'debt') {
+  if (intent.kind === 'test') {
+    amount = TEST_AMOUNT;
+    description = 'Проверка оплаты';
+    raw = {};
+  } else if (intent.kind === 'debt') {
     const debts = await query<{ id: string; amount: string }>(
       `select id, amount::text from charges
         where owner_id = $1 and pass_id is null and payment_id is null
@@ -44,7 +52,8 @@ export async function startPayment(
   const payment = await one<{ id: string }>(
     `insert into payments (provider, user_id, amount, currency, status, purpose, raw)
      values ('payplus', $1, $2, $3, 'pending', $4, $5) returning id`,
-    [user.id, amount, price.currency, intent.kind === 'debt' ? 'studio_debt' : 'studio_pass',
+    [user.id, amount, price.currency,
+     intent.kind === 'debt' ? 'studio_debt' : intent.kind === 'test' ? 'studio_test' : 'studio_pass',
      JSON.stringify(raw)],
   );
 
@@ -78,6 +87,17 @@ export async function startPayment(
  * Отмечает платёж оплаченным и раздаёт то, за что заплатили.
  * Идемпотентно: повторный вызов ничего не меняет.
  */
+export type TestPayment = { id: string; status: string; created_at: string; amount: string };
+
+export async function lastTestPayment(userId: string): Promise<TestPayment | null> {
+  return one<TestPayment>(
+    `select id, status, created_at::text, amount::text from payments
+      where user_id = $1 and purpose = 'studio_test'
+      order by created_at desc limit 1`,
+    [userId],
+  );
+}
+
 export async function checkoutUrl(paymentId: string, userId: string): Promise<string | null> {
   const row = await one<{ raw: { url?: string } | null }>(
     `select raw from payments
@@ -102,6 +122,10 @@ export async function applyPayment(paymentId: string, transactionUid: string | n
       `update payments set status = 'paid', provider_id = coalesce($2, provider_id) where id = $1`,
       [p.id, transactionUid],
     );
+
+    // Проверочный платёж ничего не выдаёт: он нужен только чтобы
+    // убедиться, что деньги доходят и обратный вызов срабатывает.
+    if (p.purpose === 'studio_test') return;
 
     if (p.purpose === 'studio_debt') {
       const ids = (p.raw?.charge_ids as string[] | undefined) ?? [];
