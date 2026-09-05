@@ -827,3 +827,100 @@ export async function resyncGroupSessions(groupId: string, weeksAhead = 6): Prom
     );
   });
 }
+
+// ── Абонементы ────────────────────────────────────────────
+
+export type PassOwner = { id: string; name: string | null; email: string; active_left: number };
+
+/** Взрослые, кому можно продать абонемент: родители и взрослые ученики. */
+export async function passOwners(): Promise<PassOwner[]> {
+  return query<PassOwner>(
+    `select u.id, u.name, u.email,
+            coalesce((select sum(p.lessons_total - (select count(*) from charges c where c.pass_id = p.id))::int
+                        from passes p
+                       where p.owner_id = u.id
+                         and (p.valid_to is null or p.valid_to >= current_date)), 0) as active_left
+       from users u
+      where exists (select 1 from guardians g where g.user_id = u.id)
+         or exists (select 1 from user_roles r where r.user_id = u.id and r.role in ('parent', 'student'))
+      order by coalesce(u.name, u.email)`,
+  );
+}
+
+export type IssuePassInput = {
+  ownerId: string;
+  lessons: number;
+  months: number;
+  paid: 'cash' | 'transfer' | 'unpaid';
+  coverDebt: boolean;
+};
+
+/**
+ * Выдаёт абонемент. При оплате наличными или переводом сразу заводит
+ * платёж. Если попросили, гасит уже накопленные неоплаченные занятия:
+ * самые старые вперёд, пока хватает занятий в пакете.
+ */
+export async function issuePass(input: IssuePassInput, byUser: string): Promise<{ covered: number }> {
+  const { amount, currency } = await lessonPrice();
+
+  return tx(async (c) => {
+    let paymentId: string | null = null;
+    if (input.paid !== 'unpaid') {
+      const pay = await c.query<{ id: string }>(
+        `insert into payments (provider, user_id, amount, currency, status, purpose, raw)
+         values ($1, $2, $3, $4, 'paid', 'studio_pass', $5) returning id`,
+        [input.paid, input.ownerId, amount * input.lessons, currency,
+         JSON.stringify({ issued_by: byUser, lessons: input.lessons })],
+      );
+      paymentId = pay.rows[0].id;
+    }
+
+    const pass = await c.query<{ id: string }>(
+      `insert into passes (owner_id, lessons_total, valid_from, valid_to, payment_id)
+       values ($1, $2, current_date, current_date + ($3 || ' months')::interval, $4)
+       returning id`,
+      [input.ownerId, input.lessons, String(input.months), paymentId],
+    );
+    const passId = pass.rows[0].id;
+
+    let covered = 0;
+    if (input.coverDebt) {
+      const debts = await c.query<{ id: string }>(
+        `select ch.id from charges ch
+           join studio_sessions s on s.id = ch.session_id
+          where ch.owner_id = $1 and ch.pass_id is null and ch.payment_id is null
+          order by s.held_on
+          limit $2`,
+        [input.ownerId, input.lessons],
+      );
+      for (const row of debts.rows) {
+        await c.query('update charges set pass_id = $2 where id = $1', [row.id, passId]);
+        covered++;
+      }
+    }
+    return { covered };
+  });
+}
+
+export type PassRow = {
+  id: string;
+  owner_name: string | null;
+  owner_email: string;
+  lessons_total: number;
+  left: number;
+  valid_to: string | null;
+  paid: string | null;
+};
+
+export async function allActivePasses(): Promise<PassRow[]> {
+  return query<PassRow>(
+    `select p.id, u.name as owner_name, u.email as owner_email, p.lessons_total,
+            p.lessons_total - (select count(*)::int from charges c where c.pass_id = p.id) as left,
+            p.valid_to::text,
+            (select pay.provider from payments pay where pay.id = p.payment_id) as paid
+       from passes p
+       join users u on u.id = p.owner_id
+      where p.valid_to is null or p.valid_to >= current_date
+      order by p.valid_to nulls last, coalesce(u.name, u.email)`,
+  );
+}

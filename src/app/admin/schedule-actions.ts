@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { isAdmin, requireUser } from '@/lib/session';
 import {
-  addSession, createGroup, deleteSession, resyncGroupSessions, setGroupActive,
+  addSession, createGroup, deleteSession, issuePass, resyncGroupSessions, setGroupActive,
   setSessionStatus, updateGroup, type GroupInput,
 } from '@/lib/studio';
 
@@ -101,4 +101,29 @@ export async function deleteSessionAction(form: FormData): Promise<void> {
   const res = await deleteSession(String(form.get('id')));
   if (!res.ok) throw new Error(res.reason);
   refresh();
+}
+
+export async function issuePassAction(form: FormData): Promise<void> {
+  const user = await requireAdmin();
+  const lessons = Number(form.get('lessons'));
+  const months = Number(form.get('months'));
+  const paid = String(form.get('paid'));
+  if (!Number.isInteger(lessons) || lessons < 1 || lessons > 100) throw new Error('BAD_LESSONS');
+  if (!Number.isInteger(months) || months < 1 || months > 24) throw new Error('BAD_MONTHS');
+  if (paid !== 'cash' && paid !== 'transfer' && paid !== 'unpaid') throw new Error('BAD_PAID');
+
+  await issuePass(
+    {
+      ownerId: String(form.get('ownerId')),
+      lessons,
+      months,
+      paid,
+      coverDebt: form.get('coverDebt') === 'on',
+    },
+    user.id,
+  );
+  revalidatePath('/admin/studio/debts');
+  revalidatePath('/admin/studio');
+  revalidatePath('/account');
+  revalidatePath('/account/pay');
 }

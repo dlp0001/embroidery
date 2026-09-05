@@ -1,32 +1,55 @@
 import { requireUser } from '@/lib/session';
-import { unpaidCharges } from '@/lib/studio';
-import { dayMonth, money } from '@/lib/format';
+import { lessonPrice, passBalances, unpaidCharges } from '@/lib/studio';
+import { dayMonth, money, plural } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
 export default async function PayPage() {
   const user = await requireUser();
-  const unpaid = await unpaidCharges(user.id);
+  const [unpaid, passes, price] = await Promise.all([
+    unpaidCharges(user.id),
+    passBalances(user.id),
+    lessonPrice(),
+  ]);
   const total = unpaid.reduce((s, c) => s + Number(c.amount), 0);
-  const currency = unpaid[0]?.currency ?? 'ILS';
+  const currency = unpaid[0]?.currency ?? price.currency;
+  const pass = passes.find((p) => p.left > 0) ?? null;
 
   return (
     <>
       <div className="top">
         <div className="kicker">Re.Create.Art · Студия</div>
-        <h1 className="h1">К оплате</h1>
+        <h1 className="h1">Оплата</h1>
       </div>
+
       <div className="body">
+        {pass && (
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+              <div className="what">Абонемент</div>
+              <div style={{ fontSize: 13, color: 'var(--warm-gray)' }}>
+                осталось {pass.left} из {pass.lessons_total}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+              {Array.from({ length: pass.lessons_total }, (_, i) => (
+                <div key={i} style={{ height: 6, flexGrow: 1, background: i < pass.used ? 'var(--rose-light)' : 'var(--rose)' }} />
+              ))}
+            </div>
+            <div className="sub">
+              Общий на всех{pass.valid_to ? ` · действует до ${dayMonth(pass.valid_to)}` : ''}
+            </div>
+          </div>
+        )}
+
+        <div className="lbl">Не покрыто абонементом</div>
+
         {unpaid.length === 0 ? (
-          <p className="hint" style={{ marginTop: 20 }}>
-            Всё оплачено. Занятия, не покрытые абонементом, появятся здесь.
+          <p className="hint">
+            Всё оплачено. Занятия, которые не покроет абонемент, появятся здесь.
           </p>
         ) : (
           <>
-            <p className="hint" style={{ margin: '8px 0 20px' }}>
-              Занятия, которые уже прошли и не покрыты абонементом.
-            </p>
-
             {unpaid.map((c) => (
               <div className="card" key={c.id}>
                 <div className="row">
@@ -46,22 +69,33 @@ export default async function PayPage() {
               padding: '20px 2px 22px', borderTop: '1px solid var(--line)', marginTop: 12,
             }}>
               <div style={{ fontSize: 12, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>
-                Итого
+                Итого за {unpaid.length}&nbsp;{plural(unpaid.length, 'занятие', 'занятия', 'занятий')}
               </div>
               <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 34 }}>
                 {money(total, currency)}
               </div>
             </div>
 
-            <button className="btn-wide" disabled title="PayPlus ещё не подключён">
+            <button className="btn-wide" disabled title="Оплата картой ещё не подключена">
               Оплатить картой
             </button>
-            <p className="hint" style={{ marginTop: 16 }}>
-              Оплата пойдёт через PayPlus, квитанция придёт на почту. Кнопка выключена,
-              пока нет доступов к терминалу.
+            <p className="hint" style={{ marginTop: 14 }}>
+              Оплата картой скоро появится. Пока рассчитаться можно на занятии,
+              наличными или переводом — Варя отметит это здесь.
             </p>
           </>
         )}
+
+        <div className="note" style={{ marginTop: 24 }}>
+          <strong style={{ color: 'var(--charcoal)', fontWeight: 500 }}>
+            {pass ? 'Продлить абонемент' : 'Абонемент вместо разовых'}
+          </strong>
+          <br />
+          Пакет занятий общий на всю семью: тратится и на детей, и на взрослого.
+          Пока он действует, платить за каждое посещение не нужно. Одно занятие
+          стоит {money(price.amount, price.currency)}. Купить можно у Вари на занятии
+          или написав на <a href="mailto:info@re-create.art">info@re-create.art</a>.
+        </div>
       </div>
     </>
   );
