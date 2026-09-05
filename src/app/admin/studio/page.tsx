@@ -2,7 +2,8 @@ import Link from 'next/link';
 import Journal from '@/components/Journal';
 import { isAdmin, requireTeacher } from '@/lib/session';
 import {
-  debtors, ensureSessions, lessonPrice, sessionRoster, teacherSessions, unclosedBefore,
+  debtors, ensureSessions, lessonPrice, nextSessions, sessionRoster, teacherSessions,
+  unclosedBefore,
 } from '@/lib/studio';
 import { dayMonth, hhmm, money, plural, todayISO, weekdayDayMonth } from '@/lib/format';
 
@@ -18,12 +19,17 @@ export default async function TodayPage({
   await ensureSessions();
 
   const scope = isAdmin(user) ? null : user.id;
-  const [today, missed, debts, price] = await Promise.all([
+  const [todaySessions, missed, debts, price] = await Promise.all([
     teacherSessions(scope),
     unclosedBefore(scope),
     debtors(),
     lessonPrice(),
   ]);
+
+  // Если сегодня занятий нет, показываем ближайшее — тоже с журналом.
+  const upcoming = todaySessions.length === 0 ? await nextSessions(scope) : [];
+  const today = todaySessions.length > 0 ? todaySessions : upcoming;
+  const isToday = todaySessions.length > 0;
 
   const rosters = await Promise.all(today.map((s) => sessionRoster(s.session_id)));
   const debtTotal = debts.reduce((s, d) => s + Number(d.amount), 0);
@@ -37,13 +43,23 @@ export default async function TodayPage({
       </div>
 
       <div className="body">
-        {today.length === 0 && <p className="hint" style={{ marginTop: 12 }}>Сегодня занятий нет.</p>}
+        {today.length === 0 && (
+          <p className="hint" style={{ marginTop: 12 }}>Занятий нет ни сегодня, ни впереди.</p>
+        )}
+
+        {!isToday && today.length > 0 && (
+          <div className="lbl" style={{ marginTop: 0 }}>
+            Сегодня занятий нет. Ближайшее: {weekdayDayMonth(today[0].held_on).toLowerCase()}
+          </div>
+        )}
 
         {today.map((s, i) => (
           <section className="card" key={s.session_id} style={{ marginBottom: 16 }}>
             <div className="row" style={{ alignItems: 'baseline' }}>
               <div>
-                <div className="when" style={{ marginBottom: 2 }}>{hhmm(s.starts_at)}</div>
+                <div className="when" style={{ marginBottom: 2 }}>
+                  {isToday ? hhmm(s.starts_at) : `${dayMonth(s.held_on)} · ${hhmm(s.starts_at)}`}
+                </div>
                 <div className="what">{s.group_title}</div>
               </div>
               {s.marked > 0 && <div className="tag tag-ok">отмечено</div>}

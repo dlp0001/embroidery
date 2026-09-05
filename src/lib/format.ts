@@ -1,3 +1,5 @@
+import { STUDIO_TZ } from './time';
+
 const MONTHS = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
 const WEEKDAYS = ['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
 
@@ -24,9 +26,14 @@ export function money(amount: string | number, currency = 'ILS'): string {
   return `${Number.isInteger(n) ? n : n.toFixed(2)} ${sign}`;
 }
 
+/** Сегодняшняя дата по времени студии, а не по времени сервера. */
 export function todayISO(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: STUDIO_TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
 }
 
 /** Русские склонения: plural(2, 'занятие', 'занятия', 'занятий'). */

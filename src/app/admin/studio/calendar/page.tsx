@@ -104,11 +104,22 @@ export default async function AdminCalendarPage({
                 <div className="when">{hhmm(s.starts_at)}</div>
                 <div className="what">{s.group_title}</div>
                 <div className="sub">
-                  {s.status === 'cancelled' ? 'отменено' : s.marked > 0 ? `отмечено ${s.marked} из ${s.people}` : `${s.people} в группе, журнал пуст`}
+                  {s.status === 'cancelled'
+                    ? 'отменено'
+                    : s.marked > 0
+                      ? `отмечено ${s.marked} из ${s.people}`
+                      : s.people > 0
+                        ? `${s.people} в группе, журнал пуст`
+                        : 'в группе никого'}
                 </div>
               </div>
-              {s.marked > 0 && (
-                <Link className="btn-quiet" href={`/admin/studio/session/${s.session_id}`}>Журнал</Link>
+              {s.status !== 'cancelled' && s.people > 0 && (
+                <Link
+                  className={s.marked > 0 ? 'btn-quiet' : 'btn'}
+                  href={`/admin/studio/session/${s.session_id}`}
+                >
+                  {s.marked > 0 ? 'Журнал' : 'Отметить'}
+                </Link>
               )}
             </div>
 

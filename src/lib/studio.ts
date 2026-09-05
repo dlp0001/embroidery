@@ -404,6 +404,34 @@ export async function teacherSessions(teacherId: string | null): Promise<Teacher
   );
 }
 
+/** Ближайший день с занятиями впереди. Нужен, когда сегодня пусто. */
+export async function nextSessions(teacherId: string | null): Promise<TeacherSession[]> {
+  return query<TeacherSession>(
+    `with soonest as (
+       select min(s.held_on) as day
+         from studio_sessions s
+         join studio_groups g on g.id = s.group_id
+        where ($1::uuid is null or g.teacher_id = $1)
+          and s.held_on > current_date
+          and s.status <> 'cancelled'
+          and exists (select 1 from studio_members m
+                       where m.group_id = g.id and m.left_at is null)
+     )
+     select s.id as session_id, g.id as group_id, g.title as group_title,
+            s.held_on::text, g.starts_at::text, s.status,
+            (select count(*)::int from studio_members m
+              where m.group_id = g.id and m.left_at is null) as people,
+            (select count(*)::int from attendance a where a.session_id = s.id) as marked
+       from studio_sessions s
+       join studio_groups g on g.id = s.group_id
+       join soonest on s.held_on = soonest.day
+      where ($1::uuid is null or g.teacher_id = $1)
+        and s.status <> 'cancelled'
+      order by g.starts_at`,
+    [teacherId],
+  );
+}
+
 /** Занятия прошлых дней, которые так и не отметили. */
 export async function unclosedBefore(teacherId: string | null): Promise<TeacherSession[]> {
   return query<TeacherSession>(

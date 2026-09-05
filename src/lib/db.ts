@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { pgConfig } from './pg-config';
+import { STUDIO_TZ } from './time';
 
 // Один пул на процесс. В dev Next перезагружает модули, поэтому держим в globalThis.
 const globalForDb = globalThis as unknown as { _pool?: pg.Pool };
@@ -11,6 +12,14 @@ export const pool =
     max: 5,
     idleTimeoutMillis: 30_000,
   });
+
+// «Сегодня» у базы должно совпадать с «сегодня» у студии, иначе между
+// полуночью и утром current_date отстаёт на день от того, что видит человек.
+pool.on('connect', (client) => {
+  client.query(`set time zone '${STUDIO_TZ}'`).catch((err) => {
+    console.error('не удалось выставить часовой пояс', err);
+  });
+});
 
 if (process.env.NODE_ENV !== 'production') globalForDb._pool = pool;
 
