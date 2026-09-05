@@ -37,7 +37,7 @@ module.exports = async function handler(req, res) {
         amount: { value: '400.00', currency: 'RUB' },
         confirmation: {
           type: 'redirect',
-          return_url: 'https://re-create.art/?success=true',
+          return_url: 'https://re-create.art/embroidery?success=true',
         },
         capture: true,
         description: 'Список материалов и инструментов для вышивки',

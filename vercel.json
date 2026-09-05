@@ -1,6 +1,13 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/",
+      "has": [{ "type": "query", "key": "success" }],
+      "destination": "/embroidery?success=true"
+    }
+  ],
   "functions": {
     "api/*.js": {
       "maxDuration": 10
