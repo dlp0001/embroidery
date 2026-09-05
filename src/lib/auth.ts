@@ -46,35 +46,56 @@ export async function requestCode(rawEmail: string): Promise<RequestCodeResult> 
     return { ok: false, error: 'Не удаётся связаться с базой. Попробуйте позже.' };
   }
 
-  await sendCode(email, code);
+  const sent = await sendCode(email, code);
+  if (!sent) {
+    return { ok: false, error: 'Письмо не ушло. Напишите на info@re-create.art, мы откроем доступ.' };
+  }
   // В разработке письма не уходят, поэтому код показываем на странице.
   const dev = process.env.NODE_ENV !== 'production' && !process.env.RESEND_API_KEY;
   return dev ? { ok: true, devCode: code } : { ok: true };
 }
 
-async function sendCode(email: string, code: string): Promise<void> {
+/**
+ * Отправка кода. Возвращает false, если письмо не ушло: молча делать вид,
+ * что оно отправлено, нельзя — человек будет ждать его вечно.
+ */
+async function sendCode(email: string, code: string): Promise<boolean> {
   const key = process.env.RESEND_API_KEY;
   if (!key) {
-    // Без ключа письма не уходят: код видно в консоли сервера.
+    if (process.env.NODE_ENV === 'production') {
+      console.error('login: RESEND_API_KEY не задан, письмо не отправлено');
+      return false;
+    }
+    // В разработке письма не шлём, код виден в консоли и на странице.
     console.log(`\n  Код входа для ${email}: ${code}\n`);
-    return;
+    return true;
   }
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      from: process.env.FROM_EMAIL ?? 'info@re-create.art',
-      to: email,
-      subject: `${code} — код входа в Re.Create.Art`,
-      html: `<div style="font-family:Georgia,serif;max-width:420px;margin:0 auto;padding:32px;color:#1a1a2e">
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: process.env.FROM_EMAIL ?? 'info@re-create.art',
+        to: email,
+        subject: `${code} — код входа в Re.Create.Art`,
+        html: `<div style="font-family:Georgia,serif;max-width:420px;margin:0 auto;padding:32px;color:#1a1a2e">
         <p style="font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:#666;margin:0 0 24px">Re.Create.Art</p>
         <p style="font-size:16px;margin:0 0 20px">Код для входа:</p>
         <p style="font-family:'Jost',sans-serif;font-size:38px;letter-spacing:.2em;color:#e91e8c;margin:0 0 20px">${code}</p>
         <p style="font-size:14px;color:#666;line-height:1.7;margin:0">Действует ${CODE_TTL_MIN} минут. Если вы не запрашивали вход, просто удалите это письмо.</p>
       </div>`,
-    }),
-  });
-  if (!res.ok) console.error('resend:', res.status, await res.text());
+      }),
+    });
+    if (!res.ok) {
+      console.error('resend:', res.status, await res.text());
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('resend: запрос не прошёл', err);
+    return false;
+  }
 }
 
 export type VerifyResult = { ok: true } | { ok: false; error: string };
