@@ -15,7 +15,7 @@ export async function startPayment(
   user: { id: string; email: string; name: string | null },
   intent: Intent,
   origin: string,
-): Promise<{ url: string } | { error: string }> {
+): Promise<{ paymentId: string } | { error: string }> {
   if (!isConfigured()) return { error: 'Оплата картой ещё не подключена.' };
 
   const price = await lessonPrice();
@@ -60,12 +60,17 @@ export async function startPayment(
       failureUrl: `${origin}/account/pay/done?ok=0`,
       callbackUrl: `${origin}/api/webhook-payplus`,
     });
-    await query('update payments set provider_id = $2 where id = $1', [payment!.id, link.pageRequestUid]);
-    return { url: link.url };
+    await query(
+      `update payments set provider_id = $2, raw = raw || jsonb_build_object('url', $3::text)
+        where id = $1`,
+      [payment!.id, link.pageRequestUid, link.url],
+    );
+    return { paymentId: payment!.id };
   } catch (err) {
     console.error('payplus: не удалось создать ссылку', err);
     await query(`update payments set status = 'failed' where id = $1`, [payment!.id]);
-    return { error: 'Не удалось открыть страницу оплаты. Попробуйте позже.' };
+    const reason = err instanceof Error ? err.message : 'неизвестная причина';
+    return { error: `PayPlus не дал страницу оплаты: ${reason}` };
   }
 }
 
@@ -73,6 +78,15 @@ export async function startPayment(
  * Отмечает платёж оплаченным и раздаёт то, за что заплатили.
  * Идемпотентно: повторный вызов ничего не меняет.
  */
+export async function checkoutUrl(paymentId: string, userId: string): Promise<string | null> {
+  const row = await one<{ raw: { url?: string } | null }>(
+    `select raw from payments
+      where id = $1 and user_id = $2 and provider = 'payplus' and status = 'pending'`,
+    [paymentId, userId],
+  );
+  return row?.raw?.url ?? null;
+}
+
 export async function applyPayment(paymentId: string, transactionUid: string | null): Promise<void> {
   await tx(async (c) => {
     const { rows } = await c.query<{

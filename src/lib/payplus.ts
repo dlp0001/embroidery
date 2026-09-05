@@ -86,7 +86,7 @@ export async function createPaymentLink(input: LinkInput): Promise<PaymentLink> 
   const uid = data.data?.page_request_uid;
   const url = data.data?.payment_page_link;
   if (!uid || !url) {
-    throw new Error(`payplus: ссылка не создана — ${data.results?.description ?? 'без описания'}`);
+    throw new Error(data.results?.description ?? 'ссылка не создана, PayPlus не объяснил причину');
   }
   return { pageRequestUid: uid, url };
 }
