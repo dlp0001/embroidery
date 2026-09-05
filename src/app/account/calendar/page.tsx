@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/session';
-import { sessionsForUser } from '@/lib/studio';
-import { hhmm, todayISO, weekdayDayMonth } from '@/lib/format';
-import { toggleBooking } from '../actions';
+import { slotsForUser } from '@/lib/studio';
+import { todayISO, weekdayDayMonth } from '@/lib/format';
+import SlotList from '@/components/SlotList';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +34,7 @@ export default async function CalendarPage({
   const month = /^\d{4}-\d{2}$/.test(params.m ?? '') ? params.m! : today.slice(0, 7);
   const { first, last, days, lead } = monthBounds(month);
 
-  const rows = await sessionsForUser(user.id, first, last);
+  const rows = await slotsForUser(user.id, first, last);
   const withSessions = new Set(rows.map((r) => r.held_on));
 
   const selected = params.d && withSessions.has(params.d)
@@ -90,25 +90,7 @@ export default async function CalendarPage({
         {selected ? (
           <section>
             <div className="lbl">{weekdayDayMonth(selected)}</div>
-            {dayRows.map((row) => (
-              <div className="card" key={`${row.session_id}-${row.participant_id}`}>
-                <div className="row">
-                  <div>
-                    <div className="when">{hhmm(row.starts_at)} · {row.group_title}</div>
-                    <div className="what">{row.who}</div>
-                    <div className="sub">{row.booked ? 'Место закреплено' : 'Пока без записи'}</div>
-                  </div>
-                  <form action={toggleBooking}>
-                    <input type="hidden" name="sessionId" value={row.session_id} />
-                    <input type="hidden" name="participantId" value={row.participant_id} />
-                    <input type="hidden" name="booked" value={row.booked ? '0' : '1'} />
-                    <button className={row.booked ? 'btn-quiet' : 'btn'} type="submit">
-                      {row.booked ? 'Отменить' : 'Записать'}
-                    </button>
-                  </form>
-                </div>
-              </div>
-            ))}
+            <SlotList rows={dayRows} />
           </section>
         ) : (
           <p className="hint" style={{ marginTop: 20 }}>В этом месяце занятий нет.</p>

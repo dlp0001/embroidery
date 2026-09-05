@@ -474,3 +474,118 @@ export async function groupsOverview(teacherId: string | null) {
     [teacherId],
   );
 }
+
+// ── Расписание для родителя ───────────────────────────────
+
+export type SlotRow = {
+  session_id: string;
+  held_on: string;
+  starts_at: string;
+  group_title: string;
+  audience: 'kids' | 'adults';
+  weekday: number;
+  capacity: number | null;
+  taken: number;
+  participant_id: string;
+  who: string;
+  is_adult: boolean;
+  booked: boolean;
+  preferred: boolean;
+};
+
+/**
+ * Занятия за период и для каждого — те члены семьи, кому оно подходит
+ * по типу: на детское ходят дети, на взрослое взрослые.
+ */
+export async function slotsForUser(userId: string, from: string, to: string): Promise<SlotRow[]> {
+  return query<SlotRow>(
+    `select s.id as session_id, s.held_on::text, g.starts_at::text, g.title as group_title,
+            g.audience, g.weekday, g.capacity,
+            (select count(*)::int from bookings bb
+              where bb.session_id = s.id and bb.status = 'booked') as taken,
+            p.id as participant_id,
+            coalesce(c.name, u.name, 'Я') as who,
+            (p.user_id is not null) as is_adult,
+            (b.id is not null and b.status = 'booked') as booked,
+            (pd.weekday is not null) as preferred
+       from studio_sessions s
+       join studio_groups g on g.id = s.group_id and g.active
+       join participants p
+         on (g.audience = 'adults' and p.user_id is not null)
+         or (g.audience = 'kids' and p.child_id is not null)
+       left join children c on c.id = p.child_id
+       left join users u on u.id = p.user_id
+       left join bookings b on b.session_id = s.id and b.participant_id = p.id
+       left join preferred_days pd on pd.participant_id = p.id and pd.weekday = g.weekday
+      where (p.user_id = $1 or p.child_id in (select child_id from guardians where user_id = $1))
+        and s.held_on between $2::date and $3::date
+        and s.status <> 'cancelled'
+      order by s.held_on, g.starts_at, (p.user_id is not null) desc, who`,
+    [userId, from, to],
+  );
+}
+
+export type FamilyMember = {
+  participant_id: string;
+  child_id: string | null;
+  who: string;
+  is_adult: boolean;
+  days: number[];
+};
+
+export async function familyWithDays(userId: string): Promise<FamilyMember[]> {
+  return query<FamilyMember>(
+    `select p.id as participant_id, p.child_id,
+            coalesce(c.name, u.name, 'Я') as who,
+            (p.user_id is not null) as is_adult,
+            coalesce(array_agg(pd.weekday order by pd.weekday)
+                     filter (where pd.weekday is not null), '{}') as days
+       from participants p
+       left join children c on c.id = p.child_id
+       left join users u on u.id = p.user_id
+       left join preferred_days pd on pd.participant_id = p.id
+      where p.user_id = $1
+         or p.child_id in (select child_id from guardians where user_id = $1)
+      group by p.id, p.child_id, c.name, u.name
+      order by (p.user_id is not null) desc, coalesce(c.name, u.name)`,
+    [userId],
+  );
+}
+
+export async function addChild(userId: string, name: string): Promise<void> {
+  await tx(async (c) => {
+    const { rows } = await c.query<{ id: string }>(
+      'insert into children (name) values ($1) returning id',
+      [name],
+    );
+    await c.query('insert into guardians (child_id, user_id) values ($1, $2)', [rows[0].id, userId]);
+    await c.query('insert into participants (child_id) values ($1)', [rows[0].id]);
+  });
+}
+
+export async function renameChild(userId: string, childId: string, name: string): Promise<void> {
+  await query(
+    `update children set name = $3
+      where id = $2 and exists (select 1 from guardians g where g.child_id = $2 and g.user_id = $1)`,
+    [userId, childId, name],
+  );
+}
+
+export async function setPreferredDay(
+  participantId: string,
+  weekday: number,
+  on: boolean,
+): Promise<void> {
+  if (on) {
+    await query(
+      `insert into preferred_days (participant_id, weekday) values ($1, $2)
+       on conflict do nothing`,
+      [participantId, weekday],
+    );
+  } else {
+    await query('delete from preferred_days where participant_id = $1 and weekday = $2', [
+      participantId,
+      weekday,
+    ]);
+  }
+}

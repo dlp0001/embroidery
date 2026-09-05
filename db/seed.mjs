@@ -48,7 +48,7 @@ const group = async (title, weekday, startsAt, audience, ageHint, capacity) => {
 
 const junior = await group('Младшие', 3, '16:30', 'kids', '6–8 лет', 10);
 const middle = await group('Средние', 3, '18:00', 'kids', '9–11 лет', 12);
-const senior = await group('Старшие', 7, '17:00', 'teens', '12+ лет', 10);
+const senior = await group('Старшие', 7, '17:00', 'kids', '12+ лет', 10);
 const adults = await group('Взрослые', 6, '11:00', 'adults', null, 8);
 
 const annaSelf = (await c.query('select id from participants where user_id = $1', [anna])).rows[0].id;
