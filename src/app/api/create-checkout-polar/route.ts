@@ -1,6 +1,7 @@
 import { clientIp } from '@/lib/sheets';
 
 export const runtime = 'nodejs';
+export const maxDuration = 10;
 
 export async function POST(req: Request) {
   const { productId, email, name, telegram, customerIp } = (await req.json()) as Record<string, string>;

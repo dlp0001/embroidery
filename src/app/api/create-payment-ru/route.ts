@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { clientIp, getSheet, SHEET_ID } from '@/lib/sheets';
 
 export const runtime = 'nodejs';
+export const maxDuration = 10;
 
 const YOOKASSA_SHOP_ID = '1351165';
 const PRICE = '400.00';

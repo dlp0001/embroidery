@@ -1,6 +1,7 @@
 import { clientIp, getSheet, SHEET_ID } from '@/lib/sheets';
 
 export const runtime = 'nodejs';
+export const maxDuration = 10;
 
 export async function POST(req: Request) {
   const { name, email, telegram, paymentMethod, transactionId, amount, currency } =

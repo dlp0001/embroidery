@@ -1,4 +1,5 @@
 export const runtime = 'nodejs';
+export const maxDuration = 10;
 
 const YOOKASSA_SHOP_ID = '1351165';
 

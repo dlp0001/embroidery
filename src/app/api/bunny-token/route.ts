@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 export const runtime = 'nodejs';
+export const maxDuration = 10;
 
 const LIBRARY_ID = '675652';
 

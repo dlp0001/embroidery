@@ -5,7 +5,7 @@
 // поэтому любой из этих адресов можно перенести в app/ и он победит.
 const legacy = [
   'embroidery', 'register', 'video', 'materials', 'materials2',
-  'portfolio', 'israeli-hints', 'camp',
+  'portfolio', 'israeli-hints', 'camp', 'studio',
   'agreement', 'privacy-ru', 'consent-data', 'consent-marketing',
   'terms', 'refunds', 'privacy',
 ];
