@@ -4,11 +4,21 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 
+/** Neon требует SSL, локальный докер его не умеет. */
+function pgConfig(connectionString) {
+  let local = false;
+  try {
+    const host = new URL(connectionString).hostname;
+    local = host === 'localhost' || host === '127.0.0.1';
+  } catch {}
+  return local ? { connectionString } : { connectionString, ssl: { rejectUnauthorized: true } };
+}
+
 const dir = join(dirname(fileURLToPath(import.meta.url)), 'migrations');
 const url = process.env.DATABASE_URL;
 if (!url) { console.error('DATABASE_URL не задан'); process.exit(1); }
 
-const client = new pg.Client({ connectionString: url });
+const client = new pg.Client(pgConfig(url));
 await client.connect();
 await client.query(`create table if not exists _migrations (
   name text primary key, applied_at timestamptz not null default now())`);

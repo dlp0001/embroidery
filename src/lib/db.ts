@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { pgConfig } from './pg-config';
 
 // Один пул на процесс. В dev Next перезагружает модули, поэтому держим в globalThis.
 const globalForDb = globalThis as unknown as { _pool?: pg.Pool };
@@ -6,7 +7,7 @@ const globalForDb = globalThis as unknown as { _pool?: pg.Pool };
 export const pool =
   globalForDb._pool ??
   new pg.Pool({
-    connectionString: process.env.DATABASE_URL,
+    ...pgConfig(process.env.DATABASE_URL),
     max: 5,
     idleTimeoutMillis: 30_000,
   });

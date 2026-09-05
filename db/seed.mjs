@@ -1,7 +1,17 @@
 // Тестовые данные для разработки. Идемпотентно: чистит студийные таблицы и заливает заново.
 import pg from 'pg';
 
-const c = new pg.Client({ connectionString: process.env.DATABASE_URL });
+/** Neon требует SSL, локальный докер его не умеет. */
+function pgConfig(connectionString) {
+  let local = false;
+  try {
+    const host = new URL(connectionString).hostname;
+    local = host === 'localhost' || host === '127.0.0.1';
+  } catch {}
+  return local ? { connectionString } : { connectionString, ssl: { rejectUnauthorized: true } };
+}
+
+const c = new pg.Client(pgConfig(process.env.DATABASE_URL));
 await c.connect();
 
 await c.query(`truncate charges, attendance, bookings, studio_sessions, studio_members,
