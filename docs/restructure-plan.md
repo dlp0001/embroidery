@@ -51,11 +51,14 @@ user-agent. Права на уроки определяются поиском e
 | `/account` | вошедший взрослый | сводка |
 | `/account/courses` | вошедший взрослый | купленные курсы |
 | `/account/children` | родитель | дети и их группы в студии |
+| `/account/schedule` | родитель, взрослый ученик | календарь, неделя, запись на занятие |
 | `/account/payments` | вошедший взрослый | платежи и квитанции |
 | `/account/settings` | вошедший взрослый | профиль, согласия, выход |
 | `/learn/embroidery/[lesson]` | есть доступ к курсу | урок, видео, материалы |
 | `/learn/knitting/[lesson]` | есть доступ к курсу | то же |
 | `/admin/studio` | admin, teacher | группы, посещаемость, абонементы |
+| `/admin/studio/today` | teacher | отметка после занятия с телефона |
+| `/admin/studio/debts` | admin, teacher | кто сколько должен, напоминания |
 | `/admin/camp` | admin | отложено вместе с лагерем |
 | `/admin/courses` | admin | ученики и доступы к курсам |
 | `/admin/people` | admin | дети, родители, преподаватели |
@@ -162,9 +165,19 @@ create table lesson_progress (
 );
 ```
 
-Студия:
+Студия. Участником занятия может быть и ребёнок, и взрослый: родитель
+ходит на субботнюю взрослую группу сам. Поэтому между человеком и
+занятием стоит `participants`, а всё студийное ссылается на него, а не на
+ребёнка напрямую.
 
 ```sql
+create table participants (
+  id       uuid primary key default gen_random_uuid(),
+  child_id uuid references children(id) on delete cascade,
+  user_id  uuid references users(id) on delete cascade,
+  check (num_nonnulls(child_id, user_id) = 1)
+);
+
 create table studio_groups (
   id          uuid primary key default gen_random_uuid(),
   title       text not null,
@@ -172,51 +185,95 @@ create table studio_groups (
   weekday     int,
   starts_at   time,
   room        text,
-  age_min     int,
-  age_max     int,
+  audience    text,                    -- kids, teens, adults
   active      boolean default true
 );
 
 create table studio_members (
-  group_id  uuid references studio_groups(id) on delete cascade,
-  child_id  uuid references children(id) on delete cascade,
-  joined_at date default current_date,
-  left_at   date,
-  primary key (group_id, child_id)
+  group_id       uuid references studio_groups(id) on delete cascade,
+  participant_id uuid references participants(id) on delete cascade,
+  joined_at      date default current_date,
+  left_at        date,
+  primary key (group_id, participant_id)
 );
 
 create table studio_sessions (
   id        uuid primary key default gen_random_uuid(),
   group_id  uuid references studio_groups(id) on delete cascade,
   held_on   date not null,
+  capacity  int,
   status    text default 'planned',
   unique (group_id, held_on)
 );
 
-create table attendance (
-  session_id  uuid references studio_sessions(id) on delete cascade,
-  child_id    uuid references children(id) on delete cascade,
-  status      text check (status in ('present','absent','sick','trial')),
-  marked_by   uuid references users(id),
-  marked_at   timestamptz default now(),
-  primary key (session_id, child_id)
+create table bookings (
+  id             uuid primary key default gen_random_uuid(),
+  session_id     uuid references studio_sessions(id) on delete cascade,
+  participant_id uuid references participants(id) on delete cascade,
+  status         text default 'booked',   -- booked, cancelled
+  created_at     timestamptz default now(),
+  unique (session_id, participant_id)
 );
 
-create table passes (                    -- абонементы
+create table attendance (
+  session_id     uuid references studio_sessions(id) on delete cascade,
+  participant_id uuid references participants(id) on delete cascade,
+  status         text check (status in ('present','absent','sick','trial')),
+  marked_by      uuid references users(id),
+  marked_at      timestamptz default now(),
+  primary key (session_id, participant_id)
+);
+
+create table passes (                    -- абонемент = пакет занятий
   id             uuid primary key default gen_random_uuid(),
-  child_id       uuid references children(id) on delete cascade,
-  group_id       uuid references studio_groups(id),
+  owner_id       uuid references users(id) on delete cascade,
   lessons_total  int not null,
   valid_from     date,
   valid_to       date,
   payment_id     uuid,
   created_at     timestamptz default now()
 );
+
+create table charges (                   -- деньги за одно посещение
+  id             uuid primary key default gen_random_uuid(),
+  participant_id uuid references participants(id) on delete cascade,
+  session_id     uuid references studio_sessions(id) on delete cascade,
+  amount         numeric not null,
+  currency       text default 'ILS',
+  pass_id        uuid references passes(id),
+  payment_id     uuid,
+  created_at     timestamptz default now(),
+  unique (participant_id, session_id)
+);
 ```
 
-Остаток абонемента не хранится полем, а считается как `lessons_total` минус
-число посещений со статусом `present` в его окне дат. Так не расходится с
-журналом.
+Абонемент принадлежит взрослому, а не ребёнку и не группе. Это пакет
+занятий, из которого тратятся посещения любого участника семьи: сам
+родитель на субботней взрослой группе, первый ребёнок, второй. Поэтому в
+`passes` стоит `owner_id`, а не `participant_id`.
+
+Две модели оплаты живут рядом. Отметка о присутствии заводит строку в
+`charges`. Дальше ищем действующий абонемент взрослого, который либо сам
+является этим участником, либо записан его опекуном в `guardians`; если
+такой есть и в нём остались занятия, строка привязывается к нему через
+`pass_id` и денег не требует. Если абонемента нет, строка остаётся
+висеть, и это долг. Родитель видит такие строки списком и гасит их одним
+платежом.
+
+Когда подходящих абонементов несколько, списываем с того, который раньше
+истекает.
+
+Цена занятия одна для всех групп, детских и взрослых. Поэтому абонемент
+можно считать штуками, а не деньгами: «осталось 5 из 8» остаётся верным,
+куда бы эти занятия ни ушли. Если цены когда-нибудь разойдутся, счётчик
+придётся менять на денежный баланс, и это заденет и `charges`, и кабинет.
+
+Остаток абонемента по-прежнему не хранится полем: это `lessons_total`
+минус число `charges` с этим `pass_id`. Так остаток не расходится с
+журналом, и родителю видно одно число на всю семью.
+
+Занятия в `studio_sessions` нужно создавать заранее, на несколько недель
+вперёд, иначе календарю и записи не на что ссылаться.
 
 Лагерь отложен, страница `/camp` пока заглушка. Схему оставляю в плане,
 чтобы не проектировать её заново, когда лагерь вернётся в работу. Таблицы
@@ -391,9 +448,35 @@ Bunny только после проверки. Здесь же чинится �
 ### Этап 7. Студия
 
 Лендинг на русском. Группы, журнал посещаемости, абонементы.
-`/admin/studio` для преподавателя и админа. Абонемент оплачивается на
-шестом этапе, здесь он становится записью в `passes`. Самый большой кусок
-работы, делится ещё раз при подходе.
+`/admin/studio` для преподавателя и админа. Самый большой кусок работы,
+делится ещё раз при подходе.
+
+Кабинет родителя здесь важнее лендинга и делается под телефон, а не под
+десктоп. Он ставится на экран «Домой» и открывается как приложение:
+манифест, иконки, `display: standalone`, кнопки не мельче 44 точек.
+Заказано пять вещей:
+
+1. Родитель может быть учеником сам, взрослые занятия идут в общем
+   списке наравне с детскими.
+2. Календарь месяца с записью прямо из него.
+3. Ближайшая неделя отдельным экраном, чтобы записаться в два касания.
+4. История посещений со статусом оплаты каждого.
+5. Кнопка, которая гасит все неоплаченные посещения одним платежом.
+
+Экран преподавателя тоже телефонный и тоже важнее десктопной админки.
+Варя отмечает сразу после занятия, стоя в студии, поэтому отметка должна
+занимать один экран и несколько касаний:
+
+- Все участники заранее отмечены пришедшими. Варя снимает тех, кого не
+  было, и жмёт «Сохранить». В обычный день это два-три касания.
+- Статус оплаты она не выставляет руками. Он выводится: есть действующий
+  абонемент — списываем с него, нет — заводим долг. В карточку ученика
+  она заходит только ради болезни, пробного или наличных.
+- Отдельный экран со списком должников и письмом-напоминанием со ссылкой
+  на оплату.
+
+Десктопный журнал остаётся, но не как основной способ отмечать, а для
+разбора задним числом.
 
 ### Этап 8. Вязание
 
@@ -429,9 +512,11 @@ Bunny только после проверки. Здесь же чинится �
 5. Роуты с `googleapis` и `crypto` держим на `runtime = 'nodejs'`.
 6. Доступ действующих учеников. После импорта проверяем поимённо, что
    каждый оплативший видит уроки.
-7. Внешний вид страниц. Фото и вёрстку на этапе 1 переносим как есть,
+7. Офлайна у кабинета нет. Приложение на телефоне это та же страница на
+   экране «Домой», без сети она не работает. Обещать обратное не надо.
+8. Внешний вид страниц. Фото и вёрстку на этапе 1 переносим как есть,
    без оптимизации и без редизайна.
-8. Существующий счёт в iCount. Выносим функцию в общий модуль, но
+9. Существующий счёт в iCount. Выносим функцию в общий модуль, но
    поведение на курсах остаётся прежним, иначе поедет бухгалтерия.
 
 ---
@@ -450,6 +535,11 @@ Bunny только после проверки. Здесь же чинится �
 | Преподаватели | пока одна Варя, в схеме заложено несколько; админы Варя и Дима, Дима суперадмин |
 | НДС | ноль, Варя осек патур |
 | Заглушка лагеря | текст «скоро», без формы |
+| Группы и возраст | жёсткой привязки нет, пока оставляем как есть |
+| Кабинет родителя | телефон, приложение на экране «Домой» |
+| Отметка посещений | телефон, все заранее «пришли», статус оплаты выводится сам |
+| Абонемент | пакет занятий на семью, тратится и на детей, и на взрослого |
+| Цена занятия | одна для всех групп, детских и взрослых |
 | Тяжёлые фото | не трогаем |
 
 ### Осталось выяснить
