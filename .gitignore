@@ -1,0 +1,6 @@
+# Сгенерированный холст Claude Design: пересобирается из файлов design/studio/*.dc.html
+design/studio/re-create-studio.html
+
+.DS_Store
+node_modules/
+.vercel
