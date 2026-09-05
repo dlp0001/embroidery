@@ -8,7 +8,9 @@
     "start": "next start -p 4321",
     "migrate": "node --env-file-if-exists=.env.local db/migrate.mjs",
     "seed": "node --env-file-if-exists=.env.local db/seed.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "roles": "node --env-file-if-exists=.env.production.local db/grant-roles.mjs",
+    "migrate:prod": "node --env-file-if-exists=.env.production.local db/migrate.mjs"
   },
   "dependencies": {
     "googleapis": "^140.0.0",

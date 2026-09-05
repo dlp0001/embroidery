@@ -68,9 +68,20 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 В базе нет ролей по умолчанию: первый вход заводит обычного родителя.
 Преподавателя и админа выдают руками:
 
+Чтобы не таскать строку подключения по командам и переписке, положите
+её один раз в `.env.production.local` в корне проекта:
+
+```
+DATABASE_URL=postgresql://…
+```
+
+Файл в `.gitignore`, в репозиторий не попадёт. Дальше команды короткие
+и без секретов:
+
 ```bash
-DATABASE_URL='<direct-строка>' node db/grant-roles.mjs acidophline@gmail.com teacher,admin 'Варя Перлина'
-DATABASE_URL='<direct-строка>' node db/grant-roles.mjs id@perlin.ru superadmin,admin 'Дима'
+npm run roles -- acidophline@gmail.com teacher,admin 'Варя Перлина'
+npm run roles -- id@perlin.ru superadmin,admin 'Дима'
+npm run migrate:prod
 ```
 
 Скрипт заводит человека, если его ещё нет, и повторный запуск ничего
