@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Студия свободного творчества · Re.Create.Art</title>
+<meta name="description" content="Студия свободного творчества Вари Перлиной в Тель-Авиве — авторское пространство, где можно творить во все стороны и во всех техниках сразу.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #ffffff; --linen: #f5f0fa; --rose: #e91e8c; --rose-dark: #c4107a;
+    --rose-light: #f9d0e8; --charcoal: #1a1a2e; --warm-gray: #666666;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--cream); color: var(--charcoal); font-family: 'Jost', sans-serif; font-weight: 300; line-height: 1.7; overflow-x: hidden; }
+  nav { position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; padding: 20px 52px; background: rgba(255,255,255,0.97); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(233,30,140,0.08); }
+  .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 17px; color: var(--charcoal); letter-spacing: 0.06em; text-decoration: none; }
+  .nav-logo span { color: var(--rose); }
+  .nav-back { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm-gray); text-decoration: none; transition: color 0.2s; }
+  .nav-back:hover { color: var(--rose); }
+  .hero { display: grid; grid-template-columns: 1fr 1fr; min-height: 520px; }
+  .hero-left { padding: 90px 64px; display: flex; flex-direction: column; justify-content: center; }
+  .hero-pretitle { font-size: 11px; letter-spacing: 0.4em; text-transform: uppercase; color: var(--warm-gray); margin-bottom: 28px; }
+  .hero-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(40px, 4.6vw, 64px); font-weight: 300; line-height: 1.05; color: var(--charcoal); }
+  .hero-title-italic { font-family: 'Cormorant Garamond', serif; font-size: clamp(40px, 4.6vw, 64px); font-weight: 300; font-style: italic; line-height: 1.05; color: var(--rose); margin-bottom: 32px; }
+  .hero-desc { font-size: 15px; color: var(--warm-gray); max-width: 450px; line-height: 1.9; }
+  .hero-right { position: relative; overflow: hidden; }
+  .hero-right img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .section { max-width: 760px; margin: 0 auto; padding: 90px 64px; text-align: center; }
+  .section-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(28px, 3.2vw, 42px); font-weight: 300; color: var(--charcoal); line-height: 1.2; margin-bottom: 20px; }
+  .section-desc { font-size: 15px; color: var(--warm-gray); line-height: 1.9; margin-bottom: 36px; }
+  .contact { display: inline-block; padding: 16px 48px; background: var(--charcoal); color: #fff; font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; text-decoration: none; transition: background 0.3s; }
+  .contact:hover { background: var(--rose); }
+  footer { background: var(--charcoal); padding: 40px 64px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px; }
+  .footer-logo { font-family: 'Cormorant Garamond', serif; font-size: 19px; font-weight: 300; color: #fff; }
+  .footer-links { display: flex; gap: 24px; }
+  .footer-links a { font-size: 12px; color: rgba(250,247,242,0.5); text-decoration: none; transition: color 0.2s; }
+  .footer-links a:hover { color: var(--rose-light); }
+  @media (max-width: 900px) {
+    nav { padding: 16px 24px; }
+    .hero { grid-template-columns: 1fr; }
+    .hero-left { padding: 56px 28px; }
+    .hero-right { height: 320px; }
+    .section { padding: 64px 28px; }
+    footer { padding: 32px 28px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="/" class="nav-logo">Re.Create.Art · <span>Варя Перлина</span></a>
+  <a href="/" class="nav-back">← На главную</a>
+</nav>
+
+<section class="hero">
+  <div class="hero-left">
+    <div class="hero-pretitle">Студия · Тель-Авив</div>
+    <h1 class="hero-title">Студия свободного</h1>
+    <div class="hero-title-italic">творчества</div>
+    <p class="hero-desc">Авторское пространство, где можно творить во все стороны и во всех техниках сразу — ради того, чтобы дать идее жить.</p>
+  </div>
+  <div class="hero-right">
+    <img src="studio.jpg" alt="Студия Свободного Творчества — занятие с детьми">
+  </div>
+</section>
+
+<section class="section">
+  <h2 class="section-title">Страница студии готовится</h2>
+  <p class="section-desc">Здесь появятся расписание групп, условия и запись на пробное занятие. Пока про студию можно спросить письмом — Варя ответит.</p>
+  <a href="mailto:info@re-create.art" class="contact">info@re-create.art</a>
+</section>
+
+<footer>
+  <div class="footer-logo">Re.Create.Art · Варя Перлина</div>
+  <div class="footer-links">
+    <a href="/embroidery">Курс вышивки</a>
+    <a href="/portfolio">Портфолио</a>
+    <a href="/agreement">Соглашение</a>
+    <a href="/privacy-ru">Конфиденциальность</a>
+  </div>
+</footer>
+
+</body>
+</html>
