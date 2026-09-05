@@ -30,7 +30,7 @@ export default function Journal({
     Object.fromEntries(
       roster.map((r) => [
         r.participant_id,
-        { present: r.status ? r.status === 'present' : expected(r), cash: r.cash },
+        { present: r.status === 'present', cash: r.cash },
       ]),
     ),
   );
@@ -40,9 +40,11 @@ export default function Journal({
   const rest = roster.filter((r) => !expected(r));
   const split = likely.length > 0 && rest.length > 0;
 
-  function moneyFor(r: RosterRow): { text: string; cls: string } {
+  function moneyFor(r: RosterRow): { text: string; cls: string } | null {
     const row = rows[r.participant_id];
-    if (!row.present) return { text: 'пропуск', cls: 'money-off' };
+    // Никого не отмечаем заранее. Пока человек не отмечен, про деньги
+    // говорить нечего: «пропуск» пишем только там, где журнал уже закрыт.
+    if (!row.present) return r.status ? { text: 'пропуск', cls: 'money-off' } : null;
     if (row.cash) return { text: 'оплачено налом', cls: 'money' };
     // «По абонементу» — только когда занятие на пакет уже село.
     if (r.on_pass) return { text: 'по абонементу', cls: 'money' };
@@ -69,14 +71,16 @@ export default function Journal({
           <button type="button" className="plain" onClick={() => toggle(r.participant_id, 'present')}>
             <span className={row.present ? 'nm' : 'nm-off'}>{r.who}</span>
           </button>
-          <button
-            type="button"
-            className={`chip-money ${m.cls}`}
-            disabled={!row.present}
-            onClick={() => toggle(r.participant_id, 'cash')}
-          >
-            {m.text}
-          </button>
+          {m && (
+            <button
+              type="button"
+              className={`chip-money ${m.cls}`}
+              disabled={!row.present}
+              onClick={() => toggle(r.participant_id, 'cash')}
+            >
+              {m.text}
+            </button>
+          )}
         </div>
 
         <button
