@@ -4,3 +4,7 @@ design/studio/re-create-studio.html
 .DS_Store
 node_modules/
 .vercel
+
+.env*.local
+.next/
+next-env.d.ts
