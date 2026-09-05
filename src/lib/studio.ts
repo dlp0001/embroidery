@@ -78,7 +78,7 @@ async function pickPass(c: PoolClient, ownerId: string): Promise<string | null> 
   return rows[0]?.id ?? null;
 }
 
-export type Mark = { participantId: string; status: AttendanceStatus };
+export type Mark = { participantId: string; status: AttendanceStatus; cash?: boolean };
 
 /**
  * Сохраняет журнал занятия. Деньги считаются здесь и только здесь:
@@ -89,13 +89,11 @@ export async function saveAttendance(
   sessionId: string,
   marks: Mark[],
   markedBy: string,
-): Promise<{ present: number; onPass: number; toDebt: number }> {
+): Promise<{ present: number; onPass: number; toDebt: number; cash: number }> {
   const { amount, currency } = await lessonPrice();
 
   return tx(async (c) => {
-    let present = 0;
-    let onPass = 0;
-    let toDebt = 0;
+    const stat = { present: 0, onPass: 0, toDebt: 0, cash: 0 };
 
     for (const mark of marks) {
       await c.query(
@@ -107,7 +105,7 @@ export async function saveAttendance(
       );
 
       if (mark.status !== 'present') {
-        // Снимаем начисление, если оно ещё не оплачено отдельным платежом.
+        await dropCashPayment(c, sessionId, mark.participantId);
         await c.query(
           `delete from charges
             where session_id = $1 and participant_id = $2 and payment_id is null`,
@@ -116,35 +114,87 @@ export async function saveAttendance(
         continue;
       }
 
-      present++;
-      const exists = await c.query(
-        'select id, pass_id from charges where session_id = $1 and participant_id = $2',
+      stat.present++;
+
+      // Начисление заводим один раз, дальше только пересобираем оплату.
+      const existing = await c.query<{ id: string; owner_id: string; pass_id: string | null; payment_id: string | null }>(
+        'select id, owner_id, pass_id, payment_id from charges where session_id = $1 and participant_id = $2',
         [sessionId, mark.participantId],
       );
-      if (exists.rows.length > 0) {
-        if (exists.rows[0].pass_id) onPass++;
-        else toDebt++;
+
+      let charge = existing.rows[0];
+      if (!charge) {
+        const owner = await ownerFor(c, mark.participantId);
+        if (!owner) continue;
+        const passId = mark.cash ? null : await pickPass(c, owner);
+        const inserted = await c.query<{ id: string; owner_id: string; pass_id: string | null; payment_id: string | null }>(
+          `insert into charges (participant_id, session_id, owner_id, amount, currency, pass_id)
+           values ($1, $2, $3, $4, $5, $6)
+           returning id, owner_id, pass_id, payment_id`,
+          [mark.participantId, sessionId, owner, amount, currency, passId],
+        );
+        charge = inserted.rows[0];
+      }
+
+      if (mark.cash) {
+        if (!charge.payment_id) {
+          const pay = await c.query<{ id: string }>(
+            `insert into payments (provider, user_id, amount, currency, status, purpose)
+             values ('cash', $1, $2, $3, 'paid', 'studio_lesson') returning id`,
+            [charge.owner_id, amount, currency],
+          );
+          await c.query('update charges set payment_id = $2, pass_id = null where id = $1', [
+            charge.id,
+            pay.rows[0].id,
+          ]);
+        }
+        stat.cash++;
         continue;
       }
 
-      const owner = await ownerFor(c, mark.participantId);
-      if (!owner) continue;
-      const passId = await pickPass(c, owner);
-      await c.query(
-        `insert into charges (participant_id, session_id, owner_id, amount, currency, pass_id)
-         values ($1, $2, $3, $4, $5, $6)`,
-        [mark.participantId, sessionId, owner, amount, currency, passId],
-      );
-      if (passId) onPass++;
-      else toDebt++;
+      // Наличные сняли — платёж убираем и заново смотрим на абонемент.
+      if (charge.payment_id) {
+        const wasCash = await dropCashPayment(c, sessionId, mark.participantId);
+        if (wasCash) {
+          const passId = await pickPass(c, charge.owner_id);
+          await c.query('update charges set pass_id = $2 where id = $1', [charge.id, passId]);
+          charge = { ...charge, pass_id: passId, payment_id: null };
+        } else {
+          continue; // оплачено картой, не трогаем
+        }
+      }
+
+      if (charge.pass_id) stat.onPass++;
+      else stat.toDebt++;
     }
 
     await c.query(
       `update studio_sessions set status = 'done', closed_at = now() where id = $1`,
       [sessionId],
     );
-    return { present, onPass, toDebt };
+    return stat;
   });
+}
+
+/** Убирает наличный платёж с начисления. Возвращает true, если он там был. */
+async function dropCashPayment(
+  c: PoolClient,
+  sessionId: string,
+  participantId: string,
+): Promise<boolean> {
+  const { rows } = await c.query<{ payment_id: string }>(
+    `select ch.payment_id from charges ch
+       join payments p on p.id = ch.payment_id
+      where ch.session_id = $1 and ch.participant_id = $2 and p.provider = 'cash'`,
+    [sessionId, participantId],
+  );
+  if (rows.length === 0) return false;
+  await c.query('update charges set payment_id = null where session_id = $1 and participant_id = $2', [
+    sessionId,
+    participantId,
+  ]);
+  await c.query('delete from payments where id = $1', [rows[0].payment_id]);
+  return true;
 }
 
 export type PassBalance = {
@@ -347,9 +397,30 @@ export async function teacherSessions(teacherId: string | null): Promise<Teacher
        from studio_sessions s
        join studio_groups g on g.id = s.group_id
       where ($1::uuid is null or g.teacher_id = $1)
-        and s.held_on between current_date - interval '14 days' and current_date
+        and s.held_on = current_date
         and s.status <> 'cancelled'
-      order by s.held_on desc, g.starts_at desc`,
+      order by g.starts_at`,
+    [teacherId],
+  );
+}
+
+/** Занятия прошлых дней, которые так и не отметили. */
+export async function unclosedBefore(teacherId: string | null): Promise<TeacherSession[]> {
+  return query<TeacherSession>(
+    `select s.id as session_id, g.id as group_id, g.title as group_title,
+            s.held_on::text, g.starts_at::text, s.status,
+            (select count(*)::int from studio_members m
+              where m.group_id = g.id and m.left_at is null) as people,
+            0 as marked
+       from studio_sessions s
+       join studio_groups g on g.id = s.group_id
+      where ($1::uuid is null or g.teacher_id = $1)
+        and s.held_on < current_date
+        and s.held_on > current_date - interval '30 days'
+        and s.status <> 'cancelled'
+        and not exists (select 1 from attendance a where a.session_id = s.id)
+        and exists (select 1 from studio_members m where m.group_id = g.id and m.left_at is null)
+      order by s.held_on desc, g.starts_at`,
     [teacherId],
   );
 }
@@ -362,6 +433,7 @@ export type RosterRow = {
   has_pass: boolean;
   on_pass: boolean;
   paid: boolean;
+  cash: boolean;
 };
 
 export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
@@ -392,7 +464,8 @@ export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
                          and (select count(*) from charges c2 where c2.pass_id = ps.id) < ps.lessons_total
                      ) > 0, false) as has_pass,
             (c.pass_id is not null) as on_pass,
-            (c.payment_id is not null) as paid
+            (c.payment_id is not null) as paid,
+            coalesce((select p.provider = 'cash' from payments p where p.id = c.payment_id), false) as cash
        from owned o
        left join attendance a on a.session_id = $1 and a.participant_id = o.participant_id
        left join charges c on c.session_id = $1 and c.participant_id = o.participant_id

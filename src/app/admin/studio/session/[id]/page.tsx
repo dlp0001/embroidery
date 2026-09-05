@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { isAdmin, requireTeacher } from '@/lib/session';
 import { lessonPrice, sessionHead, sessionRoster } from '@/lib/studio';
 import { dayMonth, hhmm, money } from '@/lib/format';
-import Journal from './Journal';
+import Journal from '@/components/Journal';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,9 +32,15 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
           <p className="hint" style={{ marginTop: 20 }}>В группе пока никого нет.</p>
         ) : (
           <>
-            <Journal sessionId={id} roster={roster} price={money(price.amount, price.currency)} />
+            <Journal
+              sessionId={id}
+              roster={roster}
+              price={money(price.amount, price.currency)}
+              saved={head.status === 'done'}
+            />
             <p className="hint" style={{ marginTop: 18 }}>
-              Нажмите на имя, чтобы поставить болезнь или пробное.
+              Нажмите на имя, чтобы снять отметку. Нажмите на строчку про деньги,
+              чтобы отметить оплату наличными.
             </p>
           </>
         )}

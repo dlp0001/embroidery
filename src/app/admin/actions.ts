@@ -22,11 +22,16 @@ export async function saveJournal(formData: FormData): Promise<void> {
     if (!key.startsWith('mark:')) continue;
     const status = String(value) as AttendanceStatus;
     if (!STATUSES.includes(status)) continue;
-    marks.push({ participantId: key.slice(5), status });
+    const participantId = key.slice(5);
+    marks.push({
+      participantId,
+      status,
+      cash: formData.get(`cash:${participantId}`) === '1',
+    });
   }
 
   await saveAttendance(sessionId, marks, user.id);
   revalidatePath('/admin/studio');
   revalidatePath('/admin/studio/debts');
-  redirect('/admin/studio?saved=1');
+  redirect(`/admin/studio?saved=${sessionId}`);
 }

@@ -119,3 +119,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   border: 1.5px solid var(--edge); background: none; font-size: 13px; color: var(--warm-gray);
 }
 .day-on { border-color: var(--rose); background: rgba(233, 30, 140, 0.06); color: var(--charcoal); font-weight: 500; }
+
+/* Журнал */
+.plain { display: block; background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
+.chip-money {
+  margin-top: 4px; padding: 4px 0; background: none; border: 0; border-bottom: 1px dashed currentColor;
+  cursor: pointer; font-size: 12.5px; line-height: 1.4;
+}
+.chip-money:disabled { border-bottom-color: transparent; cursor: default; }
+.dot-on svg, .dot-off svg { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.dot-on, .dot-off { cursor: pointer; padding: 0; }
