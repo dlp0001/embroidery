@@ -434,6 +434,8 @@ export type RosterRow = {
   on_pass: boolean;
   paid: boolean;
   cash: boolean;
+  booked: boolean;
+  preferred: boolean;
 };
 
 export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
@@ -465,10 +467,18 @@ export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
                      ) > 0, false) as has_pass,
             (c.pass_id is not null) as on_pass,
             (c.payment_id is not null) as paid,
-            coalesce((select p.provider = 'cash' from payments p where p.id = c.payment_id), false) as cash
+            coalesce((select p.provider = 'cash' from payments p where p.id = c.payment_id), false) as cash,
+            coalesce(b.status = 'booked', false) as booked,
+            (pd.weekday is not null) as preferred
        from owned o
+       cross join studio_sessions ss
+       join studio_groups gg on gg.id = ss.group_id
        left join attendance a on a.session_id = $1 and a.participant_id = o.participant_id
        left join charges c on c.session_id = $1 and c.participant_id = o.participant_id
+       left join bookings b on b.session_id = $1 and b.participant_id = o.participant_id
+       left join preferred_days pd
+              on pd.participant_id = o.participant_id and pd.weekday = gg.weekday
+      where ss.id = $1
       order by o.who`,
     [sessionId],
   );

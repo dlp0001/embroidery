@@ -24,7 +24,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         </div>
         <div className="kicker">{dayMonth(head.held_on)} · {hhmm(head.starts_at)}</div>
         <h1 className="h1">{head.group_title}</h1>
-        <p className="sub">Все отмечены как пришедшие. Снимите тех, кого не было.</p>
+        <p className="sub">Отмечены те, кого ждём. Поправьте, если пришли не они.</p>
       </div>
 
       <div className="body">
