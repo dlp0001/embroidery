@@ -1,0 +1,476 @@
+import type { PoolClient } from 'pg';
+import { one, query, tx } from './db';
+
+export type AttendanceStatus = 'present' | 'absent' | 'sick' | 'trial';
+
+export type Participant = {
+  id: string;
+  name: string;
+  kind: 'self' | 'child';
+};
+
+export async function getSetting(key: string, fallback: string): Promise<string> {
+  const row = await one<{ value: string }>('select value from settings where key = $1', [key]);
+  return row?.value ?? fallback;
+}
+
+export async function lessonPrice(): Promise<{ amount: number; currency: string }> {
+  const amount = Number(await getSetting('studio_lesson_price', '60'));
+  const currency = await getSetting('studio_currency', 'ILS');
+  return { amount, currency };
+}
+
+/** Участники семьи: сам взрослый и его дети. */
+export async function familyParticipants(userId: string): Promise<Participant[]> {
+  return query<Participant>(
+    `select p.id, coalesce(u.name, 'Я') as name, 'self' as kind
+       from participants p join users u on u.id = p.user_id
+      where p.user_id = $1
+      union all
+     select p.id, c.name, 'child' as kind
+       from participants p
+       join children c on c.id = p.child_id
+       join guardians g on g.child_id = c.id
+      where g.user_id = $1
+      order by kind desc, name`,
+    [userId],
+  );
+}
+
+/**
+ * Кому уходит счёт за посещение. Для взрослого это он сам, для ребёнка —
+ * опекун. Если опекунов несколько, берём того, у кого есть свободный
+ * абонемент; иначе первого.
+ */
+async function ownerFor(c: PoolClient, participantId: string): Promise<string | null> {
+  const { rows } = await c.query<{ user_id: string }>(
+    `select p.user_id from participants p where p.id = $1 and p.user_id is not null
+      union all
+     select g.user_id
+       from participants p
+       join guardians g on g.child_id = p.child_id
+       join users u on u.id = g.user_id
+      where p.id = $1
+      order by 1`,
+    [participantId],
+  );
+  if (rows.length === 0) return null;
+  for (const r of rows) {
+    if (await pickPass(c, r.user_id)) return r.user_id;
+  }
+  return rows[0].user_id;
+}
+
+/** Действующий абонемент с остатком; берём тот, что раньше истекает. */
+async function pickPass(c: PoolClient, ownerId: string): Promise<string | null> {
+  const { rows } = await c.query<{ id: string }>(
+    `select p.id
+       from passes p
+      where p.owner_id = $1
+        and p.valid_from <= current_date
+        and (p.valid_to is null or p.valid_to >= current_date)
+        and (select count(*) from charges ch where ch.pass_id = p.id) < p.lessons_total
+      order by p.valid_to nulls last, p.created_at
+      limit 1
+      for update`,
+    [ownerId],
+  );
+  return rows[0]?.id ?? null;
+}
+
+export type Mark = { participantId: string; status: AttendanceStatus };
+
+/**
+ * Сохраняет журнал занятия. Деньги считаются здесь и только здесь:
+ * присутствие заводит начисление, оно либо садится на абонемент,
+ * либо остаётся долгом. Остальные статусы начисления снимают.
+ */
+export async function saveAttendance(
+  sessionId: string,
+  marks: Mark[],
+  markedBy: string,
+): Promise<{ present: number; onPass: number; toDebt: number }> {
+  const { amount, currency } = await lessonPrice();
+
+  return tx(async (c) => {
+    let present = 0;
+    let onPass = 0;
+    let toDebt = 0;
+
+    for (const mark of marks) {
+      await c.query(
+        `insert into attendance (session_id, participant_id, status, marked_by)
+         values ($1, $2, $3, $4)
+         on conflict (session_id, participant_id)
+         do update set status = excluded.status, marked_by = excluded.marked_by, marked_at = now()`,
+        [sessionId, mark.participantId, mark.status, markedBy],
+      );
+
+      if (mark.status !== 'present') {
+        // Снимаем начисление, если оно ещё не оплачено отдельным платежом.
+        await c.query(
+          `delete from charges
+            where session_id = $1 and participant_id = $2 and payment_id is null`,
+          [sessionId, mark.participantId],
+        );
+        continue;
+      }
+
+      present++;
+      const exists = await c.query(
+        'select id, pass_id from charges where session_id = $1 and participant_id = $2',
+        [sessionId, mark.participantId],
+      );
+      if (exists.rows.length > 0) {
+        if (exists.rows[0].pass_id) onPass++;
+        else toDebt++;
+        continue;
+      }
+
+      const owner = await ownerFor(c, mark.participantId);
+      if (!owner) continue;
+      const passId = await pickPass(c, owner);
+      await c.query(
+        `insert into charges (participant_id, session_id, owner_id, amount, currency, pass_id)
+         values ($1, $2, $3, $4, $5, $6)`,
+        [mark.participantId, sessionId, owner, amount, currency, passId],
+      );
+      if (passId) onPass++;
+      else toDebt++;
+    }
+
+    await c.query(
+      `update studio_sessions set status = 'done', closed_at = now() where id = $1`,
+      [sessionId],
+    );
+    return { present, onPass, toDebt };
+  });
+}
+
+export type PassBalance = {
+  id: string;
+  lessons_total: number;
+  used: number;
+  left: number;
+  valid_to: string | null;
+};
+
+export async function passBalances(ownerId: string): Promise<PassBalance[]> {
+  return query<PassBalance>(
+    `select p.id, p.lessons_total, p.valid_to::text,
+            (select count(*)::int from charges ch where ch.pass_id = p.id) as used,
+            p.lessons_total - (select count(*)::int from charges ch where ch.pass_id = p.id) as left
+       from passes p
+      where p.owner_id = $1
+        and (p.valid_to is null or p.valid_to >= current_date)
+      order by p.valid_to nulls last, p.created_at`,
+    [ownerId],
+  );
+}
+
+export type UnpaidCharge = {
+  id: string;
+  held_on: string;
+  group_title: string;
+  who: string;
+  amount: string;
+  currency: string;
+};
+
+export async function unpaidCharges(ownerId: string): Promise<UnpaidCharge[]> {
+  return query<UnpaidCharge>(
+    `select ch.id, s.held_on::text, g.title as group_title, ch.amount::text, ch.currency,
+            coalesce(c.name, u.name, 'Я') as who
+       from charges ch
+       join studio_sessions s on s.id = ch.session_id
+       join studio_groups g on g.id = s.group_id
+       join participants p on p.id = ch.participant_id
+       left join children c on c.id = p.child_id
+       left join users u on u.id = p.user_id
+      where ch.owner_id = $1 and ch.pass_id is null and ch.payment_id is null
+      order by s.held_on`,
+    [ownerId],
+  );
+}
+
+export type VisitRow = UnpaidCharge & { status: AttendanceStatus; state: string };
+
+export async function visitHistory(userId: string): Promise<VisitRow[]> {
+  return query<VisitRow>(
+    `select coalesce(ch.id, a.session_id) as id, s.held_on::text, g.title as group_title,
+            coalesce(c.name, u.name, 'Я') as who, a.status,
+            coalesce(ch.amount::text, '0') as amount, coalesce(ch.currency, 'ILS') as currency,
+            case
+              when a.status = 'sick' then 'sick'
+              when a.status = 'absent' then 'absent'
+              when a.status = 'trial' then 'trial'
+              when ch.pass_id is not null then 'pass'
+              when ch.payment_id is not null then 'paid'
+              else 'due'
+            end as state
+       from attendance a
+       join studio_sessions s on s.id = a.session_id
+       join studio_groups g on g.id = s.group_id
+       join participants p on p.id = a.participant_id
+       left join children c on c.id = p.child_id
+       left join users u on u.id = p.user_id
+       left join charges ch on ch.session_id = a.session_id and ch.participant_id = a.participant_id
+      where p.user_id = $1
+         or p.child_id in (select child_id from guardians where user_id = $1)
+      order by s.held_on desc`,
+    [userId],
+  );
+}
+
+/** Создаёт занятия группы на несколько недель вперёд. */
+export async function ensureSessions(weeksAhead = 6): Promise<number> {
+  const rows = await query<{ n: string }>(
+    `with slots as (
+       select g.id as group_id,
+              (d::date) as held_on
+         from studio_groups g
+         cross join generate_series(current_date - interval '28 days',
+                                    current_date + ($1 || ' weeks')::interval,
+                                    interval '1 day') d
+        where g.active
+          and extract(isodow from d) = g.weekday
+     )
+     insert into studio_sessions (group_id, held_on)
+     select group_id, held_on from slots
+     on conflict (group_id, held_on) do nothing
+     returning 1`,
+    [String(weeksAhead)],
+  );
+  return rows.length;
+}
+
+export type UpcomingRow = {
+  session_id: string;
+  held_on: string;
+  starts_at: string;
+  group_id: string;
+  group_title: string;
+  participant_id: string;
+  who: string;
+  booked: boolean;
+};
+
+export async function sessionsForUser(
+  userId: string,
+  from: string,
+  to: string,
+): Promise<UpcomingRow[]> {
+  return query<UpcomingRow>(
+    `select s.id as session_id, s.held_on::text, g.starts_at::text, g.id as group_id,
+            g.title as group_title, p.id as participant_id,
+            coalesce(c.name, u.name, 'Я') as who,
+            (b.id is not null and b.status = 'booked') as booked
+       from studio_members m
+       join participants p on p.id = m.participant_id
+       join studio_groups g on g.id = m.group_id
+       join studio_sessions s on s.group_id = g.id
+       left join children c on c.id = p.child_id
+       left join users u on u.id = p.user_id
+       left join bookings b on b.session_id = s.id and b.participant_id = p.id
+      where (p.user_id = $1 or p.child_id in (select child_id from guardians where user_id = $1))
+        and m.left_at is null
+        and s.held_on >= $2::date and s.held_on <= $3::date
+        and s.status <> 'cancelled'
+      order by s.held_on, g.starts_at`,
+    [userId, from, to],
+  );
+}
+
+export async function upcomingForUser(userId: string, days = 7): Promise<UpcomingRow[]> {
+  return query<UpcomingRow>(
+    `select s.id as session_id, s.held_on::text, g.starts_at::text, g.id as group_id,
+            g.title as group_title, p.id as participant_id,
+            coalesce(c.name, u.name, 'Я') as who,
+            (b.id is not null and b.status = 'booked') as booked
+       from studio_members m
+       join participants p on p.id = m.participant_id
+       join studio_groups g on g.id = m.group_id
+       join studio_sessions s on s.group_id = g.id
+       left join children c on c.id = p.child_id
+       left join users u on u.id = p.user_id
+       left join bookings b on b.session_id = s.id and b.participant_id = p.id
+      where (p.user_id = $1 or p.child_id in (select child_id from guardians where user_id = $1))
+        and m.left_at is null
+        and s.held_on >= current_date
+        and s.held_on < current_date + ($2 || ' days')::interval
+        and s.status <> 'cancelled'
+      order by s.held_on, g.starts_at`,
+    [userId, String(days)],
+  );
+}
+
+export async function setBooking(
+  sessionId: string,
+  participantId: string,
+  booked: boolean,
+): Promise<void> {
+  if (booked) {
+    await query(
+      `insert into bookings (session_id, participant_id, status) values ($1, $2, 'booked')
+       on conflict (session_id, participant_id) do update set status = 'booked'`,
+      [sessionId, participantId],
+    );
+  } else {
+    await query(
+      `update bookings set status = 'cancelled' where session_id = $1 and participant_id = $2`,
+      [sessionId, participantId],
+    );
+  }
+}
+
+// ── Экран преподавателя ───────────────────────────────────
+
+export type TeacherSession = {
+  session_id: string;
+  group_id: string;
+  group_title: string;
+  held_on: string;
+  starts_at: string;
+  status: string;
+  people: number;
+  marked: number;
+};
+
+/** Занятия преподавателя: сегодняшние и недавние незакрытые. */
+export async function teacherSessions(teacherId: string | null): Promise<TeacherSession[]> {
+  return query<TeacherSession>(
+    `select s.id as session_id, g.id as group_id, g.title as group_title,
+            s.held_on::text, g.starts_at::text, s.status,
+            (select count(*)::int from studio_members m
+              where m.group_id = g.id and m.left_at is null) as people,
+            (select count(*)::int from attendance a where a.session_id = s.id) as marked
+       from studio_sessions s
+       join studio_groups g on g.id = s.group_id
+      where ($1::uuid is null or g.teacher_id = $1)
+        and s.held_on between current_date - interval '14 days' and current_date
+        and s.status <> 'cancelled'
+      order by s.held_on desc, g.starts_at desc`,
+    [teacherId],
+  );
+}
+
+export type RosterRow = {
+  participant_id: string;
+  who: string;
+  owner_id: string | null;
+  status: AttendanceStatus | null;
+  has_pass: boolean;
+  on_pass: boolean;
+  paid: boolean;
+};
+
+export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
+  return query<RosterRow>(
+    `with roster as (
+       select m.participant_id, p.child_id, p.user_id,
+              coalesce(ch.name, u.name, 'Я') as who
+         from studio_sessions s
+         join studio_members m on m.group_id = s.group_id and m.left_at is null
+         join participants p on p.id = m.participant_id
+         left join children ch on ch.id = p.child_id
+         left join users u on u.id = p.user_id
+        where s.id = $1
+     ),
+     owned as (
+       select r.*,
+              coalesce(r.user_id,
+                       (select g.user_id from guardians g
+                         where g.child_id = r.child_id order by g.user_id limit 1)) as owner_id
+         from roster r
+     )
+     select o.participant_id, o.who, o.owner_id,
+            a.status,
+            coalesce((select count(*) from passes ps
+                       where ps.owner_id = o.owner_id
+                         and ps.valid_from <= current_date
+                         and (ps.valid_to is null or ps.valid_to >= current_date)
+                         and (select count(*) from charges c2 where c2.pass_id = ps.id) < ps.lessons_total
+                     ) > 0, false) as has_pass,
+            (c.pass_id is not null) as on_pass,
+            (c.payment_id is not null) as paid
+       from owned o
+       left join attendance a on a.session_id = $1 and a.participant_id = o.participant_id
+       left join charges c on c.session_id = $1 and c.participant_id = o.participant_id
+      order by o.who`,
+    [sessionId],
+  );
+}
+
+export type SessionHead = {
+  session_id: string;
+  group_title: string;
+  age_hint: string | null;
+  held_on: string;
+  starts_at: string;
+  status: string;
+  teacher_id: string | null;
+};
+
+export async function sessionHead(sessionId: string): Promise<SessionHead | null> {
+  return one<SessionHead>(
+    `select s.id as session_id, g.title as group_title, g.age_hint,
+            s.held_on::text, g.starts_at::text, s.status, g.teacher_id
+       from studio_sessions s join studio_groups g on g.id = s.group_id
+      where s.id = $1`,
+    [sessionId],
+  );
+}
+
+export type Debtor = {
+  owner_id: string;
+  name: string | null;
+  email: string;
+  lessons: number;
+  amount: string;
+  currency: string;
+  since: string;
+  who: string;
+};
+
+export async function debtors(): Promise<Debtor[]> {
+  return query<Debtor>(
+    `select ch.owner_id, u.name, u.email,
+            count(*)::int as lessons,
+            sum(ch.amount)::text as amount,
+            min(ch.currency) as currency,
+            min(s.held_on)::text as since,
+            string_agg(distinct coalesce(c.name, pu.name, 'сам'), ', ') as who
+       from charges ch
+       join users u on u.id = ch.owner_id
+       join studio_sessions s on s.id = ch.session_id
+       join participants p on p.id = ch.participant_id
+       left join children c on c.id = p.child_id
+       left join users pu on pu.id = p.user_id
+      where ch.pass_id is null and ch.payment_id is null
+      group by ch.owner_id, u.name, u.email
+      order by sum(ch.amount) desc`,
+  );
+}
+
+export async function groupsOverview(teacherId: string | null) {
+  return query<{
+    id: string; title: string; age_hint: string | null; weekday: number;
+    starts_at: string; people: number; active_passes: number; audience: string;
+  }>(
+    `select g.id, g.title, g.age_hint, g.weekday, g.starts_at::text, g.audience,
+            (select count(*)::int from studio_members m where m.group_id = g.id and m.left_at is null) as people,
+            (select count(distinct ps.id)::int
+               from studio_members m
+               join participants p on p.id = m.participant_id
+               left join guardians gd on gd.child_id = p.child_id
+               join passes ps on ps.owner_id = coalesce(p.user_id, gd.user_id)
+              where m.group_id = g.id and m.left_at is null
+                and (ps.valid_to is null or ps.valid_to >= current_date)
+                and (select count(*) from charges c2 where c2.pass_id = ps.id) < ps.lessons_total
+            ) as active_passes
+       from studio_groups g
+      where g.active and ($1::uuid is null or g.teacher_id = $1)
+      order by g.weekday, g.starts_at`,
+    [teacherId],
+  );
+}
