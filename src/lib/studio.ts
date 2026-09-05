@@ -672,3 +672,155 @@ export async function setPreferredDay(
     ]);
   }
 }
+
+// ── Управление расписанием ────────────────────────────────
+
+export type GroupRow = {
+  id: string;
+  title: string;
+  teacher_id: string | null;
+  weekday: number;
+  starts_at: string;
+  duration_min: number;
+  room: string | null;
+  audience: 'kids' | 'adults';
+  age_hint: string | null;
+  capacity: number | null;
+  active: boolean;
+  people: number;
+};
+
+export async function allGroups(): Promise<GroupRow[]> {
+  return query<GroupRow>(
+    `select g.id, g.title, g.teacher_id, g.weekday, g.starts_at::text, g.duration_min,
+            g.room, g.audience, g.age_hint, g.capacity, g.active,
+            (select count(*)::int from studio_members m
+              where m.group_id = g.id and m.left_at is null) as people
+       from studio_groups g
+      order by g.active desc, g.weekday, g.starts_at`,
+  );
+}
+
+export async function teachers(): Promise<{ id: string; name: string | null; email: string }[]> {
+  return query(
+    `select u.id, u.name, u.email from users u
+      join user_roles r on r.user_id = u.id and r.role = 'teacher'
+      order by coalesce(u.name, u.email)`,
+  );
+}
+
+export type GroupInput = {
+  title: string;
+  weekday: number;
+  startsAt: string;
+  durationMin: number;
+  audience: 'kids' | 'adults';
+  ageHint: string | null;
+  capacity: number | null;
+  room: string | null;
+  teacherId: string | null;
+};
+
+export async function createGroup(input: GroupInput): Promise<string> {
+  const row = await one<{ id: string }>(
+    `insert into studio_groups
+       (title, weekday, starts_at, duration_min, audience, age_hint, capacity, room, teacher_id)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id`,
+    [input.title, input.weekday, input.startsAt, input.durationMin, input.audience,
+     input.ageHint, input.capacity, input.room, input.teacherId],
+  );
+  return row!.id;
+}
+
+export async function updateGroup(id: string, input: GroupInput): Promise<void> {
+  await query(
+    `update studio_groups set title = $2, weekday = $3, starts_at = $4, duration_min = $5,
+            audience = $6, age_hint = $7, capacity = $8, room = $9, teacher_id = $10
+      where id = $1`,
+    [id, input.title, input.weekday, input.startsAt, input.durationMin, input.audience,
+     input.ageHint, input.capacity, input.room, input.teacherId],
+  );
+}
+
+export async function setGroupActive(id: string, active: boolean): Promise<void> {
+  await query('update studio_groups set active = $2 where id = $1', [id, active]);
+}
+
+export type CalendarSession = {
+  session_id: string;
+  group_id: string;
+  group_title: string;
+  held_on: string;
+  starts_at: string;
+  status: string;
+  marked: number;
+  people: number;
+};
+
+export async function sessionsInRange(from: string, to: string): Promise<CalendarSession[]> {
+  return query<CalendarSession>(
+    `select s.id as session_id, g.id as group_id, g.title as group_title,
+            s.held_on::text, g.starts_at::text, s.status,
+            (select count(*)::int from attendance a where a.session_id = s.id) as marked,
+            (select count(*)::int from studio_members m
+              where m.group_id = g.id and m.left_at is null) as people
+       from studio_sessions s
+       join studio_groups g on g.id = s.group_id
+      where s.held_on between $1::date and $2::date
+      order by s.held_on, g.starts_at`,
+    [from, to],
+  );
+}
+
+/** Разовое занятие в произвольный день, вне обычного расписания группы. */
+export async function addSession(groupId: string, heldOn: string): Promise<void> {
+  await query(
+    `insert into studio_sessions (group_id, held_on) values ($1, $2::date)
+     on conflict (group_id, held_on) do update set status = 'planned'`,
+    [groupId, heldOn],
+  );
+}
+
+export async function setSessionStatus(id: string, status: 'planned' | 'cancelled'): Promise<void> {
+  await query('update studio_sessions set status = $2 where id = $1', [id, status]);
+}
+
+/** Удалять можно только пустое занятие: иначе потеряются отметки и деньги. */
+export async function deleteSession(id: string): Promise<{ ok: boolean; reason?: string }> {
+  const used = await one<{ n: string }>(
+    `select (select count(*) from attendance where session_id = $1)
+          + (select count(*) from charges where session_id = $1) as n`,
+    [id],
+  );
+  if (Number(used?.n ?? 0) > 0) {
+    return { ok: false, reason: 'В занятии есть отметки или начисления. Его можно отменить, но не удалить.' };
+  }
+  await query('delete from studio_sessions where id = $1', [id]);
+  return { ok: true };
+}
+
+/**
+ * Пересобирает будущие занятия группы под её текущий день и время.
+ * Прошлое и всё, где уже есть отметки или деньги, не трогает.
+ */
+export async function resyncGroupSessions(groupId: string, weeksAhead = 6): Promise<void> {
+  await tx(async (c) => {
+    await c.query(
+      `delete from studio_sessions s
+        where s.group_id = $1
+          and s.held_on > current_date
+          and not exists (select 1 from attendance a where a.session_id = s.id)
+          and not exists (select 1 from charges ch where ch.session_id = s.id)`,
+      [groupId],
+    );
+    await c.query(
+      `insert into studio_sessions (group_id, held_on)
+       select g.id, d::date
+         from studio_groups g
+         cross join generate_series(current_date, current_date + ($2 || ' weeks')::interval, interval '1 day') d
+        where g.id = $1 and g.active and extract(isodow from d) = g.weekday
+       on conflict (group_id, held_on) do nothing`,
+      [groupId, String(weeksAhead)],
+    );
+  });
+}
