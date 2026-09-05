@@ -11,7 +11,7 @@ function hashCode(email: string, code: string): string {
   return createHash('sha256').update(`${email.toLowerCase()}:${code}:${pepper}`).digest('hex');
 }
 
-export type RequestCodeResult = { ok: true } | { ok: false; error: string };
+export type RequestCodeResult = { ok: true; devCode?: string } | { ok: false; error: string };
 
 export async function requestCode(rawEmail: string): Promise<RequestCodeResult> {
   const email = rawEmail.trim().toLowerCase();
@@ -36,7 +36,9 @@ export async function requestCode(rawEmail: string): Promise<RequestCodeResult> 
   );
 
   await sendCode(email, code);
-  return { ok: true };
+  // В разработке письма не уходят, поэтому код показываем на странице.
+  const dev = process.env.NODE_ENV !== 'production' && !process.env.RESEND_API_KEY;
+  return dev ? { ok: true, devCode: code } : { ok: true };
 }
 
 async function sendCode(email: string, code: string): Promise<void> {
