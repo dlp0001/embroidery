@@ -139,3 +139,15 @@ npm run payplus:pages
 `api-key`, `secret-key` и свой `PAYPLUS_PAGE_UID`. Боевой ключ в среде
 `test` даёт 403 «API_KEY / SECRET_KEY ARE INCORRECT». Доступ к тестовой
 среде выдаёт поддержка PayPlus, tech@payplus.co.il.
+
+## Тестовые семьи
+
+```bash
+npm run families                      # завести
+npm run families -- --group 'Младшие' # завести и сразу записать детей в группу
+npm run families -- --remove          # удалить всё разом
+```
+
+Все тестовые родители сидят на домене `@test.re-create.art`, по нему
+удаление их и находит. Дети уходят вместе с родителем, если других
+опекунов у них нет. Повторный запуск ничего не дублирует.

@@ -12,7 +12,8 @@
     "roles": "node --env-file-if-exists=.env.production.local db/grant-roles.mjs",
     "migrate:prod": "node --env-file-if-exists=.env.production.local db/migrate.mjs",
     "payplus:pages": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.production.local scripts/payplus-pages.mjs",
-    "verify": "tsc --noEmit && BUILD_DIR=.next-verify next build"
+    "verify": "tsc --noEmit && BUILD_DIR=.next-verify next build",
+    "families": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.production.local scripts/test-families.mjs"
   },
   "dependencies": {
     "googleapis": "^140.0.0",
