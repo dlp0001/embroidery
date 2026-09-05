@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap">
+  <style>
+    body { margin: 0; background: #ffffff; color: #1a1a2e; font-family: 'Jost', system-ui, sans-serif; font-weight: 300; line-height: 1.7; }
+    a { color: #e91e8c; text-decoration: none; }
+    a:hover { color: #c4107a; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 900px; display: flex; background: #ffffff;">
+
+  <div style="width: 248px; flex-shrink: 0; background: #1a1a2e; padding: 28px 0; display: flex; flex-direction: column;">
+    <div style="font-family: 'Cormorant Garamond', serif; font-size: 19px; font-weight: 300; color: #ffffff; padding: 0 28px 28px;">Re.Create.Art</div>
+    <div style="font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(250,247,242,0.3); padding: 0 28px 12px;">Управление</div>
+    <div style="display: flex; flex-direction: column;">
+      <a href="#" style="font-size: 13px; color: #ffffff; padding: 11px 28px; border-left: 3px solid #e91e8c; background: rgba(233,30,140,0.12);">Студия</a>
+      <a href="#" style="font-size: 13px; color: rgba(250,247,242,0.55); padding: 11px 28px; border-left: 3px solid transparent;">Курсы</a>
+      <a href="#" style="font-size: 13px; color: rgba(250,247,242,0.55); padding: 11px 28px; border-left: 3px solid transparent;">Люди</a>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 11px 28px; border-left: 3px solid transparent;">
+        <div style="font-size: 13px; color: rgba(250,247,242,0.25);">Лагерь</div>
+        <div style="font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(250,247,242,0.3); border: 1px solid rgba(250,247,242,0.18); padding: 2px 7px;">скоро</div>
+      </div>
+    </div>
+    <div style="margin-top: auto; padding: 0 28px;">
+      <div style="font-size: 13px; color: rgba(250,247,242,0.55);">Варя Перлина</div>
+      <div style="font-size: 11px; color: rgba(250,247,242,0.3);">преподаватель · админ</div>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; padding: 44px 52px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 8px;">
+      <div>
+        <div style="font-size: 11px; letter-spacing: 0.4em; text-transform: uppercase; color: #666666; margin-bottom: 12px;">Студия</div>
+        <div style="font-family: 'Cormorant Garamond', serif; font-size: 44px; font-weight: 300; color: #1a1a2e; line-height: 1.1;">Группы</div>
+      </div>
+      <div style="display: flex; gap: 12px;">
+        <div style="padding: 15px 28px; border: 1.5px solid rgba(26,26,46,0.15); color: #1a1a2e; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;">Архив</div>
+        <div style="padding: 15px 36px; background: #e91e8c; color: #ffffff; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;">Новая группа</div>
+      </div>
+    </div>
+
+    <div style="font-size: 14px; color: #666666; margin-bottom: 36px;">Сегодня среда: два занятия, журнал ещё не сохранён.</div>
+
+    <div style="display: grid; grid-template-columns: 2.2fr 1.2fr 1.4fr 1fr 1.4fr; gap: 20px; padding: 0 20px 12px; border-bottom: 1px solid rgba(233,30,140,0.14);">
+      <div style="font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: #666666;">Группа</div>
+      <div style="font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: #666666;">Возраст</div>
+      <div style="font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: #666666;">Когда</div>
+      <div style="font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: #666666;">Дети</div>
+      <div style="font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: #666666;">Абонементы</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column;">
+      <div style="display: grid; grid-template-columns: 2.2fr 1.2fr 1.4fr 1fr 1.4fr; gap: 20px; align-items: center; padding: 22px 20px; border-bottom: 1px solid rgba(233,30,140,0.09); background: rgba(233,30,140,0.03);">
+        <div>
+          <div style="font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 400; color: #1a1a2e;">Младшие</div>
+          <div style="font-size: 12px; color: #666666;">Варя Перлина</div>
+        </div>
+        <div style="font-size: 14px; color: #666666;">[6–8 лет]</div>
+        <div style="font-size: 14px; color: #1a1a2e;">[среда 16:30]</div>
+        <div style="font-size: 14px; color: #1a1a2e;">8</div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="font-size: 14px; color: #1a1a2e;">6 активных</div>
+          <div style="font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; color: #e91e8c; background: rgba(233,30,140,0.08); padding: 3px 9px;">2 заканчиваются</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 2.2fr 1.2fr 1.4fr 1fr 1.4fr; gap: 20px; align-items: center; padding: 22px 20px; border-bottom: 1px solid rgba(233,30,140,0.09);">
+        <div>
+          <div style="font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 400; color: #1a1a2e;">Средние</div>
+          <div style="font-size: 12px; color: #666666;">Варя Перлина</div>
+        </div>
+        <div style="font-size: 14px; color: #666666;">[9–11 лет]</div>
+        <div style="font-size: 14px; color: #1a1a2e;">[среда 18:00]</div>
+        <div style="font-size: 14px; color: #1a1a2e;">10</div>
+        <div style="font-size: 14px; color: #1a1a2e;">9 активных</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 2.2fr 1.2fr 1.4fr 1fr 1.4fr; gap: 20px; align-items: center; padding: 22px 20px; border-bottom: 1px solid rgba(233,30,140,0.09);">
+        <div>
+          <div style="font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 400; color: #1a1a2e;">Старшие</div>
+          <div style="font-size: 12px; color: #666666;">Варя Перлина</div>
+        </div>
+        <div style="font-size: 14px; color: #666666;">[12+ лет]</div>
+        <div style="font-size: 14px; color: #1a1a2e;">[воскресенье 17:00]</div>
+        <div style="font-size: 14px; color: #1a1a2e;">6</div>
+        <div style="font-size: 14px; color: #1a1a2e;">6 активных</div>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 16px; margin-top: 40px; padding: 22px 24px; background: #f5f0fa; border-left: 3px solid #e91e8c;">
+      <div style="font-size: 14px; color: #666666; line-height: 1.75;">Преподаватель видит только свои группы. Пока все три ведёт Варя, но право уже отдельное от админского, чтобы второй педагог не видел чужой журнал и платежи.</div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

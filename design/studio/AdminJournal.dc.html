@@ -1,0 +1,127 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500&display=swap">
+  <style>
+    body { margin: 0; background: #ffffff; color: #1a1a2e; font-family: 'Jost', system-ui, sans-serif; font-weight: 300; line-height: 1.7; }
+    a { color: #e91e8c; text-decoration: none; }
+    a:hover { color: #c4107a; }
+    .seg { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; padding: 9px 16px; border: 1.5px solid rgba(26,26,46,0.15); color: #666666; white-space: nowrap; }
+    .seg-on { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; padding: 9px 16px; border: 1.5px solid #e91e8c; background: rgba(233,30,140,0.06); color: #1a1a2e; font-weight: 500; white-space: nowrap; }
+    .row { display: grid; grid-template-columns: 1.6fr 1.1fr auto; gap: 24px; align-items: center; padding: 16px 20px; border-bottom: 1px solid rgba(233,30,140,0.09); }
+    .name { font-family: 'Cormorant Garamond', serif; font-size: 22px; font-weight: 400; color: #1a1a2e; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; height: 980px; display: flex; background: #ffffff;">
+
+  <div style="width: 248px; flex-shrink: 0; background: #1a1a2e; padding: 28px 0; display: flex; flex-direction: column;">
+    <div style="font-family: 'Cormorant Garamond', serif; font-size: 19px; font-weight: 300; color: #ffffff; padding: 0 28px 28px;">Re.Create.Art</div>
+    <div style="font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: rgba(250,247,242,0.3); padding: 0 28px 12px;">Управление</div>
+    <div style="display: flex; flex-direction: column;">
+      <a href="#" style="font-size: 13px; color: #ffffff; padding: 11px 28px; border-left: 3px solid #e91e8c; background: rgba(233,30,140,0.12);">Студия</a>
+      <a href="#" style="font-size: 13px; color: rgba(250,247,242,0.55); padding: 11px 28px; border-left: 3px solid transparent;">Курсы</a>
+      <a href="#" style="font-size: 13px; color: rgba(250,247,242,0.55); padding: 11px 28px; border-left: 3px solid transparent;">Люди</a>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 11px 28px; border-left: 3px solid transparent;">
+        <div style="font-size: 13px; color: rgba(250,247,242,0.25);">Лагерь</div>
+        <div style="font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: rgba(250,247,242,0.3); border: 1px solid rgba(250,247,242,0.18); padding: 2px 7px;">скоро</div>
+      </div>
+    </div>
+    <div style="margin-top: auto; padding: 0 28px;">
+      <div style="font-size: 13px; color: rgba(250,247,242,0.55);">Варя Перлина</div>
+      <div style="font-size: 11px; color: rgba(250,247,242,0.3);">преподаватель · админ</div>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; padding: 44px 52px; display: flex; flex-direction: column;">
+    <div style="font-size: 12px; color: #666666; margin-bottom: 16px;"><a href="#" style="color: #666666;">Студия</a> · Младшие</div>
+
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 28px;">
+      <div>
+        <div style="font-family: 'Cormorant Garamond', serif; font-size: 44px; font-weight: 300; color: #1a1a2e; line-height: 1.1;">Журнал</div>
+        <div style="font-size: 14px; color: #666666; margin-top: 6px;">Младшие · [6–8 лет] · [среда 16:30]</div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 4px;">
+        <div style="padding: 11px 14px; border: 1.5px solid rgba(26,26,46,0.15); color: #666666; font-size: 13px;">&larr;</div>
+        <div style="padding: 11px 24px; border: 1.5px solid #1a1a2e; color: #1a1a2e; font-size: 13px; letter-spacing: 0.05em;">Занятие 11 марта</div>
+        <div style="padding: 11px 14px; border: 1.5px solid rgba(26,26,46,0.15); color: rgba(26,26,46,0.25); font-size: 13px;">&rarr;</div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1.6fr 1.1fr auto; gap: 24px; padding: 0 20px 12px; border-bottom: 1px solid rgba(233,30,140,0.14);">
+      <div style="font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: #666666;">Ребёнок</div>
+      <div style="font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: #666666;">Абонемент</div>
+      <div style="font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: #666666;">Отметка</div>
+    </div>
+
+    <div style="display: flex; flex-direction: column;">
+
+      <div class="row">
+        <div class="name">Мия</div>
+        <div style="font-size: 14px; color: #1a1a2e;">6 из 8</div>
+        <div style="display: flex; gap: 8px;"><div class="seg-on">Есть</div><div class="seg">Нет</div><div class="seg">Болеет</div><div class="seg">Пробное</div></div>
+      </div>
+
+      <div class="row">
+        <div class="name">Ноам</div>
+        <div style="font-size: 14px; color: #c4107a;">0 из 8 · закончился</div>
+        <div style="display: flex; gap: 8px;"><div class="seg">Есть</div><div class="seg-on">Нет</div><div class="seg">Болеет</div><div class="seg">Пробное</div></div>
+      </div>
+
+      <div class="row">
+        <div class="name">Ноа</div>
+        <div style="font-size: 14px; color: #1a1a2e;">2 из 8</div>
+        <div style="display: flex; gap: 8px;"><div class="seg-on">Есть</div><div class="seg">Нет</div><div class="seg">Болеет</div><div class="seg">Пробное</div></div>
+      </div>
+
+      <div class="row">
+        <div class="name">Даниэль</div>
+        <div style="font-size: 14px; color: #1a1a2e;">7 из 8</div>
+        <div style="display: flex; gap: 8px;"><div class="seg">Есть</div><div class="seg">Нет</div><div class="seg-on">Болеет</div><div class="seg">Пробное</div></div>
+      </div>
+
+      <div class="row">
+        <div class="name">Тамар</div>
+        <div style="font-size: 14px; color: #1a1a2e;">4 из 8</div>
+        <div style="display: flex; gap: 8px;"><div class="seg-on">Есть</div><div class="seg">Нет</div><div class="seg">Болеет</div><div class="seg">Пробное</div></div>
+      </div>
+
+      <div class="row">
+        <div class="name">Софи</div>
+        <div style="font-size: 14px; color: #666666;">нет абонемента</div>
+        <div style="display: flex; gap: 8px;"><div class="seg">Есть</div><div class="seg">Нет</div><div class="seg">Болеет</div><div class="seg-on">Пробное</div></div>
+      </div>
+
+      <div class="row">
+        <div class="name">Йонатан</div>
+        <div style="font-size: 14px; color: #1a1a2e;">6 из 8</div>
+        <div style="display: flex; gap: 8px;"><div class="seg-on">Есть</div><div class="seg">Нет</div><div class="seg">Болеет</div><div class="seg">Пробное</div></div>
+      </div>
+
+      <div class="row">
+        <div class="name">Ари</div>
+        <div style="font-size: 14px; color: #1a1a2e;">3 из 8</div>
+        <div style="display: flex; gap: 8px;"><div class="seg-on">Есть</div><div class="seg">Нет</div><div class="seg">Болеет</div><div class="seg">Пробное</div></div>
+      </div>
+
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 32px;">
+      <div style="font-size: 14px; color: #666666; line-height: 1.75; max-width: 640px;">Отмечено 8 из 8. У Ноама абонемент закончился, у Софи пробное. Отметка «болеет» занятие не списывает.</div>
+      <div style="display: flex; gap: 12px;">
+        <div style="padding: 15px 28px; border: 1.5px solid rgba(26,26,46,0.15); color: #1a1a2e; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;">Отмена</div>
+        <div style="padding: 15px 36px; background: #e91e8c; color: #ffffff; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;">Сохранить журнал</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>
