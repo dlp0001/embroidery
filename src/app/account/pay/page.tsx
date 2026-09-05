@@ -1,11 +1,21 @@
 import { requireUser } from '@/lib/session';
 import { lessonPrice, passBalances, unpaidCharges } from '@/lib/studio';
+import { isConfigured } from '@/lib/payplus';
 import { dayMonth, money, plural } from '@/lib/format';
+import { buyPassAction, payDebtAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function PayPage() {
+const PACKS = [4, 8, 12];
+
+export default async function PayPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const user = await requireUser();
+  const { error } = await searchParams;
+  const online = isConfigured();
   const [unpaid, passes, price] = await Promise.all([
     unpaidCharges(user.id),
     passBalances(user.id),
@@ -23,6 +33,8 @@ export default async function PayPage() {
       </div>
 
       <div className="body">
+        {error && <p className="err">{error}</p>}
+
         {pass && (
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
@@ -76,26 +88,53 @@ export default async function PayPage() {
               </div>
             </div>
 
-            <button className="btn-wide" disabled title="Оплата картой ещё не подключена">
-              Оплатить картой
-            </button>
+            {online ? (
+              <form action={payDebtAction}>
+                <button className="btn-wide" type="submit">
+                  Оплатить {money(total, currency)}
+                </button>
+              </form>
+            ) : (
+              <button className="btn-wide" disabled title="Оплата картой ещё не подключена">
+                Оплатить картой
+              </button>
+            )}
             <p className="hint" style={{ marginTop: 14 }}>
-              Оплата картой скоро появится. Пока рассчитаться можно на занятии,
-              наличными или переводом — Варя отметит это здесь.
+              {online
+                ? 'Оплата картой на странице банка. Квитанция придёт на почту.'
+                : 'Оплата картой скоро появится. Пока рассчитаться можно на занятии, наличными или переводом — Варя отметит это здесь.'}
             </p>
           </>
         )}
 
-        <div className="note" style={{ marginTop: 24 }}>
-          <strong style={{ color: 'var(--charcoal)', fontWeight: 500 }}>
-            {pass ? 'Продлить абонемент' : 'Абонемент вместо разовых'}
-          </strong>
-          <br />
+        <div className="lbl">{pass ? 'Продлить абонемент' : 'Абонемент'}</div>
+        <p className="hint" style={{ marginBottom: 16 }}>
           Пакет занятий общий на всю семью: тратится и на детей, и на взрослого.
-          Пока он действует, платить за каждое посещение не нужно. Одно занятие
-          стоит {money(price.amount, price.currency)}. Купить можно у Вари на занятии
-          или написав на <a href="mailto:info@re-create.art">info@re-create.art</a>.
-        </div>
+          Пока он действует, платить за каждое посещение не нужно.
+          Одно занятие стоит {money(price.amount, price.currency)}.
+        </p>
+
+        {online ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {PACKS.map((n) => (
+              <form action={buyPassAction} key={n}>
+                <input type="hidden" name="lessons" value={n} />
+                <input type="hidden" name="months" value={3} />
+                <button className="btn-quiet" type="submit" style={{ width: '100%', justifyContent: 'space-between' }}>
+                  <span>{n}&nbsp;{plural(n, 'занятие', 'занятия', 'занятий')}</span>
+                  <span>{money(price.amount * n, price.currency)}</span>
+                </button>
+              </form>
+            ))}
+            <p className="hint">Действует три месяца со дня покупки.</p>
+          </div>
+        ) : (
+          <div className="note">
+            Купить можно у Вари на занятии или написав на{' '}
+            <a href="mailto:info@re-create.art">info@re-create.art</a>. Оплата картой
+            появится, когда подключим банк.
+          </div>
+        )}
       </div>
     </>
   );
