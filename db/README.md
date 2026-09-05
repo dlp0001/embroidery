@@ -128,3 +128,8 @@ npm run payplus:pages
 Команда берёт ключи из `.env.production.local` и печатает список страниц
 терминала с их `uid`. Если PayPlus попросит `terminal_uid`, добавьте в тот
 же файл `PAYPLUS_TERMINAL_UID`.
+
+Тестовая и боевая среды PayPlus не связаны между собой: у каждой свои
+`api-key`, `secret-key` и свой `PAYPLUS_PAGE_UID`. Боевой ключ в среде
+`test` даёт 403 «API_KEY / SECRET_KEY ARE INCORRECT». Доступ к тестовой
+среде выдаёт поддержка PayPlus, tech@payplus.co.il.

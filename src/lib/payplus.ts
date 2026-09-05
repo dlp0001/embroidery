@@ -13,12 +13,15 @@ const BASE = {
 
 function env() {
   const mode = process.env.PAYPLUS_ENV === 'prod' ? 'prod' : 'test';
+  // Ключи часто копируют с переносом строки или пробелом на конце,
+  // а PayPlus на это отвечает тем же 403, что и на чужой ключ.
+  const clean = (v: string | undefined) => (v ?? '').trim();
   return {
     mode,
     base: BASE[mode],
-    apiKey: process.env.PAYPLUS_API_KEY ?? '',
-    secretKey: process.env.PAYPLUS_SECRET_KEY ?? '',
-    pageUid: process.env.PAYPLUS_PAGE_UID ?? '',
+    apiKey: clean(process.env.PAYPLUS_API_KEY),
+    secretKey: clean(process.env.PAYPLUS_SECRET_KEY),
+    pageUid: clean(process.env.PAYPLUS_PAGE_UID),
   };
 }
 
@@ -45,7 +48,12 @@ async function call<T>(path: string, body: unknown): Promise<T> {
   } catch {
     throw new Error(`payplus: ответ не JSON (${res.status}): ${text.slice(0, 200)}`);
   }
-  if (!res.ok) throw new Error(`payplus ${path}: ${res.status} ${text.slice(0, 300)}`);
+  if (!res.ok) {
+    const hint = res.status === 403
+      ? ` Ключи не подходят к среде «${e.mode}»: у тестовой и боевой они разные, как и идентификатор страницы.`
+      : '';
+    throw new Error(`${res.status} ${text.slice(0, 200)}.${hint}`);
+  }
   return data as T;
 }
 
