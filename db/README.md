@@ -62,3 +62,16 @@ DATABASE_URL='<direct-строка>' npm run migrate
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 ```
+
+## Роли
+
+В базе нет ролей по умолчанию: первый вход заводит обычного родителя.
+Преподавателя и админа выдают руками:
+
+```bash
+DATABASE_URL='<direct-строка>' node db/grant-roles.mjs acidophline@gmail.com teacher,admin 'Варя Перлина'
+DATABASE_URL='<direct-строка>' node db/grant-roles.mjs id@perlin.ru superadmin,admin 'Дима'
+```
+
+Скрипт заводит человека, если его ещё нет, и повторный запуск ничего
+не ломает.

@@ -19,21 +19,32 @@ export async function requestCode(rawEmail: string): Promise<RequestCodeResult> 
     return { ok: false, error: 'Проверьте адрес почты' };
   }
 
-  const recent = await one<{ n: string }>(
+  let recent: { n: string } | null;
+  try {
+    recent = await one<{ n: string }>(
     `select count(*)::text as n from login_codes
       where email = $1 and created_at > now() - interval '15 minutes'`,
-    [email],
-  );
+      [email],
+    );
+  } catch (err) {
+    console.error('login: база недоступна', err);
+    return { ok: false, error: 'Не удаётся связаться с базой. Попробуйте позже.' };
+  }
   if (Number(recent?.n ?? 0) >= MAX_CODES_PER_15MIN) {
     return { ok: false, error: 'Слишком много запросов. Попробуйте через несколько минут.' };
   }
 
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
-  await query(
+  try {
+    await query(
     `insert into login_codes (email, code_hash, expires_at)
      values ($1, $2, now() + ($3 || ' minutes')::interval)`,
-    [email, hashCode(email, code), String(CODE_TTL_MIN)],
-  );
+      [email, hashCode(email, code), String(CODE_TTL_MIN)],
+    );
+  } catch (err) {
+    console.error('login: не удалось записать код', err);
+    return { ok: false, error: 'Не удаётся связаться с базой. Попробуйте позже.' };
+  }
 
   await sendCode(email, code);
   // В разработке письма не уходят, поэтому код показываем на странице.
