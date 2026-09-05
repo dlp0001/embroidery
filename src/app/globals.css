@@ -17,7 +17,12 @@ body {
 a { color: var(--rose); text-decoration: none; }
 button, input, select { font: inherit; color: inherit; }
 
-.app { max-width: 560px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; }
+.app {
+  max-width: 560px; margin: 0 auto; min-height: 100dvh;
+  display: flex; flex-direction: column;
+  /* место под закреплённое меню, чтобы оно не накрывало последнюю строку */
+  padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px));
+}
 .top { padding: 20px 20px 14px; }
 .kicker { font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--warm-gray); margin-bottom: 6px; }
 .h1 { font-family: 'Cormorant Garamond', serif; font-size: 30px; font-weight: 400; line-height: 1.1; }
@@ -74,12 +79,19 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .dot-off { border: 2px solid rgba(26, 26, 46, 0.18); }
 .dot-alt { border: 2px solid var(--rose); color: var(--rose); font-size: 11px; }
 
-.bar { border-top: 1px solid var(--line); padding: 14px 20px 22px; position: sticky; bottom: 0; background: var(--cream); }
-.tabs { display: grid; grid-template-columns: repeat(var(--tabs, 4), minmax(0, 1fr)); border-top: 1px solid var(--line); }
+.bar { border-top: 1px solid var(--line); padding: 14px 20px 22px; background: var(--cream); }
+.tabs {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+  width: 100%; max-width: 560px; margin: 0 auto;
+  display: grid; grid-template-columns: repeat(var(--tabs, 4), minmax(0, 1fr));
+  border-top: 1px solid var(--line);
+  background: var(--cream);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
 .tab {
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 12px 0 20px; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--warm-gray);
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 11px 2px 14px; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--warm-gray); text-align: center;
 }
 .tab[data-on='1'] { color: var(--rose); }
 .tab svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }

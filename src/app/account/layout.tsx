@@ -8,6 +8,7 @@ const TABS: Tab[] = [
   { href: '/account', icon: 'week', label: 'Неделя' },
   { href: '/account/calendar', icon: 'cal', label: 'Календарь' },
   { href: '/account/history', icon: 'hist', label: 'История' },
+  { href: '/account/pay', icon: 'pay', label: 'Оплата' },
   { href: '/account/profile', icon: 'person', label: 'Профиль' },
 ];
 

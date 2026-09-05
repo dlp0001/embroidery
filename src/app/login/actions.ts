@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { requestCode, verifyCode } from '@/lib/auth';
-import { destroySession } from '@/lib/session';
+import { canTeach, currentUser, destroySession } from '@/lib/session';
 
 export type LoginState = { step: 'email' | 'code'; email: string; error?: string; devCode?: string };
 
@@ -18,7 +18,9 @@ export async function verifyCodeAction(prev: LoginState, form: FormData): Promis
   const code = String(form.get('code') ?? '');
   const res = await verifyCode(email, code);
   if (!res.ok) return { step: 'code', email, error: res.error };
-  redirect('/account');
+  // Кто ведёт занятия, тому нужен журнал, а не родительский кабинет.
+  const user = await currentUser();
+  redirect(user && canTeach(user) ? '/admin/studio' : '/account');
 }
 
 export async function logoutAction(): Promise<void> {
