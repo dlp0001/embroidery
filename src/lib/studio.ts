@@ -703,10 +703,12 @@ export async function allGroups(): Promise<GroupRow[]> {
 
 export async function teachers(): Promise<{ id: string; name: string | null; email: string }[]> {
   return query(
-    `select distinct u.id, u.name, u.email from users u
-      join user_roles r on r.user_id = u.id
-     where r.role in ('teacher', 'admin', 'superadmin')
-     order by coalesce(u.name, u.email)`,
+    `select u.id, u.name, u.email
+       from users u
+      where exists (
+        select 1 from user_roles r
+         where r.user_id = u.id and r.role in ('teacher', 'admin', 'superadmin'))
+      order by coalesce(u.name, u.email)`,
   );
 }
 
