@@ -22,6 +22,7 @@ function env() {
     apiKey: clean(process.env.PAYPLUS_API_KEY),
     secretKey: clean(process.env.PAYPLUS_SECRET_KEY),
     pageUid: clean(process.env.PAYPLUS_PAGE_UID),
+    chargeDefault: clean(process.env.PAYPLUS_CHARGE_DEFAULT),
   };
 }
 
@@ -84,6 +85,9 @@ export async function createPaymentLink(input: LinkInput): Promise<PaymentLink> 
     data?: { page_request_uid?: string; payment_page_link?: string };
   }>('/PaymentPages/generateLink', {
     payment_page_uid: e.pageUid,
+    // Какой способ предложить первым. Остальные включённые на терминале
+    // всё равно останутся на странице.
+    ...(e.chargeDefault ? { charge_default: e.chargeDefault } : {}),
     amount: input.amount,
     currency_code: input.currency,
     sendEmailApproval: true,

@@ -19,7 +19,7 @@ export async function startPayment(
   user: { id: string; email: string; name: string | null },
   intent: Intent,
   origin: string,
-): Promise<{ paymentId: string } | { error: string }> {
+): Promise<{ url: string; paymentId: string } | { error: string }> {
   if (!isConfigured()) return { error: 'Оплата картой ещё не подключена.' };
 
   const price = await lessonPrice();
@@ -74,7 +74,7 @@ export async function startPayment(
         where id = $1`,
       [payment!.id, link.pageRequestUid, link.url],
     );
-    return { paymentId: payment!.id };
+    return { url: link.url, paymentId: payment!.id };
   } catch (err) {
     console.error('payplus: не удалось создать ссылку', err);
     await query(`update payments set status = 'failed' where id = $1`, [payment!.id]);

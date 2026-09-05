@@ -17,9 +17,9 @@ async function go(intent: Intent): Promise<never> {
   const user = await requireUser();
   const res = await startPayment(user, intent, await origin());
   if ('error' in res) redirect(`/account/pay?error=${encodeURIComponent(res.error)}`);
-  // Уводим на свою страницу: переход на чужой адрес прямо из формы
-  // ведёт себя по-разному, а тут человек в любом случае видит кнопку.
-  redirect(`/account/pay/go/${res.paymentId}`);
+  // Сразу в кассу, без промежуточного экрана. Ссылка остаётся в записи
+  // платежа, поэтому /account/pay/go/<id> работает как запасной путь.
+  redirect(res.url);
 }
 
 export async function payDebtAction(): Promise<void> {

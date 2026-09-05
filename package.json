@@ -13,7 +13,8 @@
     "migrate:prod": "node --env-file-if-exists=.env.production.local db/migrate.mjs",
     "payplus:pages": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.production.local scripts/payplus-pages.mjs",
     "verify": "tsc --noEmit && BUILD_DIR=.next-verify next build",
-    "families": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.production.local scripts/test-families.mjs"
+    "families": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.production.local scripts/test-families.mjs",
+    "payplus:methods": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.production.local scripts/payplus-methods.mjs"
   },
   "dependencies": {
     "googleapis": "^140.0.0",
