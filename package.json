@@ -10,7 +10,8 @@
     "seed": "node --env-file-if-exists=.env.local db/seed.mjs",
     "typecheck": "tsc --noEmit",
     "roles": "node --env-file-if-exists=.env.production.local db/grant-roles.mjs",
-    "migrate:prod": "node --env-file-if-exists=.env.production.local db/migrate.mjs"
+    "migrate:prod": "node --env-file-if-exists=.env.production.local db/migrate.mjs",
+    "payplus:pages": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.production.local scripts/payplus-pages.mjs"
   },
   "dependencies": {
     "googleapis": "^140.0.0",
