@@ -44,10 +44,12 @@ export default function Journal({
     const row = rows[r.participant_id];
     if (!row.present) return { text: 'пропуск', cls: 'money-off' };
     if (row.cash) return { text: 'оплачено налом', cls: 'money' };
-    // Абонемент показываем, только когда занятие на него действительно
-    // село, либо человек записан и пакет у семьи есть. Иначе не гадаем.
-    if (r.on_pass || (r.booked && r.has_pass)) return { text: 'по абонементу', cls: 'money' };
+    // «По абонементу» — только когда занятие на пакет уже село.
+    if (r.on_pass) return { text: 'по абонементу', cls: 'money' };
     if (r.paid) return { text: 'оплачено', cls: 'money' };
+    // Для тех, кого ждём, обещаем списание, если пакет у семьи есть.
+    // Для остальных не гадаем: по умолчанию не оплачено.
+    if (expected(r) && r.has_pass) return { text: 'спишется с абонемента', cls: 'money' };
     return { text: `не оплачено · ${price}`, cls: 'money-due' };
   }
 
