@@ -98,7 +98,8 @@ async function sendCode(email: string, code: string): Promise<boolean> {
   }
 }
 
-export type VerifyResult = { ok: true } | { ok: false; error: string };
+/** created — учётку завели прямо сейчас: человеку надо в профиль. */
+export type VerifyResult = { ok: true; created: boolean } | { ok: false; error: string };
 
 export async function verifyCode(rawEmail: string, rawCode: string): Promise<VerifyResult> {
   const email = rawEmail.trim().toLowerCase();
@@ -128,6 +129,7 @@ export async function verifyCode(rawEmail: string, rawCode: string): Promise<Ver
   await query('update login_codes set used_at = now() where id = $1', [row.id]);
 
   let user = await one<{ id: string }>('select id from users where email = $1', [email]);
+  const created = !user;
   if (!user) {
     user = await one<{ id: string }>(
       'insert into users (email) values ($1) returning id',
@@ -144,5 +146,5 @@ export async function verifyCode(rawEmail: string, rawCode: string): Promise<Ver
   }
 
   await createSession(user!.id);
-  return { ok: true };
+  return { ok: true, created };
 }

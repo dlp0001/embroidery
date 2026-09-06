@@ -3,7 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import { one } from '@/lib/db';
 import { requireUser } from '@/lib/session';
-import { addChild, renameChild, setBooking, setPreferredDay } from '@/lib/studio';
+import {
+  addChild, ownsChild, renameChild, renameUser, restoreChild, retireChild, setBooking,
+  setPreferredDay,
+} from '@/lib/studio';
 
 /** Участник принадлежит семье вошедшего? */
 async function assertOwn(userId: string, participantId: string): Promise<void> {
@@ -48,6 +51,34 @@ export async function createChild(formData: FormData): Promise<void> {
   const name = String(formData.get('name') ?? '').trim().slice(0, 60);
   if (!name) return;
   await addChild(user.id, name);
+  refresh();
+}
+
+/** Своё имя родитель правит сам: раньше его мог поменять только админ. */
+export async function updateMyName(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const name = String(formData.get('name') ?? '').trim().slice(0, 120);
+  await renameUser(user.id, name);
+  refresh();
+}
+
+/**
+ * Убрать ребёнка. Ни разу не был на занятии — запись стирается совсем;
+ * был — прячется, потому что журналы и деньги переписывать нельзя.
+ */
+export async function retireMyChild(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const childId = String(formData.get('childId'));
+  if (!(await ownsChild(user.id, childId))) throw new Error('FORBIDDEN');
+  await retireChild(childId);
+  refresh();
+}
+
+export async function restoreMyChild(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const childId = String(formData.get('childId'));
+  if (!(await ownsChild(user.id, childId))) throw new Error('FORBIDDEN');
+  await restoreChild(childId);
   refresh();
 }
 

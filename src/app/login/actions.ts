@@ -20,7 +20,9 @@ export async function verifyCodeAction(prev: LoginState, form: FormData): Promis
   if (!res.ok) return { step: 'code', email, error: res.error };
   // Кто ведёт занятия, тому нужен журнал, а не родительский кабинет.
   const user = await currentUser();
-  redirect(user && canTeach(user) ? '/admin/studio' : '/account');
+  if (user && canTeach(user)) redirect('/admin/studio');
+  // Новичку показывать нечего, пока он не сказал, кто ходит в студию.
+  redirect(res.created ? '/account/profile' : '/account');
 }
 
 export async function logoutAction(): Promise<void> {

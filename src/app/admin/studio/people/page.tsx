@@ -3,8 +3,8 @@ import { families } from '@/lib/studio';
 import { plural } from '@/lib/format';
 import Toggles from '@/components/Toggles';
 import {
-  addChildAction, createParentAction, removeChildAction, renameChildAction,
-  renameUserAction, toggleDayAction,
+  addChildAction, createParentAction, renameChildAction, renameUserAction,
+  restoreChildAction, retireChildAction, toggleDayAction,
 } from '@/app/admin/people-actions';
 
 export const dynamic = 'force-dynamic';
@@ -36,7 +36,7 @@ const inline: React.CSSProperties = {
 export default async function PeoplePage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; add?: string }>;
+  searchParams: Promise<{ error?: string; note?: string; add?: string }>;
 }) {
   const user = await requireTeacher();
   if (!isAdmin(user)) {
@@ -53,7 +53,7 @@ export default async function PeoplePage({
     );
   }
 
-  const { error, add } = await searchParams;
+  const { error, note, add } = await searchParams;
   const list = await families();
 
   return (
@@ -68,6 +68,7 @@ export default async function PeoplePage({
 
       <div className="body">
         {error && <p className="err">{error}</p>}
+        {note && <p className="note">{note}</p>}
 
         {add && (
           <div className="card" style={{ borderStyle: 'dashed' }}>
@@ -110,19 +111,34 @@ export default async function PeoplePage({
 
             {f.children.map((ch) => (
               <div key={ch.child_id} style={{ padding: '12px 0', borderBottom: '1px solid var(--line-soft)' }}>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <form action={renameChildAction} style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1 }}>
-                    <input type="hidden" name="childId" value={ch.child_id} />
-                    <input name="name" defaultValue={ch.name} aria-label="Имя ребёнка"
-                           style={{ ...inline, fontFamily: "'Cormorant Garamond', serif", fontSize: 20 }} />
-                    <button className="btn-quiet" type="submit">Переименовать</button>
-                  </form>
-                  <form action={removeChildAction}>
-                    <input type="hidden" name="childId" value={ch.child_id} />
-                    <button className="btn-quiet" type="submit" aria-label={`Удалить ${ch.name}`}>×</button>
-                  </form>
-                </div>
-                <DayRow participantId={ch.participant_id} days={ch.days ?? []} />
+                {ch.archived ? (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="what" style={{ opacity: 0.5 }}>{ch.name}</div>
+                      <div className="sub">скрыт, в журналах не появляется</div>
+                    </div>
+                    <form action={restoreChildAction}>
+                      <input type="hidden" name="childId" value={ch.child_id} />
+                      <button className="btn-quiet" type="submit">Вернуть</button>
+                    </form>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <form action={renameChildAction} style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1 }}>
+                        <input type="hidden" name="childId" value={ch.child_id} />
+                        <input name="name" defaultValue={ch.name} aria-label="Имя ребёнка"
+                               style={{ ...inline, fontFamily: "'Cormorant Garamond', serif", fontSize: 20 }} />
+                        <button className="btn-quiet" type="submit">Переименовать</button>
+                      </form>
+                      <form action={retireChildAction}>
+                        <input type="hidden" name="childId" value={ch.child_id} />
+                        <button className="btn-quiet" type="submit" aria-label={`Убрать ${ch.name}`}>Убрать</button>
+                      </form>
+                    </div>
+                    <DayRow participantId={ch.participant_id} days={ch.days ?? []} />
+                  </>
+                )}
               </div>
             ))}
 
@@ -143,7 +159,9 @@ export default async function PeoplePage({
           Дни сохраняются сразу, отдельная кнопка им не нужна.
           Дни — это те, в которые человек обычно приходит. По ним он попадает в журнал
           нужного занятия и в раздел «ждём». На конкретное занятие родитель записывается
-          сам, в своём кабинете. Ребёнка с посещениями удалить нельзя.
+          сам, в своём кабинете. «Убрать» стирает ребёнка, если он ещё не был
+          ни на одном занятии, и прячет, если посещения уже есть: журналы и
+          деньги прошлых занятий переписывать нельзя.
         </p>
       </div>
     </>

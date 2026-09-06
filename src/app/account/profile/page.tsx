@@ -1,9 +1,17 @@
 import { requireUser } from '@/lib/session';
-import { familyWithDays } from '@/lib/studio';
+import { archivedChildren, familyWithDays } from '@/lib/studio';
 import Toggles from '@/components/Toggles';
-import { createChild, togglePreferredDay, updateChild } from '../actions';
+import {
+  createChild, restoreMyChild, retireMyChild, togglePreferredDay, updateChild, updateMyName,
+} from '../actions';
 
 export const dynamic = 'force-dynamic';
+
+const nameField: React.CSSProperties = {
+  flex: 1, minWidth: 0, border: 0, borderBottom: '1.5px solid transparent',
+  background: 'none', outline: 'none', padding: '4px 0',
+  fontFamily: "'Cormorant Garamond', serif", fontSize: 21,
+};
 
 const WEEK = [
   { n: 1, short: 'пн' }, { n: 2, short: 'вт' }, { n: 3, short: 'ср' }, { n: 4, short: 'чт' },
@@ -12,7 +20,14 @@ const WEEK = [
 
 export default async function ProfilePage() {
   const user = await requireUser();
-  const family = await familyWithDays(user.id);
+  const [family, hidden] = await Promise.all([
+    familyWithDays(user.id),
+    archivedChildren(user.id),
+  ]);
+  // Своя карточка есть всегда, даже если взрослый сам на занятия не ходит
+  // и строки участника у него нет: имя-то поменять всё равно нужно.
+  const me = family.find((m) => m.is_adult) ?? null;
+  const kids = family.filter((m) => !m.is_adult);
 
   return (
     <>
@@ -23,30 +38,58 @@ export default async function ProfilePage() {
       </div>
 
       <div className="body">
-        {family.map((m) => (
+        <div className="card">
+          <form action={updateMyName} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <input
+              name="name"
+              defaultValue={user.name ?? ''}
+              placeholder="Как вас зовут"
+              aria-label="Ваше имя"
+              maxLength={120}
+              style={nameField}
+            />
+            <button className="btn-quiet" type="submit">Сохранить</button>
+          </form>
+          <div className="sub" style={{ marginTop: 4 }}>{user.email}</div>
+
+          {me && (
+            <>
+              <div className="lbl" style={{ margin: '16px 0 0' }}>Хожу сам</div>
+              <Toggles
+                items={WEEK.map((d) => ({ id: String(d.n), label: d.short }))}
+                active={me.days.map(String)}
+                action={togglePreferredDay}
+                fields={{ participantId: me.participant_id }}
+                itemField="weekday"
+              />
+              <div className="hint" style={{ marginTop: 10 }}>
+                Выбранные дни подсвечиваются в расписании. Записью это не является.
+              </div>
+            </>
+          )}
+        </div>
+
+        {kids.map((m) => (
           <div className="card" key={m.participant_id}>
-            {m.is_adult ? (
-              <div className="what">{user.name ?? 'Я'}</div>
-            ) : (
-              <form action={updateChild} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <form action={updateChild} style={{ display: 'flex', gap: 10, alignItems: 'center', flex: 1 }}>
                 <input type="hidden" name="childId" value={m.child_id ?? ''} />
                 <input
                   name="name"
                   defaultValue={m.who}
                   aria-label="Имя ребёнка"
-                  style={{
-                    flex: 1, minWidth: 0, border: 0, borderBottom: '1.5px solid transparent',
-                    background: 'none', outline: 'none', padding: '4px 0',
-                    fontFamily: "'Cormorant Garamond', serif", fontSize: 21,
-                  }}
+                  maxLength={60}
+                  style={nameField}
                 />
                 <button className="btn-quiet" type="submit">Переименовать</button>
               </form>
-            )}
-
-            <div className="sub" style={{ marginTop: 4 }}>
-              {m.is_adult ? 'Взрослые занятия' : 'Детские занятия'}
+              <form action={retireMyChild}>
+                <input type="hidden" name="childId" value={m.child_id ?? ''} />
+                <button className="btn-quiet" type="submit" aria-label={`Убрать ${m.who}`}>Убрать</button>
+              </form>
             </div>
+
+            <div className="sub" style={{ marginTop: 4 }}>Детские занятия</div>
 
             <Toggles
               items={WEEK.map((d) => ({ id: String(d.n), label: d.short }))}
@@ -57,6 +100,7 @@ export default async function ProfilePage() {
             />
             <div className="hint" style={{ marginTop: 10 }}>
               Выбранные дни подсвечиваются в расписании. Записью это не является.
+              «Убрать» прячет ребёнка из списков, прошлые занятия остаются.
             </div>
           </div>
         ))}
@@ -74,6 +118,25 @@ export default async function ProfilePage() {
             Больше ничего вводить не нужно. Мы храним только имя.
           </p>
         </div>
+
+        {hidden.length > 0 && (
+          <div className="card">
+            <div className="what" style={{ marginBottom: 4 }}>Скрытые</div>
+            <p className="hint" style={{ marginBottom: 14 }}>
+              Они не появляются в расписании и журналах, но прошлые занятия
+              и оплаты за них сохранены.
+            </p>
+            {hidden.map((ch) => (
+              <div className="row" key={ch.child_id} style={{ padding: '8px 0' }}>
+                <div className="sub">{ch.name}</div>
+                <form action={restoreMyChild}>
+                  <input type="hidden" name="childId" value={ch.child_id} />
+                  <button className="btn-quiet" type="submit">Вернуть</button>
+                </form>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );

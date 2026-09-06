@@ -58,7 +58,7 @@ export async function familyParticipants(userId: string): Promise<Participant[]>
       union all
      select p.id, c.name, 'child' as kind
        from participants p
-       join children c on c.id = p.child_id
+       join children c on c.id = p.child_id and c.archived_at is null
        join guardians g on g.child_id = c.id
       where g.user_id = $1
       order by kind desc, name`,
@@ -635,8 +635,9 @@ export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
          cross join ses
          left join children ch on ch.id = p.child_id
          left join users u on u.id = p.user_id
-        where (ses.audience = 'adults' and p.user_id is not null)
-           or (ses.audience = 'kids' and p.child_id is not null)
+        where ch.archived_at is null
+          and ((ses.audience = 'adults' and p.user_id is not null)
+            or (ses.audience = 'kids' and p.child_id is not null))
      )
      select o.participant_id, o.who, o.owner_id,
             a.status,
@@ -785,6 +786,7 @@ export async function slotsForUser(userId: string, from: string, to: string): Pr
        left join bookings b on b.session_id = s.id and b.participant_id = p.id
        left join preferred_days pd on pd.participant_id = p.id and pd.weekday = g.weekday
       where (p.user_id = $1 or p.child_id in (select child_id from guardians where user_id = $1))
+        and c.archived_at is null
         and s.held_on between $2::date and $3::date
         and s.status <> 'cancelled'
       order by s.held_on, g.starts_at, (p.user_id is not null) desc, who`,
@@ -811,8 +813,9 @@ export async function familyWithDays(userId: string): Promise<FamilyMember[]> {
        left join children c on c.id = p.child_id
        left join users u on u.id = p.user_id
        left join preferred_days pd on pd.participant_id = p.id
-      where p.user_id = $1
-         or p.child_id in (select child_id from guardians where user_id = $1)
+      where c.archived_at is null
+        and (p.user_id = $1
+             or p.child_id in (select child_id from guardians where user_id = $1))
       group by p.id, p.child_id, c.name, u.name
       order by (p.user_id is not null) desc, coalesce(c.name, u.name)`,
     [userId],
@@ -1124,6 +1127,7 @@ export type FamilyChild = {
   participant_id: string;
   name: string;
   days: number[];
+  archived: boolean;
 };
 
 export type Family = {
@@ -1152,10 +1156,11 @@ export async function families(): Promise<Family[]> {
                        'child_id', ch.id,
                        'participant_id', p.id,
                        'name', ch.name,
+                       'archived', ch.archived_at is not null,
                        'days', coalesce((select array_agg(pd.weekday order by pd.weekday)
                                            from preferred_days pd
                                           where pd.participant_id = p.id), '{}')
-                     ) order by ch.name)
+                     ) order by ch.archived_at nulls first, ch.name)
                 from guardians g
                 join children ch on ch.id = g.child_id
                 left join participants p on p.child_id = ch.id
@@ -1199,18 +1204,56 @@ export async function renameChildById(childId: string, name: string): Promise<vo
 }
 
 /** Убирает ребёнка совсем. Отметки и деньги держат его: тогда отказ. */
-export async function removeChild(childId: string): Promise<{ ok: boolean; reason?: string }> {
-  const used = await one<{ n: string }>(
-    `select (select count(*) from attendance a
-              join participants p on p.id = a.participant_id where p.child_id = $1)
+/**
+ * Убирает ребёнка из списков. Если он ни разу не был на занятии и денег
+ * за него не считали, запись стирается совсем. Если след уже есть, она
+ * прячется: журналы и деньги прошлых занятий должны остаться правдой.
+ */
+export type RetireResult = { removed: boolean; name: string | null };
+
+export async function retireChild(childId: string): Promise<RetireResult> {
+  const row = await one<{ name: string; used: string }>(
+    `select c.name,
+            (select count(*) from attendance a
+               join participants p on p.id = a.participant_id where p.child_id = c.id)
           + (select count(*) from charges ch
-              join participants p on p.id = ch.participant_id where p.child_id = $1) as n`,
+               join participants p on p.id = ch.participant_id where p.child_id = c.id)
+          + (select count(*) from bookings b
+               join participants p on p.id = b.participant_id where p.child_id = c.id) as used
+       from children c where c.id = $1`,
     [childId],
   );
-  if (Number(used?.n ?? 0) > 0) {
-    return { ok: false, reason: 'У ребёнка есть посещения или начисления. Уберите его из групп вместо удаления.' };
+  if (!row) return { removed: false, name: null };
+
+  if (Number(row.used) === 0) {
+    await query('delete from children where id = $1', [childId]);
+    return { removed: true, name: row.name };
   }
-  await query('delete from children where id = $1', [childId]);
-  return { ok: true };
+  await query('update children set archived_at = now() where id = $1 and archived_at is null',
+    [childId]);
+  return { removed: false, name: row.name };
+}
+
+/** Возвращает скрытого ребёнка обратно в списки. */
+export async function restoreChild(childId: string): Promise<void> {
+  await query('update children set archived_at = null where id = $1', [childId]);
+}
+
+/** Скрытые дети семьи: показываем отдельно, чтобы можно было вернуть. */
+export async function archivedChildren(userId: string): Promise<{ child_id: string; name: string }[]> {
+  return query<{ child_id: string; name: string }>(
+    `select c.id as child_id, c.name
+       from children c join guardians g on g.child_id = c.id
+      where g.user_id = $1 and c.archived_at is not null
+      order by c.name`,
+    [userId],
+  );
+}
+
+/** Ребёнок принадлежит этому родителю? */
+export async function ownsChild(userId: string, childId: string): Promise<boolean> {
+  const row = await one(
+    'select 1 from guardians where user_id = $1 and child_id = $2', [userId, childId]);
+  return Boolean(row);
 }
 

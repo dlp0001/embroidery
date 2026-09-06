@@ -4,7 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { isAdmin, requireUser } from '@/lib/session';
 import {
-  addChildTo, createParent, removeChild, renameChildById, renameUser, setPreferredDay,
+  addChildTo, createParent, renameChildById, renameUser, restoreChild, retireChild,
+  setPreferredDay,
 } from '@/lib/studio';
 
 async function requireAdmin() {
@@ -57,12 +58,22 @@ export async function renameChildAction(form: FormData): Promise<void> {
   refresh();
 }
 
-export async function removeChildAction(form: FormData): Promise<void> {
+export async function retireChildAction(form: FormData): Promise<void> {
   await requireAdmin();
-  const res = await removeChild(String(form.get('childId')));
+  const res = await retireChild(String(form.get('childId')));
   refresh();
-  if (!res.ok) redirect('/admin/studio/people?error=' + encodeURIComponent(res.reason ?? ''));
+  // Скрытие — не ошибка, но человек должен понимать, что произошло.
+  if (!res.removed && res.name) {
+    redirect('/admin/studio/people?note=' + encodeURIComponent(
+      `${res.name} скрыт: у него есть посещения или начисления, стереть их нельзя.`));
+  }
   redirect('/admin/studio/people');
+}
+
+export async function restoreChildAction(form: FormData): Promise<void> {
+  await requireAdmin();
+  await restoreChild(String(form.get('childId')));
+  refresh();
 }
 
 
