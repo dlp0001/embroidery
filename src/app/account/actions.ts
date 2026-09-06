@@ -45,7 +45,7 @@ export async function togglePreferredDay(formData: FormData): Promise<void> {
 
 export async function createChild(formData: FormData): Promise<void> {
   const user = await requireUser();
-  const name = String(formData.get('name') ?? '').trim().slice(0, 60);
+  const name = String(formData.get('name') ?? '').trim().slice(0, 120);
   if (!name) return;
   await addChild(user.id, name);
   refresh();
@@ -62,7 +62,7 @@ export async function updateMyName(formData: FormData): Promise<void> {
 export async function updateChild(formData: FormData): Promise<void> {
   const user = await requireUser();
   const childId = String(formData.get('childId'));
-  const name = String(formData.get('name') ?? '').trim().slice(0, 60);
+  const name = String(formData.get('name') ?? '').trim().slice(0, 120);
   if (!name) return;
   await renameChild(user.id, childId, name);
   refresh();

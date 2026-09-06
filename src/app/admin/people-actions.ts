@@ -44,7 +44,7 @@ export async function renameUserAction(form: FormData): Promise<void> {
 
 export async function addChildAction(form: FormData): Promise<void> {
   await requireAdmin();
-  const name = text(form, 'name', 60);
+  const name = text(form, 'name', 120);
   if (!name) return;
   await addChildTo(String(form.get('userId')), name);
   refresh();
@@ -52,7 +52,7 @@ export async function addChildAction(form: FormData): Promise<void> {
 
 export async function renameChildAction(form: FormData): Promise<void> {
   await requireAdmin();
-  const name = text(form, 'name', 60);
+  const name = text(form, 'name', 120);
   if (!name) return;
   await renameChildById(String(form.get('childId')), name);
   refresh();

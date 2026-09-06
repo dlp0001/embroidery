@@ -37,18 +37,21 @@ export default async function ProfilePage() {
 
       <div className="body">
         <div className="card">
-          <form action={updateMyName} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            <input
-              name="name"
-              defaultValue={user.name ?? ''}
-              placeholder="Как вас зовут"
-              aria-label="Ваше имя"
-              maxLength={120}
-              style={nameField}
-            />
+          <div className="what" style={{ marginBottom: 14 }}>Родитель</div>
+          <form action={updateMyName} style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
+            <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+              <label htmlFor="my-name">Имя и фамилия</label>
+              <input
+                id="my-name"
+                name="name"
+                defaultValue={user.name ?? ''}
+                placeholder="Как вас зовут"
+                maxLength={120}
+              />
+            </div>
             <button className="btn-quiet" type="submit">Сохранить</button>
           </form>
-          <div className="sub" style={{ marginTop: 4 }}>{user.email}</div>
+          <div className="sub" style={{ marginTop: 10 }}>{user.email}</div>
 
           {me && (
             <>
@@ -74,8 +77,8 @@ export default async function ProfilePage() {
               <input
                 name="name"
                 defaultValue={m.who}
-                aria-label="Имя ребёнка"
-                maxLength={60}
+                aria-label="Имя и фамилия ребёнка"
+                maxLength={120}
                 style={nameField}
               />
               <button className="btn-quiet" type="submit">Переименовать</button>
@@ -100,8 +103,8 @@ export default async function ProfilePage() {
           <div className="what" style={{ marginBottom: 14 }}>Добавить ребёнка</div>
           <form action={createChild} style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
             <div className="field" style={{ flex: 1, marginBottom: 0 }}>
-              <label htmlFor="child-name">Имя</label>
-              <input id="child-name" name="name" required maxLength={60} placeholder="Как зовут" />
+              <label htmlFor="child-name">Имя и фамилия</label>
+              <input id="child-name" name="name" required maxLength={120} placeholder="Как зовут" />
             </div>
             <button className="btn" type="submit">Добавить</button>
           </form>

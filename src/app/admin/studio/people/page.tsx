@@ -146,7 +146,7 @@ export default async function PeoplePage({
               <input type="hidden" name="userId" value={f.user_id} />
               <div className="field" style={{ flex: 1, marginBottom: 0 }}>
                 <label htmlFor={`child-${f.user_id}`}>Добавить ребёнка</label>
-                <input id={`child-${f.user_id}`} name="name" maxLength={60} placeholder="Имя" />
+                <input id={`child-${f.user_id}`} name="name" maxLength={120} placeholder="Имя" />
               </div>
               <button className="btn-quiet" type="submit">Добавить</button>
             </form>
