@@ -34,7 +34,7 @@ if (!local && !process.argv.includes('--allow-remote')) {
  * Список можно задать явно: --keep кто@то,ещё@кто-то
  */
 const DEFAULT_KEEP = [
-  'varya@re-create.art', 'acidophline@gmail.com',
+  'varya@re-create.art', 'acidophiline@gmail.com',
   'id@perlin.ru', 'dmitriy.perlin@gmail.com',
 ];
 

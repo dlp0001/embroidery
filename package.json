@@ -21,6 +21,8 @@
     "payments": "node --env-file-if-exists=.env.local scripts/payment-check.mjs",
     "payments:prod": "node --env-file-if-exists=.env.production.local scripts/payment-check.mjs",
     "icount": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.production.local scripts/icount-check.mjs",
+    "email": "node --env-file-if-exists=.env.local scripts/set-email.mjs",
+    "email:prod": "node --env-file-if-exists=.env.production.local scripts/set-email.mjs",
     "inventory": "node --env-file-if-exists=.env.local scripts/db-inventory.mjs",
     "inventory:prod": "node --env-file-if-exists=.env.production.local scripts/db-inventory.mjs"
   },
