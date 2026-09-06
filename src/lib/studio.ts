@@ -940,20 +940,6 @@ export async function setSessionStatus(id: string, status: 'planned' | 'cancelle
   await query('update studio_sessions set status = $2 where id = $1', [id, status]);
 }
 
-/** Удалять можно только пустое занятие: иначе потеряются отметки и деньги. */
-export async function deleteSession(id: string): Promise<{ ok: boolean; reason?: string }> {
-  const used = await one<{ n: string }>(
-    `select (select count(*) from attendance where session_id = $1)
-          + (select count(*) from charges where session_id = $1) as n`,
-    [id],
-  );
-  if (Number(used?.n ?? 0) > 0) {
-    return { ok: false, reason: 'В занятии есть отметки или начисления. Его можно отменить, но не удалить.' };
-  }
-  await query('delete from studio_sessions where id = $1', [id]);
-  return { ok: true };
-}
-
 /**
  * Пересобирает будущие занятия группы под её текущий день и время.
  * Прошлое и всё, где уже есть отметки или деньги, не трогает.

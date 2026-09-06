@@ -3,7 +3,7 @@ import { isAdmin, requireTeacher } from '@/lib/session';
 import { allGroups, ensureSessions, sessionsInRange } from '@/lib/studio';
 import { hhmm, todayISO, weekdayDayMonth } from '@/lib/format';
 import {
-  addSessionAction, deleteSessionAction, setSessionStatusAction,
+  addSessionAction, setSessionStatusAction,
 } from '@/app/admin/schedule-actions';
 
 export const dynamic = 'force-dynamic';
@@ -132,12 +132,6 @@ export default async function AdminCalendarPage({
                     {s.status === 'cancelled' ? 'Вернуть' : 'Отменить'}
                   </button>
                 </form>
-                {s.marked === 0 && (
-                  <form action={deleteSessionAction}>
-                    <input type="hidden" name="id" value={s.session_id} />
-                    <button className="btn-quiet" type="submit">Удалить</button>
-                  </form>
-                )}
               </div>
             )}
           </div>

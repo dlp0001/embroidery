@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { confirmCash, declineCash } from '@/lib/billing';
 import { isAdmin, requireUser } from '@/lib/session';
 import {
-  addSession, createGroup, deleteSession, issuePass, resyncGroupSessions, setGroupActive,
+  addSession, createGroup, issuePass, resyncGroupSessions, setGroupActive,
   setSessionStatus, updateGroup, type GroupInput,
 } from '@/lib/studio';
 
@@ -97,12 +97,6 @@ export async function setSessionStatusAction(form: FormData): Promise<void> {
   refresh();
 }
 
-export async function deleteSessionAction(form: FormData): Promise<void> {
-  await requireAdmin();
-  const res = await deleteSession(String(form.get('id')));
-  if (!res.ok) throw new Error(res.reason);
-  refresh();
-}
 
 export async function issuePassAction(form: FormData): Promise<void> {
   const user = await requireAdmin();
