@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { requireUser } from '@/lib/session';
 import { slotsForUser } from '@/lib/studio';
 import { todayISO, weekdayDayMonth } from '@/lib/format';
+import BookingHint from '@/components/BookingHint';
 import SlotList from '@/components/SlotList';
 
 export const dynamic = 'force-dynamic';
@@ -90,6 +91,7 @@ export default async function CalendarPage({
         {selected ? (
           <section>
             <div className="lbl">{weekdayDayMonth(selected)}</div>
+            <BookingHint />
             <SlotList rows={dayRows} />
           </section>
         ) : (

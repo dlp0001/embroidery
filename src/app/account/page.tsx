@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import BookingHint from '@/components/BookingHint';
 import SlotList from '@/components/SlotList';
 import { requireUser } from '@/lib/session';
 import { passBalances, slotsForUser, unpaidCharges } from '@/lib/studio';
@@ -71,6 +72,10 @@ export default async function WeekPage() {
         {days.length === 0 ? (
           <p className="hint" style={{ marginTop: 20 }}>На ближайшую неделю занятий нет.</p>
         ) : (
+          <BookingHint />
+        )}
+
+        {days.length > 0 && (
           days.map((day) => (
             <section key={day}>
               <div className="lbl">{weekdayDayMonth(day)}</div>
