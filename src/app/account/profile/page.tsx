@@ -40,7 +40,7 @@ export default async function ProfilePage() {
                     fontFamily: "'Cormorant Garamond', serif", fontSize: 21,
                   }}
                 />
-                <button className="btn-quiet" type="submit">Сохранить</button>
+                <button className="btn-quiet" type="submit">Переименовать</button>
               </form>
             )}
 

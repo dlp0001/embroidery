@@ -97,7 +97,7 @@ export default async function PeoplePage({
               <input name="name" defaultValue={f.name ?? ''} aria-label="Имя"
                      placeholder="без имени"
                      style={{ ...inline, fontFamily: "'Cormorant Garamond', serif", fontSize: 23 }} />
-              <button className="btn-quiet" type="submit">Сохранить</button>
+              <button className="btn-quiet" type="submit">Переименовать</button>
             </form>
             <div className="sub">{f.email}{f.roles.length ? ` · ${f.roles.join(', ')}` : ''}</div>
 
@@ -115,7 +115,7 @@ export default async function PeoplePage({
                     <input type="hidden" name="childId" value={ch.child_id} />
                     <input name="name" defaultValue={ch.name} aria-label="Имя ребёнка"
                            style={{ ...inline, fontFamily: "'Cormorant Garamond', serif", fontSize: 20 }} />
-                    <button className="btn-quiet" type="submit">Сохранить</button>
+                    <button className="btn-quiet" type="submit">Переименовать</button>
                   </form>
                   <form action={removeChildAction}>
                     <input type="hidden" name="childId" value={ch.child_id} />
@@ -140,6 +140,7 @@ export default async function PeoplePage({
         {list.length === 0 && <p className="hint" style={{ marginTop: 20 }}>Пока никого нет.</p>}
 
         <p className="hint" style={{ marginTop: 18 }}>
+          Дни сохраняются сразу, отдельная кнопка им не нужна.
           Дни — это те, в которые человек обычно приходит. По ним он попадает в журнал
           нужного занятия и в раздел «ждём». На конкретное занятие родитель записывается
           сам, в своём кабинете. Ребёнка с посещениями удалить нельзя.
