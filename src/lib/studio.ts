@@ -451,6 +451,12 @@ export async function visitHistory(userId: string): Promise<VisitRow[]> {
  * открытия экрана, поэтому чаще раза в час не работает: иначе на каждый
  * показ страницы уходил бы тяжёлый запрос.
  */
+/**
+ * Досоздаёт занятия по расписанию групп на несколько недель вперёд.
+ * Только вперёд: раньше подсыпалось ещё и 28 дней назад, и удалённое
+ * прошлое возвращалось само собой. Разовое занятие задним числом
+ * добавляется руками в календаре.
+ */
 export async function ensureSessions(weeksAhead = 6): Promise<number> {
   const fresh = await one<{ recent: boolean }>(
     `select value::timestamptz > now() - interval '1 hour' as recent
@@ -463,7 +469,7 @@ export async function ensureSessions(weeksAhead = 6): Promise<number> {
        insert into studio_sessions (group_id, held_on)
        select g.id, d::date
          from studio_groups g
-         cross join generate_series(current_date - interval '28 days',
+         cross join generate_series(current_date,
                                     current_date + ($1 || ' weeks')::interval,
                                     interval '1 day') d
         where g.active and extract(isodow from d) = g.weekday

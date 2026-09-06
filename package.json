@@ -26,7 +26,9 @@
     "inventory": "node --env-file-if-exists=.env.local scripts/db-inventory.mjs",
     "inventory:prod": "node --env-file-if-exists=.env.production.local scripts/db-inventory.mjs",
     "children": "node --env-file-if-exists=.env.local scripts/wipe-children.mjs",
-    "children:prod": "node --env-file-if-exists=.env.production.local scripts/wipe-children.mjs --allow-remote"
+    "children:prod": "node --env-file-if-exists=.env.production.local scripts/wipe-children.mjs --allow-remote",
+    "sessions": "node --env-file-if-exists=.env.local scripts/wipe-sessions.mjs",
+    "sessions:prod": "node --env-file-if-exists=.env.production.local scripts/wipe-sessions.mjs --allow-remote"
   },
   "dependencies": {
     "googleapis": "^140.0.0",
