@@ -1,7 +1,10 @@
 import { requireUser } from '@/lib/session';
 import { archivedChildren, familyWithDays } from '@/lib/studio';
 import Toggles from '@/components/Toggles';
-import { createChild, togglePreferredDay, updateChild, updateMyName } from '../actions';
+import YesNo from '@/components/YesNo';
+import {
+  createChild, setMyAttendance, togglePreferredDay, updateChild, updateMyName,
+} from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +29,8 @@ export default async function ProfilePage() {
   // и строки участника у него нет: имя-то поменять всё равно нужно.
   const me = family.find((m) => m.is_adult) ?? null;
   const kids = family.filter((m) => !m.is_adult);
+  // Взрослый в списке семьи есть всегда, но ходит ли он — отдельный вопрос.
+  const attends = me?.attends ?? false;
 
   return (
     <>
@@ -53,9 +58,14 @@ export default async function ProfilePage() {
           </form>
           <div className="sub" style={{ marginTop: 10 }}>{user.email}</div>
 
-          {me && (
+          <div className="lbl" style={{ margin: '18px 0 0' }}>Хожу на занятия сам</div>
+          <YesNo value={attends} action={setMyAttendance} />
+
+          {attends && me && (
             <>
-              <div className="lbl" style={{ margin: '16px 0 0' }}>Хожу сам</div>
+              <div className="lbl" style={{ margin: '18px 0 0' }}>
+                Возможные дни моих посещений
+              </div>
               <Toggles
                 items={WEEK.map((d) => ({ id: String(d.n), label: d.short }))}
                 active={me.days.map(String)}
@@ -84,7 +94,9 @@ export default async function ProfilePage() {
               <button className="btn-quiet" type="submit">Переименовать</button>
             </form>
 
-            <div className="sub" style={{ marginTop: 4 }}>Детские занятия</div>
+            <div className="lbl" style={{ margin: '14px 0 0' }}>
+              Детские занятия · возможные дни посещений
+            </div>
 
             <Toggles
               items={WEEK.map((d) => ({ id: String(d.n), label: d.short }))}

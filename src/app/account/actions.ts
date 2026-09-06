@@ -3,7 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { one } from '@/lib/db';
 import { requireUser } from '@/lib/session';
-import { addChild, renameChild, renameUser, setBooking, setPreferredDay } from '@/lib/studio';
+import {
+  addChild, renameChild, renameUser, setAttends, setBooking, setPreferredDay,
+} from '@/lib/studio';
 
 /** Участник принадлежит семье вошедшего? */
 async function assertOwn(userId: string, participantId: string): Promise<void> {
@@ -48,6 +50,13 @@ export async function createChild(formData: FormData): Promise<void> {
   const name = String(formData.get('name') ?? '').trim().slice(0, 120);
   if (!name) return;
   await addChild(user.id, name);
+  refresh();
+}
+
+/** Ходит ли взрослый на занятия сам. Пока не сказал — считаем, что нет. */
+export async function setMyAttendance(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  await setAttends(user.id, String(formData.get('on')) === '1');
   refresh();
 }
 

@@ -102,8 +102,14 @@ export default async function PeoplePage({
             </form>
             <div className="sub">{f.email}{f.roles.length ? ` · ${f.roles.join(', ')}` : ''}</div>
 
-            <div className="lbl" style={{ margin: '16px 0 0' }}>Ходит сам</div>
-            <DayRow participantId={f.participant_id} days={f.own_days ?? []} />
+            {f.attends ? (
+              <>
+                <div className="lbl" style={{ margin: '16px 0 0' }}>Ходит сам</div>
+                <DayRow participantId={f.participant_id} days={f.own_days ?? []} />
+              </>
+            ) : (
+              <div className="lbl" style={{ margin: '16px 0 0' }}>Сам не ходит</div>
+            )}
 
             <div className="lbl" style={{ margin: '18px 0 0' }}>
               Дети: {f.children.length}&nbsp;{plural(f.children.length, 'ребёнок', 'ребёнка', 'детей')}

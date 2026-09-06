@@ -54,7 +54,7 @@ export async function familyParticipants(userId: string): Promise<Participant[]>
   return query<Participant>(
     `select p.id, coalesce(u.name, 'Я') as name, 'self' as kind
        from participants p join users u on u.id = p.user_id
-      where p.user_id = $1
+      where p.user_id = $1 and u.attends
       union all
      select p.id, c.name, 'child' as kind
        from participants p
@@ -642,7 +642,7 @@ export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
          left join children ch on ch.id = p.child_id
          left join users u on u.id = p.user_id
         where ch.archived_at is null
-          and ((ses.audience = 'adults' and p.user_id is not null)
+          and ((ses.audience = 'adults' and p.user_id is not null and u.attends)
             or (ses.audience = 'kids' and p.child_id is not null))
      )
      select o.participant_id, o.who, o.owner_id,
@@ -793,6 +793,7 @@ export async function slotsForUser(userId: string, from: string, to: string): Pr
        left join preferred_days pd on pd.participant_id = p.id and pd.weekday = g.weekday
       where (p.user_id = $1 or p.child_id in (select child_id from guardians where user_id = $1))
         and c.archived_at is null
+        and (p.user_id is null or u.attends)
         and s.held_on between $2::date and $3::date
         and s.status <> 'cancelled'
       order by s.held_on, g.starts_at, (p.user_id is not null) desc, who`,
@@ -805,6 +806,7 @@ export type FamilyMember = {
   child_id: string | null;
   who: string;
   is_adult: boolean;
+  attends: boolean;
   days: number[];
 };
 
@@ -813,6 +815,7 @@ export async function familyWithDays(userId: string): Promise<FamilyMember[]> {
     `select p.id as participant_id, p.child_id,
             coalesce(c.name, u.name, 'Я') as who,
             (p.user_id is not null) as is_adult,
+            coalesce(u.attends, false) as attends,
             coalesce(array_agg(pd.weekday order by pd.weekday)
                      filter (where pd.weekday is not null), '{}') as days
        from participants p
@@ -822,7 +825,7 @@ export async function familyWithDays(userId: string): Promise<FamilyMember[]> {
       where c.archived_at is null
         and (p.user_id = $1
              or p.child_id in (select child_id from guardians where user_id = $1))
-      group by p.id, p.child_id, c.name, u.name
+      group by p.id, p.child_id, c.name, u.name, u.attends
       order by (p.user_id is not null) desc, coalesce(c.name, u.name)`,
     [userId],
   );
@@ -1142,6 +1145,7 @@ export type Family = {
   name: string | null;
   email: string;
   roles: string[];
+  attends: boolean;
   own_days: number[];
   children: FamilyChild[];
 };
@@ -1149,7 +1153,7 @@ export type Family = {
 /** Все взрослые с детьми и составом групп. */
 export async function families(): Promise<Family[]> {
   const rows = await query<Family>(
-    `select u.id as user_id, u.name, u.email,
+    `select u.id as user_id, u.name, u.email, u.attends,
             (select p.id from participants p where p.user_id = u.id) as participant_id,
             coalesce((select array_agg(r.role order by r.role) from user_roles r
                        where r.user_id = u.id), '{}') as roles,
@@ -1190,6 +1194,20 @@ export async function createParent(email: string, name: string): Promise<string>
   await query(`insert into user_roles (user_id, role) values ($1, 'parent') on conflict do nothing`, [row!.id]);
   await query('insert into participants (user_id) values ($1) on conflict do nothing', [row!.id]);
   return row!.id;
+}
+
+/**
+ * Ходит ли взрослый на занятия сам. По умолчанию нет: он просто родитель.
+ * Сказал «да» — заводим ему участника, иначе отмечать дни будет не на ком.
+ */
+export async function setAttends(userId: string, attends: boolean): Promise<void> {
+  await tx(async (c) => {
+    await c.query('update users set attends = $2 where id = $1', [userId, attends]);
+    if (attends) {
+      await c.query(
+        'insert into participants (user_id) values ($1) on conflict do nothing', [userId]);
+    }
+  });
 }
 
 export async function renameUser(userId: string, name: string): Promise<void> {

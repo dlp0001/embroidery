@@ -62,41 +62,10 @@ export default async function PayPage({
           </div>
         )}
 
-        <div className="lbl">Не покрыто абонементом</div>
-
-        {cash && (
-          <div className="note" style={{ marginBottom: 16 }}>
-            Заявка отправлена. Отдайте деньги Варе на занятии — она отметит получение,
-            и занятия станут оплаченными.
-          </div>
-        )}
-
-        {claim && (
-          <div className="card-lin">
-            <div className="what">Ждёт подтверждения</div>
-            <div className="sub">
-              Наличными за {claim.lessons}&nbsp;{plural(claim.lessons, 'занятие', 'занятия', 'занятий')} ·{' '}
-              {money(claim.amount, claim.currency)}
-            </div>
-            <p className="hint" style={{ marginTop: 10 }}>
-              Пока Варя не отметит получение, занятия числятся неоплаченными.
-            </p>
-          </div>
-        )}
-
-        {unpaid.length === 0 ? (
-          <p className="hint">
-            Всё оплачено. Занятия, которые не покроет абонемент, появятся здесь.
-          </p>
-        ) : (
-          <DebtPicker charges={unpaid} online={online} />
-        )}
-
         <div className="lbl">{pass ? 'Продлить абонемент' : 'Абонемент'}</div>
         <p className="hint" style={{ marginBottom: 16 }}>
           Пакет занятий общий на всю семью: тратится и на детей, и на взрослого.
-          Пока он действует, платить за каждое посещение не нужно.
-          Одно занятие стоит {money(price.amount, price.currency)}.
+          Пока он действует, его можно использовать для оплаты любого занятия.
         </p>
 
         {online ? (
@@ -130,6 +99,37 @@ export default async function PayPage({
             <a href="mailto:info@re-create.art">info@re-create.art</a>. Оплата картой
             появится, когда подключим банк.
           </div>
+        )}
+
+        <div className="lbl">Неоплаченные разовые занятия</div>
+
+        {cash && (
+          <div className="note" style={{ marginBottom: 16 }}>
+            Заявка отправлена. Отдайте деньги Варе на занятии — она отметит получение,
+            и занятия станут оплаченными.
+          </div>
+        )}
+
+        {claim && (
+          <div className="card-lin">
+            <div className="what">Ждёт подтверждения</div>
+            <div className="sub">
+              Наличными за {claim.lessons}&nbsp;{plural(claim.lessons, 'занятие', 'занятия', 'занятий')} ·{' '}
+              {money(claim.amount, claim.currency)}
+            </div>
+            <p className="hint" style={{ marginTop: 10 }}>
+              Пока Варя не отметит получение, занятия числятся неоплаченными.
+            </p>
+          </div>
+        )}
+
+        {unpaid.length === 0 ? (
+          <p className="hint">
+            Сейчас всё оплачено. Занятия, которые не покроет абонемент, появятся
+            здесь. Одно занятие стоит {money(price.amount, price.currency)}.
+          </p>
+        ) : (
+          <DebtPicker charges={unpaid} online={online} />
         )}
 
         {admin && online && (
