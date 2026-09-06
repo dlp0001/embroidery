@@ -121,8 +121,13 @@ export async function fetchTransaction(params: {
   pageRequestUid?: string;
   transactionUid?: string;
 }): Promise<TransactionCheck> {
+  // PayPlus называет этот идентификатор по-разному в разных местах
+  // документации, поэтому кладём под обоими именами: лишнее он игнорирует.
   const body: Record<string, string> = {};
-  if (params.pageRequestUid) body.payment_request_uid = params.pageRequestUid;
+  if (params.pageRequestUid) {
+    body.payment_request_uid = params.pageRequestUid;
+    body.page_request_uid = params.pageRequestUid;
+  }
   if (params.transactionUid) body.transaction_uid = params.transactionUid;
 
   const raw = await call<Record<string, unknown>>('/PaymentPages/ipn', body);

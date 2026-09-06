@@ -1,7 +1,7 @@
 import { one, query, tx } from './db';
 import { plural } from './format';
 import { logMoneyIn } from './ledger';
-import { createPaymentLink, isConfigured } from './payplus';
+import { createPaymentLink, fetchTransaction, isConfigured } from './payplus';
 import { lessonPrice, passTypes } from './studio';
 
 export type Intent =
@@ -168,7 +168,7 @@ export async function applyPayment(paymentId: string, transactionUid: string | n
 
     if (p.purpose === 'studio_pass') {
       const lessons = Number(p.raw?.lessons ?? 0);
-      const months = Number(p.raw?.months ?? 3);
+      const months = Number(p.raw?.months ?? 1);
       if (lessons < 1) return;
       const { rows: made } = await c.query<{ id: string }>(
         `insert into passes (owner_id, lessons_total, valid_from, valid_to, payment_id)
@@ -184,6 +184,63 @@ export async function applyPayment(paymentId: string, transactionUid: string | n
       });
     }
   });
+}
+
+/**
+ * Спрашивает у PayPlus про зависшие платежи родителя и доводит их до конца.
+ *
+ * Обратный вызов может не дойти: его глушит сеть, деплой или сам PayPlus.
+ * Поэтому не полагаемся на него как на единственный источник правды —
+ * когда человек возвращается с кассы, переспрашиваем сами. Повторный
+ * вызов безопасен: applyPayment идемпотентен.
+ */
+export type PendingCheck = { paid: number; failed: number; waiting: number };
+
+export async function verifyPending(userId: string): Promise<PendingCheck> {
+  const out: PendingCheck = { paid: 0, failed: 0, waiting: 0 };
+  if (!isConfigured()) return out;
+
+  const pending = await query<{ id: string; provider_id: string | null; amount: string }>(
+    `select id, provider_id, amount::text from payments
+      where user_id = $1 and provider = 'payplus' and status = 'pending'
+        and provider_id is not null
+        and created_at > now() - interval '2 days'
+      order by created_at desc limit 5`,
+    [userId],
+  );
+
+  for (const p of pending) {
+    let check;
+    try {
+      check = await fetchTransaction({ pageRequestUid: p.provider_id! });
+    } catch (err) {
+      console.error('payplus: не удалось переспросить про платёж', p.id, err);
+      out.waiting++;
+      continue;
+    }
+
+    if (!check.paid) {
+      // Пустой статус значит «человек ещё не платил», а не «отказано».
+      if (check.statusCode && check.statusCode !== '000') {
+        await query(`update payments set status = 'failed' where id = $1 and status = 'pending'`, [p.id]);
+        out.failed++;
+      } else {
+        out.waiting++;
+      }
+      continue;
+    }
+
+    if (check.amount !== null && Math.abs(check.amount - Number(p.amount)) > 0.01) {
+      console.error('payplus: сумма разошлась при проверке', p.id, check.amount, p.amount);
+      out.waiting++;
+      continue;
+    }
+
+    await applyPayment(p.id, check.transactionUid);
+    out.paid++;
+  }
+
+  return out;
 }
 
 // ── Наличные по заявке родителя ───────────────────────────

@@ -3,7 +3,7 @@ import { lessonPrice, passBalances, passTypes, unpaidCharges } from '@/lib/studi
 import { isConfigured } from '@/lib/payplus';
 import { dayMonth, money, plural } from '@/lib/format';
 import { STUDIO_TZ } from '@/lib/time';
-import { lastTestPayment, myPendingCash, paymentHistory, TEST_AMOUNT } from '@/lib/billing';
+import { lastTestPayment, myPendingCash, paymentHistory, TEST_AMOUNT, verifyPending } from '@/lib/billing';
 import DebtPicker from './DebtPicker';
 import { buyPassAction, testPaymentAction } from './actions';
 
@@ -19,6 +19,8 @@ export default async function PayPage({
   const { error, cash } = await searchParams;
   const online = isConfigured();
   const admin = isAdmin(user);
+  // Зависшие платежи доводим до конца сами, не дожидаясь обратного вызова.
+  await verifyPending(user.id);
   const lastTest = admin ? await lastTestPayment(user.id) : null;
   const claim = await myPendingCash(user.id);
   const history = await paymentHistory(user.id);
