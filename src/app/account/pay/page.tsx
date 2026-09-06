@@ -179,6 +179,11 @@ export default async function PayPage({
                       <div className={h.status === 'paid' ? 'sub' : 'money-due'}>
                         {how} · {state}
                       </div>
+                      {h.invoice_url && (
+                        <div className="sub" style={{ marginTop: 4 }}>
+                          <a href={h.invoice_url} target="_blank" rel="noreferrer">Квитанция</a>
+                        </div>
+                      )}
                     </div>
                     <div style={{
                       fontFamily: "'Cormorant Garamond', serif", fontSize: 20,

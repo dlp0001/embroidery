@@ -1,5 +1,9 @@
 import { one, query, tx } from './db';
 import { plural } from './format';
+import {
+  ALREADY_ISSUED, createReceipt, ICountError,
+  isConfigured as receiptsConfigured, type Card,
+} from './icount';
 import { logMoneyIn } from './ledger';
 import { createPaymentLink, fetchTransaction, isConfigured } from './payplus';
 import { lessonPrice, passTypes } from './studio';
@@ -193,6 +197,90 @@ export async function applyPayment(
   });
 }
 
+// ── Квитанции iCount ──────────────────────────────────────
+
+/** Как платёж назван в квитанции: теми же словами, что и на кассе. */
+function receiptFor(purpose: string | null, raw: Record<string, unknown> | null): string {
+  if (purpose === 'studio_pass') {
+    const lessons = Number(raw?.lessons ?? 0);
+    return `Абонемент на ${lessons} ${plural(lessons, 'занятие', 'занятия', 'занятий')}`;
+  }
+  if (purpose === 'studio_debt') {
+    const ids = raw?.charge_ids;
+    const count = Array.isArray(ids) ? ids.length : 0;
+    return count > 0 ? `Занятия в студии, ${count}` : 'Занятия в студии';
+  }
+  return 'Проверка оплаты';
+}
+
+type ToBill = {
+  id: string; amount: string; currency: string; purpose: string | null;
+  raw: Record<string, unknown> | null; user_id: string; name: string | null; email: string;
+};
+
+const UNBILLED = `select p.id, p.amount::text, p.currency, p.purpose, p.raw,
+            u.id as user_id, u.name, u.email
+       from payments p join users u on u.id = p.user_id
+      where p.status = 'paid' and p.invoice_url is null and p.raw -> 'receipt' is null`;
+
+/**
+ * Выписывает квитанцию на оплаченный платёж и запоминает ссылку на неё.
+ *
+ * Ошибка iCount не должна ронять зачёт денег: занятия важнее бумажки,
+ * поэтому здесь мы только пишем в журнал, а следующий заход родителя
+ * на страницу оплаты попробует ещё раз. Второй квитанции не будет —
+ * iCount отбивает повтор сам.
+ */
+export async function issueReceipt(paymentId: string, card?: Card | null): Promise<void> {
+  if (!receiptsConfigured()) return;
+  const p = await one<ToBill>(`${UNBILLED} and p.id = $1`, [paymentId]);
+  if (!p) return;
+
+  try {
+    const doc = await createReceipt({
+      paymentId: p.id,
+      userId: p.user_id,
+      customerName: p.name ?? p.email,
+      email: p.email,
+      description: receiptFor(p.purpose, p.raw),
+      amount: Number(p.amount),
+      currency: p.currency,
+      method: 'cc',
+      card,
+    });
+    await query(
+      `update payments set invoice_url = $2,
+              raw = coalesce(raw, '{}'::jsonb) || jsonb_build_object('receipt', $3::jsonb)
+        where id = $1`,
+      [p.id, doc.url, JSON.stringify({ docnum: doc.docnum })],
+    );
+    console.log('icount: выписана квитанция', doc.docnum, 'на платёж', p.id);
+  } catch (err) {
+    // Квитанция уже выписана, но ссылку на неё iCount в отказе не вернул.
+    // Помечаем платёж, иначе будем проситься за ней каждый раз.
+    if (err instanceof ICountError && err.reason === ALREADY_ISSUED) {
+      await query(
+        `update payments set raw = coalesce(raw, '{}'::jsonb) || '{"receipt":{"exists":true}}'::jsonb
+          where id = $1`,
+        [p.id],
+      );
+      return;
+    }
+    console.error('icount: квитанция не выписана', p.id, err);
+  }
+}
+
+/** Догоняет квитанции, которые в свой час не выписались. */
+async function sweepReceipts(userId: string): Promise<void> {
+  if (!receiptsConfigured()) return;
+  const late = await query<{ id: string }>(
+    `${UNBILLED} and p.user_id = $1 and p.created_at > now() - interval '30 days'
+      order by p.created_at desc limit 3`,
+    [userId],
+  );
+  for (const p of late) await issueReceipt(p.id);
+}
+
 /**
  * Спрашивает у PayPlus про зависшие платежи родителя и доводит их до конца.
  *
@@ -244,9 +332,11 @@ export async function verifyPending(userId: string): Promise<PendingCheck> {
     }
 
     await applyPayment(p.id, check.transactionUid, 'return');
+    await issueReceipt(p.id, check.card);
     out.paid++;
   }
 
+  await sweepReceipts(userId);
   return out;
 }
 
@@ -390,13 +480,14 @@ export type PaymentRow = {
   amount: string;
   currency: string;
   lessons: number;
+  invoice_url: string | null;
 };
 
 /** Все платежи родителя: картой, напрямую и абонементы. */
 export async function paymentHistory(userId: string): Promise<PaymentRow[]> {
   return query<PaymentRow>(
     `select p.id, p.created_at::text as at, p.provider, p.status, p.purpose,
-            p.amount::text, p.currency,
+            p.amount::text, p.currency, p.invoice_url,
             coalesce(
               jsonb_array_length(p.raw -> 'charge_ids'),
               (p.raw ->> 'lessons')::int,

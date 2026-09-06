@@ -44,6 +44,8 @@ const KEEP = keepArg
   : DEFAULT_KEEP;
 
 const apply = process.argv.includes('--yes');
+// Группы — это расписание студии, а не данные людей: их можно сохранить.
+const keepGroups = process.argv.includes('--keep-groups');
 const pool = new pg.Pool(
   local ? { connectionString: url } : { connectionString: url, ssl: { rejectUnauthorized: true } },
 );
@@ -52,7 +54,8 @@ if (!local) console.log(`База не локальная: ${host}\n`);
 // Порядок важен только там, где нет каскада; лишний delete не мешает.
 const WIPE = [
   'money_events', 'charges', 'passes', 'payments',
-  'attendance', 'bookings', 'studio_sessions', 'studio_members', 'studio_groups',
+  'attendance', 'bookings', 'studio_sessions', 'studio_members',
+  ...(keepGroups ? [] : ['studio_groups']),
   'preferred_days', 'participants', 'guardians', 'children',
   'enrollments', 'lessons', 'courses', 'consents', 'login_codes',
 ];
@@ -77,6 +80,20 @@ try {
   console.log(`Уйдут учётки: ${drop.length}`);
   for (const u of drop) console.log(`  ${u.email} · ${u.name ?? 'без имени'}`);
 
+  if (keepGroups) {
+    const { rows } = await client.query(
+      `select title, case weekday when 1 then 'пн' when 2 then 'вт' when 3 then 'ср'
+                                 when 4 then 'чт' when 5 then 'пт' when 6 then 'сб'
+                                 else 'вс' end as day,
+              starts_at::text, audience, active
+         from studio_groups order by weekday, starts_at`);
+    console.log(`\nГруппы останутся (${rows.length}):`);
+    for (const g of rows) {
+      console.log(`  ${g.day} ${g.starts_at.slice(0, 5)} · ${g.title} · ${
+        g.audience === 'adults' ? 'взрослые' : 'дети'}${g.active ? '' : ' · выключена'}`);
+    }
+  }
+
   console.log('\nСтроки в таблицах:');
   for (const t of WIPE) {
     const { rows } = await client.query(`select count(*)::int as n from ${t}`);
@@ -88,7 +105,9 @@ try {
     process.exit(1);
   }
   if (!apply) {
-    const cmd = local ? 'npm run reset:local -- --yes' : 'npm run reset:prod -- --yes';
+    // Подсказка должна повторять флаги: без --keep-groups группы бы ушли.
+    const cmd = `npm run ${local ? 'reset:local' : 'reset:prod'} --${
+      keepGroups ? ' --keep-groups' : ''} --yes`;
     console.log(`\nЭто был просмотр, база не изменилась. Чтобы удалить: ${cmd}`);
     process.exit(0);
   }
@@ -97,10 +116,18 @@ try {
   for (const t of WIPE) await client.query(`delete from ${t}`);
   await client.query('delete from user_roles where not (user_id = any($1::uuid[]))', [keep.map((u) => u.id)]);
   await client.query('delete from sessions where not (user_id = any($1::uuid[]))', [keep.map((u) => u.id)]);
+  // Группа может быть закреплена за преподавателем, которого мы удаляем.
+  await client.query(
+    'update studio_groups set teacher_id = null where not (teacher_id = any($1::uuid[]))',
+    [keep.map((u) => u.id)]);
   await client.query('delete from users where not (id = any($1::uuid[]))', [keep.map((u) => u.id)]);
+  // Занятия рождаются заново из расписания групп, но только если снять
+  // отметку о том, что их недавно уже создавали.
+  await client.query(`delete from settings where key = 'sessions_filled_at'`);
   await client.query('commit');
 
   console.log(`\nБаза очищена. Осталось учёток: ${keep.length}.`);
+  if (keepGroups) console.log('Группы сохранены, занятия по ним создадутся заново при первом заходе.');
 } catch (e) {
   await client.query('rollback').catch(() => {});
   console.error(e.message);

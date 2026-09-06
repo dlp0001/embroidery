@@ -1,4 +1,4 @@
-import { applyPayment } from '@/lib/billing';
+import { applyPayment, issueReceipt } from '@/lib/billing';
 import { one } from '@/lib/db';
 import { fetchTransaction } from '@/lib/payplus';
 
@@ -66,6 +66,9 @@ async function handle(params: {
 
   await applyPayment(payment.id, check.transactionUid, 'callback');
   console.log('payplus: платёж зачтён', payment.id);
+  // Квитанция — уже после зачёта: если iCount молчит, деньги всё равно
+  // засчитаны, а квитанцию догонит следующий заход родителя на страницу.
+  await issueReceipt(payment.id, check.card);
   return Response.json({ received: true });
 }
 

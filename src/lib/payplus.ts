@@ -6,6 +6,8 @@
  * произошло на самом деле, через /PaymentPages/ipn.
  */
 
+import type { Card } from './icount';
+
 const BASE = {
   test: 'https://restapidev.payplus.co.il/api/v1.0',
   prod: 'https://restapi.payplus.co.il/api/v1.0',
@@ -114,6 +116,8 @@ export type TransactionCheck = {
   amount: number | null;
   transactionUid: string | null;
   reference: string | null;
+  /** Хвост карты и номер подтверждения: нужны только для квитанции. */
+  card: Card | null;
 };
 
 /** Спрашиваем у PayPlus, что на самом деле случилось с платежом. */
@@ -145,5 +149,29 @@ export async function fetchTransaction(params: {
     amount: Number.isFinite(amount) ? amount : null,
     transactionUid: typeof tx.uid === 'string' ? tx.uid : null,
     reference: typeof tx.more_info === 'string' ? tx.more_info : null,
+    card: cardOf(holder, tx),
   };
+}
+
+/**
+ * Данные карты для квитанции. PayPlus кладёт их то в корень, то в data,
+ * то не кладёт вовсе, поэтому каждое поле необязательное: без хвоста
+ * карты квитанция всё равно законна, а без суммы — нет, но сумму мы
+ * берём не отсюда.
+ */
+function cardOf(holder: Record<string, unknown>, tx: Record<string, unknown>): Card | null {
+  const data = (holder.data ?? holder) as Record<string, unknown>;
+  const info = (data.card_information ?? holder.card_information ?? {}) as Record<string, unknown>;
+  const payments = (tx.payments ?? {}) as Record<string, unknown>;
+
+  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  const count = Number(payments.number_of_payments);
+
+  const card: Card = {
+    fourDigits: str(info.four_digits),
+    brand: str(info.brand_name),
+    approvalNumber: str(tx.approval_number) ?? str(tx.voucher_number),
+    payments: Number.isFinite(count) && count > 0 ? count : null,
+  };
+  return Object.values(card).some((v) => v !== null) ? card : null;
 }
