@@ -24,7 +24,9 @@
     "email": "node --env-file-if-exists=.env.local scripts/set-email.mjs",
     "email:prod": "node --env-file-if-exists=.env.production.local scripts/set-email.mjs",
     "inventory": "node --env-file-if-exists=.env.local scripts/db-inventory.mjs",
-    "inventory:prod": "node --env-file-if-exists=.env.production.local scripts/db-inventory.mjs"
+    "inventory:prod": "node --env-file-if-exists=.env.production.local scripts/db-inventory.mjs",
+    "children": "node --env-file-if-exists=.env.local scripts/wipe-children.mjs",
+    "children:prod": "node --env-file-if-exists=.env.production.local scripts/wipe-children.mjs --allow-remote"
   },
   "dependencies": {
     "googleapis": "^140.0.0",
