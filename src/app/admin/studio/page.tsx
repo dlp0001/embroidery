@@ -9,13 +9,8 @@ import { dayMonth, hhmm, money, plural, todayISO, weekdayDayMonth } from '@/lib/
 
 export const dynamic = 'force-dynamic';
 
-export default async function TodayPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ saved?: string }>;
-}) {
+export default async function TodayPage() {
   const user = await requireTeacher();
-  const { saved } = await searchParams;
   await ensureSessions();
 
   const scope = isAdmin(user) ? null : user.id;
@@ -78,9 +73,6 @@ export default async function TodayPage({
               </div>
             )}
 
-            {saved === s.session_id && (
-              <p className="hint" style={{ marginTop: 12 }}>Сохранено.</p>
-            )}
           </section>
         ))}
 

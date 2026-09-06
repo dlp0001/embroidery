@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useActionState, useState } from 'react';
 import { saveJournal } from '@/app/admin/actions';
 import type { PayWay, RosterRow } from '@/lib/studio';
 
@@ -55,6 +55,17 @@ export default function Journal({
   // Строки с проведёнными деньгами открываются только после подтверждения.
   const [unlocked, setUnlocked] = useState<Set<string>>(new Set());
   const [asking, setAsking] = useState<string | null>(null);
+
+  // Отправка через useActionState: нужна и «сохраняю…», и отметка о том,
+  // что сохранение уже прошло. Раньше про это говорил адрес страницы,
+  // ради которого делался лишний переход.
+  const [savedAt, submit, pending] = useActionState<number, FormData>(
+    async (_prev, form) => {
+      await saveJournal(form);
+      return Date.now();
+    },
+    0,
+  );
 
   const present = Object.values(rows).filter((r) => r.present).length;
   const likely = roster.filter(expected);
@@ -181,7 +192,7 @@ export default function Journal({
   }
 
   return (
-    <form action={saveJournal}>
+    <form action={submit}>
       <input type="hidden" name="sessionId" value={sessionId} />
 
       {/* Заголовки нужны, только когда список действительно разделён */}
@@ -199,9 +210,14 @@ export default function Journal({
         </>
       )}
 
-      <button className="btn-wide" type="submit" style={{ marginTop: 14 }}>
-        {saved ? 'Пересохранить' : 'Сохранить'} · отмечено {present}
+      <button className="btn-wide" type="submit" style={{ marginTop: 14 }} disabled={pending}>
+        {pending
+          ? 'Сохраняю…'
+          : `${saved ? 'Пересохранить' : 'Сохранить'} · отмечено ${present}`}
       </button>
+      {savedAt > 0 && !pending && (
+        <p className="hint" style={{ marginTop: 12 }}>Сохранено.</p>
+      )}
       {unlocked.size > 0 && (
         <p className="hint" style={{ marginTop: 12 }}>
           Открыто для правки: {unlocked.size}. После сохранения изменение появится в реестре.

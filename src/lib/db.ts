@@ -23,11 +23,23 @@ pool.on('connect', (client) => {
 
 if (process.env.NODE_ENV !== 'production') globalForDb._pool = pool;
 
+// Включается переменной DB_TRACE=1: печатает каждый запрос и его время.
+// Нужен, чтобы искать не «где-то медленно», а конкретное место.
+const TRACE = process.env.DB_TRACE === '1';
+
+function trace(text: string, started: number, rows: number): void {
+  const ms = Date.now() - started;
+  const short = text.trim().replace(/\s+/g, ' ').slice(0, 70);
+  console.log(`[db] ${String(ms).padStart(5)}мс  строк ${String(rows).padStart(4)}  ${short}`);
+}
+
 export async function query<T extends pg.QueryResultRow = pg.QueryResultRow>(
   text: string,
   params: unknown[] = [],
 ): Promise<T[]> {
+  const started = Date.now();
   const res = await pool.query<T>(text, params);
+  if (TRACE) trace(text, started, res.rowCount ?? 0);
   return res.rows;
 }
 
@@ -40,11 +52,14 @@ export async function one<T extends pg.QueryResultRow = pg.QueryResultRow>(
 }
 
 export async function tx<T>(fn: (c: pg.PoolClient) => Promise<T>): Promise<T> {
+  const started = Date.now();
   const client = await pool.connect();
+  if (TRACE) console.log(`[db] ${Date.now() - started}мс  взят клиент из пула`);
   try {
     await client.query('begin');
     const result = await fn(client);
     await client.query('commit');
+    if (TRACE) console.log(`[db] ${Date.now() - started}мс  транзакция целиком`);
     return result;
   } catch (err) {
     await client.query('rollback');

@@ -1,7 +1,6 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
 import { canTeach, isAdmin, requireUser } from '@/lib/session';
 import { saveAttendance, sessionHead, type AttendanceStatus, type Mark, type PayWay } from '@/lib/studio';
 
@@ -33,7 +32,10 @@ export async function saveJournal(formData: FormData): Promise<void> {
   }
 
   await saveAttendance(sessionId, marks, { id: user.id });
+  // Без redirect: ответ на само действие уже несёт свежую страницу, а
+  // переход добавлял к сохранению ещё два похода на сервер.
   revalidatePath('/admin/studio');
   revalidatePath('/admin/studio/debts');
-  redirect(`/admin/studio?saved=${sessionId}`);
+  // Журнал открывают и с отдельной страницы занятия: там тоже обновляем.
+  revalidatePath(`/admin/studio/session/${sessionId}`);
 }

@@ -11,6 +11,9 @@ let local = false;
 try {
   const h = new URL(url).hostname;
   local = h === 'localhost' || h === '127.0.0.1';
+  // Регион базы — не секрет, а от него зависит, где держать функции.
+  const region = h.split('.').slice(-4, -3)[0];
+  console.log(`База: ${local ? 'локальная' : `${region ?? 'регион не разобрать'}, пул ${h.includes('-pooler') ? 'включён' : 'ВЫКЛЮЧЕН'}`}\n`);
 } catch {}
 
 const TABLES = [

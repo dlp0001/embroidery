@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { one, query } from './db';
@@ -44,7 +45,12 @@ export async function destroySession(): Promise<void> {
   store.delete(COOKIE);
 }
 
-export async function currentUser(): Promise<CurrentUser | null> {
+/**
+ * Обёрнуто в cache: layout и страница спрашивают пользователя каждый по
+ * разу, а до базы за один рендер ходим один раз. При латентности до Neon
+ * это не мелочь: лишний поход стоит дороже, чем весь запрос.
+ */
+export const currentUser = cache(async (): Promise<CurrentUser | null> => {
   const store = await cookies();
   const token = store.get(COOKIE)?.value;
   if (!token) return null;
@@ -61,7 +67,7 @@ export async function currentUser(): Promise<CurrentUser | null> {
   );
   if (!row) return null;
   return { id: row.id, email: row.email, name: row.name, roles: row.roles ?? [] };
-}
+});
 
 /**
  * Страница и layout рендерятся параллельно, поэтому проверка в layout
