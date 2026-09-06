@@ -1,6 +1,7 @@
 import { isAdmin, requireTeacher } from '@/lib/session';
 import { allGroups, families } from '@/lib/studio';
 import { hhmm, plural } from '@/lib/format';
+import Toggles from '@/components/Toggles';
 import {
   addChildAction, createParentAction, removeChildAction, renameChildAction,
   renameUserAction, toggleMembershipAction,
@@ -27,22 +28,14 @@ function GroupChips({
 }) {
   if (!participantId) return null;
   return (
-    <div className="days" style={{ marginTop: 10 }}>
-      {groups.map((g) => {
-        const on = current.includes(g.id);
-        return (
-          <form action={toggleMembershipAction} key={g.id}>
-            <input type="hidden" name="participantId" value={participantId} />
-            <input type="hidden" name="groupId" value={g.id} />
-            <input type="hidden" name="member" value={on ? '0' : '1'} />
-            <button className={on ? 'day-on' : 'day'} type="submit" aria-pressed={on}
-                    style={{ minWidth: 0, padding: '0 12px' }}>
-              {g.title} · {WD[g.weekday]} {hhmm(g.starts_at)}
-            </button>
-          </form>
-        );
-      })}
-    </div>
+    <Toggles
+      items={groups.map((g) => ({ id: g.id, label: `${g.title} · ${WD[g.weekday]} ${hhmm(g.starts_at)}` }))}
+      active={current}
+      action={toggleMembershipAction}
+      fields={{ participantId }}
+      itemField="groupId"
+      size="wide"
+    />
   );
 }
 

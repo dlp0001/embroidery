@@ -1,5 +1,6 @@
 import { requireUser } from '@/lib/session';
 import { familyWithDays } from '@/lib/studio';
+import Toggles from '@/components/Toggles';
 import { createChild, togglePreferredDay, updateChild } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -47,21 +48,13 @@ export default async function ProfilePage() {
               {m.is_adult ? 'Взрослые занятия' : 'Детские занятия'}
             </div>
 
-            <div className="days">
-              {WEEK.map((d) => {
-                const on = m.days.includes(d.n);
-                return (
-                  <form action={togglePreferredDay} key={d.n}>
-                    <input type="hidden" name="participantId" value={m.participant_id} />
-                    <input type="hidden" name="weekday" value={d.n} />
-                    <input type="hidden" name="on" value={on ? '0' : '1'} />
-                    <button className={on ? 'day-on' : 'day'} type="submit" aria-pressed={on}>
-                      {d.short}
-                    </button>
-                  </form>
-                );
-              })}
-            </div>
+            <Toggles
+              items={WEEK.map((d) => ({ id: String(d.n), label: d.short }))}
+              active={m.days.map(String)}
+              action={togglePreferredDay}
+              fields={{ participantId: m.participant_id }}
+              itemField="weekday"
+            />
             <div className="hint" style={{ marginTop: 10 }}>
               Выбранные дни подсвечиваются в расписании. Записью это не является.
             </div>
