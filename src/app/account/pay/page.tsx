@@ -163,7 +163,7 @@ export default async function PayPage({
               const what = h.purpose === 'studio_pass' ? 'абонемент'
                 : h.purpose === 'studio_test' ? 'проверочный платёж'
                 : `занятия${h.lessons ? `, ${h.lessons}` : ''}`;
-              const how = h.provider === 'cash' ? 'наличными' : 'картой';
+              const how = h.provider === 'cash' ? 'наличными или переводом' : 'картой';
               const state = h.status === 'paid'
                 ? (h.provider === 'cash' ? 'получены' : 'проведён')
                 : h.status === 'pending' ? 'ждёт подтверждения'

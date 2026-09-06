@@ -40,7 +40,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
             />
             <p className="hint" style={{ marginTop: 18 }}>
               Нажмите на имя, чтобы снять отметку. Нажмите на строчку про деньги,
-              чтобы отметить оплату наличными.
+              чтобы выбрать, как занятие оплачено.
             </p>
           </>
         )}

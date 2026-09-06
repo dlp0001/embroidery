@@ -58,7 +58,7 @@ export default function DebtPicker({
                 <div>
                   <div className="when">{dayMonth(c.held_on)} · {c.group_title}</div>
                   <div className="what">{c.who}</div>
-                  <div className="money">будет оплачено наличными</div>
+                  <div className="money">будет оплачено наличными или переводом</div>
                 </div>
                 <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20 }}>
                   {money(c.amount, c.currency)}
@@ -106,7 +106,7 @@ export default function DebtPicker({
       </div>
 
       {payable.length === 0 && (
-        <p className="hint">Все занятия уже заявлены к оплате наличными.</p>
+        <p className="hint">Все занятия уже заявлены к оплате наличными или переводом.</p>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -115,14 +115,14 @@ export default function DebtPicker({
         </button>
         <button className="btn-quiet" formAction={declareCashAction} disabled={picked.size === 0}
                 style={{ width: '100%' }}>
-          Заплачу наличными
+          Заплачу наличными или переведу
         </button>
       </div>
 
       <p className="hint" style={{ marginTop: 14 }}>
         {online
-          ? 'Картой — на защищённой странице банка. Наличные Варя подтвердит на занятии, до этого занятия остаются неоплаченными.'
-          : 'Оплата картой ещё не подключена. Наличные Варя подтвердит на занятии, до этого занятия остаются неоплаченными.'}
+          ? 'Картой — на защищённой странице банка. Оплату наличными, битом или пейбоксом Варя подтвердит на занятии, до этого занятия остаются неоплаченными.'
+          : 'Оплата картой ещё не подключена. Оплату наличными, битом или пейбоксом Варя подтвердит на занятии, до этого занятия остаются неоплаченными.'}
       </p>
     </form>
   );

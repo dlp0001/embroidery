@@ -199,7 +199,7 @@ export type CashClaim = {
 };
 
 /**
- * Родитель заявляет, что заплатит наличными. Деньги не считаются
+ * Родитель заявляет, что заплатит студии напрямую. Деньги не считаются
  * полученными, пока студия не подтвердит: занятия остаются в долгу.
  */
 export async function declareCash(
@@ -233,7 +233,7 @@ export async function declareCash(
     await logMoneyIn(c, {
       kind: 'cash_declared', actorId: user.id, ownerId: user.id,
       paymentId: rows[0].id, amount, currency,
-      note: `родитель заявил оплату наличными за ${debts.length} ${plural(debts.length, 'занятие', 'занятия', 'занятий')}`,
+      note: `родитель заявил оплату наличными или переводом за ${debts.length} ${plural(debts.length, 'занятие', 'занятия', 'занятий')}`,
       details: { charge_ids: debts.map((d) => d.id) },
     });
   });
@@ -280,7 +280,7 @@ export async function confirmCash(paymentId: string, actorId: string): Promise<v
     await logMoneyIn(c, {
       kind: 'cash_confirmed', actorId, ownerId: p.user_id, paymentId: p.id,
       amount: p.amount, currency: p.currency,
-      note: `подтверждено получение наличных за ${ids.length} ${plural(ids.length, 'занятие', 'занятия', 'занятий')}`,
+      note: `подтверждено получение денег за ${ids.length} ${plural(ids.length, 'занятие', 'занятия', 'занятий')}`,
     });
   });
 }
@@ -297,7 +297,7 @@ export async function declineCash(paymentId: string, actorId: string): Promise<v
     await c.query(`update payments set status = 'failed' where id = $1`, [p.id]);
     await logMoneyIn(c, {
       kind: 'cash_declined', actorId, ownerId: p.user_id, paymentId: p.id,
-      amount: p.amount, currency: p.currency, note: 'заявка на оплату наличными отклонена',
+      amount: p.amount, currency: p.currency, note: 'заявка на оплату отклонена',
     });
   });
 }
@@ -328,7 +328,7 @@ export type PaymentRow = {
   lessons: number;
 };
 
-/** Все платежи родителя: картой, наличными и абонементы. */
+/** Все платежи родителя: картой, напрямую и абонементы. */
 export async function paymentHistory(userId: string): Promise<PaymentRow[]> {
   return query<PaymentRow>(
     `select p.id, p.created_at::text as at, p.provider, p.status, p.purpose,

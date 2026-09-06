@@ -55,7 +55,7 @@ export default async function DebtsPage() {
               <div className="card-lin" key={cl.id}>
                 <div className="what">{cl.owner_name ?? cl.owner_email}</div>
                 <div className="sub">
-                  наличными за {cl.lessons}&nbsp;
+                  наличными или переводом за {cl.lessons}&nbsp;
                   {plural(cl.lessons, 'занятие', 'занятия', 'занятий')} ·{' '}
                   {money(cl.amount, cl.currency)}
                 </div>

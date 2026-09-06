@@ -231,7 +231,7 @@ export async function saveAttendance(
             await logMoneyIn(c, {
               kind: 'charge_removed', actorId: actor.id, ownerId: charge.owner_id,
               participantId: mark.participantId, sessionId, chargeId: charge.id,
-              amount, currency, note: wasCash ? 'снята отметка, наличные отменены' : 'снята отметка',
+              amount, currency, note: wasCash ? 'снята отметка, оплата отменена' : 'снята отметка',
             });
           }
         }
@@ -289,14 +289,14 @@ export async function saveAttendance(
           await logMoneyIn(c, {
             kind: 'cash_taken', actorId: actor.id, ownerId: charge.owner_id,
             participantId: mark.participantId, sessionId, chargeId: charge.id,
-            paymentId: pay.rows[0].id, amount, currency, note: 'приняты наличные, 1 занятие',
+            paymentId: pay.rows[0].id, amount, currency, note: 'оплачено наличными или переводом, 1 занятие',
           });
         }
         stat.cash++;
         continue;
       }
 
-      // Не наличные: если раньше были, платёж убираем.
+      // Оплату сняли: платёж убираем.
       if (charge.payment_id) {
         const wasCash = await dropCashPayment(c, sessionId, mark.participantId, actor.id);
         if (!wasCash) continue; // оплачено картой, руками не трогаем
@@ -337,7 +337,7 @@ export async function saveAttendance(
   });
 }
 
-/** Убирает наличный платёж с начисления. Возвращает true, если он там был. */
+/** Убирает прямой платёж с начисления. Возвращает true, если он там был. */
 async function dropCashPayment(
   c: PoolClient,
   sessionId: string,
@@ -357,7 +357,7 @@ async function dropCashPayment(
   ]);
   await logMoneyIn(c, {
     kind: 'cash_reverted', actorId, participantId, sessionId,
-    paymentId: rows[0].payment_id, note: 'наличные отменены',
+    paymentId: rows[0].payment_id, note: 'оплата отменена',
   });
   await c.query('delete from payments where id = $1', [rows[0].payment_id]);
   return true;
@@ -391,7 +391,7 @@ export type UnpaidCharge = {
   who: string;
   amount: string;
   currency: string;
-  /** Родитель уже заявил оплату наличными, ждём подтверждения студии. */
+  /** Родитель уже заявил, что заплатит напрямую, ждём подтверждения студии. */
   declared: boolean;
 };
 

@@ -68,7 +68,7 @@ export default function Journal({
     if (!row.present) return r.status ? { text: 'пропуск', cls: 'money-off' } : null;
     // Оплату картой из журнала не снять: деньги пришли через банк.
     if (r.paid && !r.cash) return { text: 'оплачено картой', cls: 'money' };
-    if (row.pay === 'cash') return { text: 'оплачено налом', cls: 'money' };
+    if (row.pay === 'cash') return { text: 'оплачено наличными или переводом', cls: 'money' };
     if (row.pay === 'pass') return { text: 'по абонементу', cls: 'money' };
     return { text: `не оплачено · ${price}`, cls: 'money-due' };
   }
@@ -102,7 +102,7 @@ export default function Journal({
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className={row.present ? 'nm' : 'nm-off'}>{r.who}</div>
               <div className="money">
-                {done === 'cash' ? 'оплачено налом'
+                {done === 'cash' ? 'оплачено наличными или переводом'
                   : done === 'card' ? 'оплачено картой'
                   : 'по абонементу'} · записано
               </div>

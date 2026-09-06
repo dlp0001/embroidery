@@ -11,13 +11,13 @@ const KIND: Record<MoneyKind, { text: string; good: boolean }> = {
   charge_removed: { text: 'начисление снято', good: true },
   charge_on_pass: { text: 'списано с абонемента', good: true },
   charge_off_pass: { text: 'возвращено в абонемент', good: true },
-  cash_taken: { text: 'приняты наличные', good: true },
-  cash_reverted: { text: 'наличные отменены', good: false },
+  cash_taken: { text: 'оплачено наличными или переводом', good: true },
+  cash_reverted: { text: 'оплата отменена', good: false },
   pass_issued: { text: 'продан абонемент', good: true },
   pass_covered_debt: { text: 'долг закрыт абонементом', good: true },
   payment_paid: { text: 'оплачено картой', good: true },
-  cash_declared: { text: 'заявлена оплата наличными', good: false },
-  cash_confirmed: { text: 'наличные подтверждены', good: true },
+  cash_declared: { text: 'заявлена оплата наличными или переводом', good: false },
+  cash_confirmed: { text: 'оплата подтверждена', good: true },
   cash_declined: { text: 'заявка отклонена', good: false },
 };
 
