@@ -1250,10 +1250,4 @@ export async function archivedChildren(userId: string): Promise<{ child_id: stri
   );
 }
 
-/** Ребёнок принадлежит этому родителю? */
-export async function ownsChild(userId: string, childId: string): Promise<boolean> {
-  const row = await one(
-    'select 1 from guardians where user_id = $1 and child_id = $2', [userId, childId]);
-  return Boolean(row);
-}
 

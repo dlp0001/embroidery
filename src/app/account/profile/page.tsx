@@ -1,9 +1,7 @@
 import { requireUser } from '@/lib/session';
 import { archivedChildren, familyWithDays } from '@/lib/studio';
 import Toggles from '@/components/Toggles';
-import {
-  createChild, restoreMyChild, retireMyChild, togglePreferredDay, updateChild, updateMyName,
-} from '../actions';
+import { createChild, togglePreferredDay, updateChild, updateMyName } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,23 +69,17 @@ export default async function ProfilePage() {
 
         {kids.map((m) => (
           <div className="card" key={m.participant_id}>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <form action={updateChild} style={{ display: 'flex', gap: 10, alignItems: 'center', flex: 1 }}>
-                <input type="hidden" name="childId" value={m.child_id ?? ''} />
-                <input
-                  name="name"
-                  defaultValue={m.who}
-                  aria-label="Имя ребёнка"
-                  maxLength={60}
-                  style={nameField}
-                />
-                <button className="btn-quiet" type="submit">Переименовать</button>
-              </form>
-              <form action={retireMyChild}>
-                <input type="hidden" name="childId" value={m.child_id ?? ''} />
-                <button className="btn-quiet" type="submit" aria-label={`Убрать ${m.who}`}>Убрать</button>
-              </form>
-            </div>
+            <form action={updateChild} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <input type="hidden" name="childId" value={m.child_id ?? ''} />
+              <input
+                name="name"
+                defaultValue={m.who}
+                aria-label="Имя ребёнка"
+                maxLength={60}
+                style={nameField}
+              />
+              <button className="btn-quiet" type="submit">Переименовать</button>
+            </form>
 
             <div className="sub" style={{ marginTop: 4 }}>Детские занятия</div>
 
@@ -100,7 +92,6 @@ export default async function ProfilePage() {
             />
             <div className="hint" style={{ marginTop: 10 }}>
               Выбранные дни подсвечиваются в расписании. Записью это не является.
-              «Убрать» прячет ребёнка из списков, прошлые занятия остаются.
             </div>
           </div>
         ))}
@@ -124,16 +115,10 @@ export default async function ProfilePage() {
             <div className="what" style={{ marginBottom: 4 }}>Скрытые</div>
             <p className="hint" style={{ marginBottom: 14 }}>
               Они не появляются в расписании и журналах, но прошлые занятия
-              и оплаты за них сохранены.
+              и оплаты за них сохранены. Вернуть может Варя.
             </p>
             {hidden.map((ch) => (
-              <div className="row" key={ch.child_id} style={{ padding: '8px 0' }}>
-                <div className="sub">{ch.name}</div>
-                <form action={restoreMyChild}>
-                  <input type="hidden" name="childId" value={ch.child_id} />
-                  <button className="btn-quiet" type="submit">Вернуть</button>
-                </form>
-              </div>
+              <div className="sub" key={ch.child_id} style={{ padding: '6px 0' }}>{ch.name}</div>
             ))}
           </div>
         )}

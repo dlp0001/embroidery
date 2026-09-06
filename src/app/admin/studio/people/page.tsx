@@ -124,8 +124,8 @@ export default async function PeoplePage({
                   </div>
                 ) : (
                   <>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <form action={renameChildAction} style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <form action={renameChildAction} style={{ display: 'flex', gap: 8, alignItems: 'center', flex: '1 1 260px', minWidth: 0 }}>
                         <input type="hidden" name="childId" value={ch.child_id} />
                         <input name="name" defaultValue={ch.name} aria-label="Имя ребёнка"
                                style={{ ...inline, fontFamily: "'Cormorant Garamond', serif", fontSize: 20 }} />
