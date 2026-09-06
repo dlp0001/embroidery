@@ -2,7 +2,8 @@ import { isAdmin, requireUser } from '@/lib/session';
 import { lessonPrice, passBalances, unpaidCharges } from '@/lib/studio';
 import { isConfigured } from '@/lib/payplus';
 import { dayMonth, money, plural } from '@/lib/format';
-import { lastTestPayment, myPendingCash, TEST_AMOUNT } from '@/lib/billing';
+import { STUDIO_TZ } from '@/lib/time';
+import { lastTestPayment, myPendingCash, paymentHistory, TEST_AMOUNT } from '@/lib/billing';
 import DebtPicker from './DebtPicker';
 import { buyPassAction, testPaymentAction } from './actions';
 
@@ -21,6 +22,7 @@ export default async function PayPage({
   const admin = isAdmin(user);
   const lastTest = admin ? await lastTestPayment(user.id) : null;
   const claim = await myPendingCash(user.id);
+  const history = await paymentHistory(user.id);
   const mode = process.env.PAYPLUS_ENV === 'prod' ? 'боевая' : 'тестовая';
   const [unpaid, passes, price] = await Promise.all([
     unpaidCharges(user.id),
@@ -143,7 +145,47 @@ export default async function PayPage({
             )}
           </div>
         )}
+        {history.length > 0 && (
+          <>
+            <div className="lbl">История платежей</div>
+            {history.map((h) => {
+              const what = h.purpose === 'studio_pass' ? 'абонемент'
+                : h.purpose === 'studio_test' ? 'проверочный платёж'
+                : `занятия${h.lessons ? `, ${h.lessons}` : ''}`;
+              const how = h.provider === 'cash' ? 'наличными' : 'картой';
+              const state = h.status === 'paid'
+                ? (h.provider === 'cash' ? 'получены' : 'проведён')
+                : h.status === 'pending' ? 'ждёт подтверждения'
+                : 'не прошёл';
+              return (
+                <div className="card" key={h.id}>
+                  <div className="row">
+                    <div>
+                      <div className="when">{whenDay(h.at)}</div>
+                      <div className="what">{what}</div>
+                      <div className={h.status === 'paid' ? 'sub' : 'money-due'}>
+                        {how} · {state}
+                      </div>
+                    </div>
+                    <div style={{
+                      fontFamily: "'Cormorant Garamond', serif", fontSize: 20,
+                      opacity: h.status === 'paid' ? 1 : 0.6,
+                    }}>
+                      {money(h.amount, h.currency)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </>
+        )}
       </div>
     </>
   );
+}
+
+function whenDay(iso: string): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    timeZone: STUDIO_TZ, day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+  }).format(new Date(iso));
 }

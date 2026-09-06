@@ -16,9 +16,11 @@ export default function DebtPicker({
   charges: UnpaidCharge[];
   online: boolean;
 }) {
-  const [picked, setPicked] = useState<Set<string>>(() => new Set(charges.map((c) => c.id)));
+  // Заявленные наличными уже ждут подтверждения: их не выбираем.
+  const payable = charges.filter((c) => !c.declared);
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(payable.map((c) => c.id)));
   const currency = charges[0]?.currency ?? 'ILS';
-  const total = charges
+  const total = payable
     .filter((c) => picked.has(c.id))
     .reduce((s, c) => s + Number(c.amount), 0);
 
@@ -31,24 +33,40 @@ export default function DebtPicker({
     });
   }
 
-  const all = picked.size === charges.length;
+  const all = picked.size === payable.length;
 
   return (
     <form>
       <div className="row" style={{ marginBottom: 12 }}>
         <p className="hint" style={{ margin: 0 }}>
-          Отмечено {picked.size} из {charges.length}
+          Отмечено {picked.size} из {payable.length}
         </p>
         <button
           type="button"
           className="chip-money money"
-          onClick={() => setPicked(all ? new Set() : new Set(charges.map((c) => c.id)))}
+          onClick={() => setPicked(all ? new Set() : new Set(payable.map((c) => c.id)))}
         >
           {all ? 'снять все' : 'выбрать все'}
         </button>
       </div>
 
       {charges.map((c) => {
+        if (c.declared) {
+          return (
+            <div className="card" key={c.id}>
+              <div className="row">
+                <div>
+                  <div className="when">{dayMonth(c.held_on)} · {c.group_title}</div>
+                  <div className="what">{c.who}</div>
+                  <div className="money">будет оплачено наличными</div>
+                </div>
+                <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20 }}>
+                  {money(c.amount, c.currency)}
+                </div>
+              </div>
+            </div>
+          );
+        }
         const on = picked.has(c.id);
         return (
           <div className="card" key={c.id} style={{ opacity: on ? 1 : 0.5 }}>
@@ -86,6 +104,10 @@ export default function DebtPicker({
           {money(total, currency)}
         </div>
       </div>
+
+      {payable.length === 0 && (
+        <p className="hint">Все занятия уже заявлены к оплате наличными.</p>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <button className="btn-wide" formAction={payDebtAction} disabled={picked.size === 0 || !online}>

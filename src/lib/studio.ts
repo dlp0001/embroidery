@@ -327,12 +327,20 @@ export type UnpaidCharge = {
   who: string;
   amount: string;
   currency: string;
+  /** Родитель уже заявил оплату наличными, ждём подтверждения студии. */
+  declared: boolean;
 };
 
 export async function unpaidCharges(ownerId: string): Promise<UnpaidCharge[]> {
   return query<UnpaidCharge>(
     `select ch.id, s.held_on::text, g.title as group_title, ch.amount::text, ch.currency,
-            coalesce(c.name, u.name, 'Я') as who
+            coalesce(c.name, u.name, 'Я') as who,
+            exists (
+              select 1 from payments pay
+               where pay.provider = 'cash' and pay.status = 'pending'
+                 and pay.purpose = 'studio_debt' and pay.user_id = ch.owner_id
+                 and pay.raw -> 'charge_ids' ? ch.id::text
+            ) as declared
        from charges ch
        join studio_sessions s on s.id = ch.session_id
        join studio_groups g on g.id = s.group_id

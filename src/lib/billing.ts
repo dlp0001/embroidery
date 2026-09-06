@@ -37,10 +37,15 @@ export async function startPayment(
     // Родитель может выбрать не всё: платим ровно за отмеченное.
     const picked = intent.chargeIds?.length ? intent.chargeIds : null;
     const debts = await query<{ id: string; amount: string }>(
-      `select id, amount::text from charges
-        where owner_id = $1 and pass_id is null and payment_id is null
-          and ($2::uuid[] is null or id = any($2::uuid[]))
-        order by created_at`,
+      `select ch.id, ch.amount::text from charges ch
+        where ch.owner_id = $1 and ch.pass_id is null and ch.payment_id is null
+          and ($2::uuid[] is null or ch.id = any($2::uuid[]))
+          and not exists (
+            select 1 from payments pay
+             where pay.provider = 'cash' and pay.status = 'pending'
+               and pay.purpose = 'studio_debt' and pay.user_id = ch.owner_id
+               and pay.raw -> 'charge_ids' ? ch.id::text)
+        order by ch.created_at`,
       [user.id, picked],
     );
     if (debts.length === 0) return { error: 'Нечего оплачивать.' };
@@ -201,10 +206,15 @@ export async function declareCash(
 ): Promise<{ ok: true; count: number } | { error: string }> {
   const picked = chargeIds.length ? chargeIds : null;
   const debts = await query<{ id: string; amount: string; currency: string }>(
-    `select id, amount::text, currency from charges
-      where owner_id = $1 and pass_id is null and payment_id is null
-        and ($2::uuid[] is null or id = any($2::uuid[]))
-      order by created_at`,
+    `select ch.id, ch.amount::text, ch.currency from charges ch
+      where ch.owner_id = $1 and ch.pass_id is null and ch.payment_id is null
+        and ($2::uuid[] is null or ch.id = any($2::uuid[]))
+        and not exists (
+          select 1 from payments pay
+           where pay.provider = 'cash' and pay.status = 'pending'
+             and pay.purpose = 'studio_debt' and pay.user_id = ch.owner_id
+             and pay.raw -> 'charge_ids' ? ch.id::text)
+      order by ch.created_at`,
     [user.id, picked],
   );
   if (debts.length === 0) return { error: 'Нечего оплачивать.' };
@@ -300,6 +310,36 @@ export async function myPendingCash(userId: string): Promise<CashClaim | null> {
       where p.user_id = $1 and p.provider = 'cash'
         and p.status = 'pending' and p.purpose = 'studio_debt'
       order by p.created_at desc limit 1`,
+    [userId],
+  );
+}
+
+
+export type PaymentRow = {
+  id: string;
+  at: string;
+  provider: string;
+  status: string;
+  purpose: string | null;
+  amount: string;
+  currency: string;
+  lessons: number;
+};
+
+/** Все платежи родителя: картой, наличными и абонементы. */
+export async function paymentHistory(userId: string): Promise<PaymentRow[]> {
+  return query<PaymentRow>(
+    `select p.id, p.created_at::text as at, p.provider, p.status, p.purpose,
+            p.amount::text, p.currency,
+            coalesce(
+              jsonb_array_length(p.raw -> 'charge_ids'),
+              (p.raw ->> 'lessons')::int,
+              (select ps.lessons_total from passes ps where ps.payment_id = p.id),
+              0) as lessons
+       from payments p
+      where p.user_id = $1
+      order by p.created_at desc
+      limit 50`,
     [userId],
   );
 }
