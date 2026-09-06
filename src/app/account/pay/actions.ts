@@ -47,9 +47,8 @@ export async function testPaymentAction(): Promise<void> {
 
 export async function buyPassAction(form: FormData): Promise<void> {
   const lessons = Number(form.get('lessons'));
-  const months = Number(form.get('months') ?? 3);
   if (!Number.isInteger(lessons) || lessons < 1 || lessons > 100) {
     redirect('/account/pay?error=' + encodeURIComponent('Странное число занятий.'));
   }
-  await go({ kind: 'pass', lessons, months });
+  await go({ kind: 'pass', lessons });
 }

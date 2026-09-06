@@ -1,5 +1,5 @@
 import { isAdmin, requireTeacher } from '@/lib/session';
-import { allActivePasses, debtors, lessonPrice, passOwners } from '@/lib/studio';
+import { allActivePasses, debtors, lessonPrice, passOwners, passTypes } from '@/lib/studio';
 import { pendingCash } from '@/lib/billing';
 import { dayMonth, money, plural } from '@/lib/format';
 import Link from 'next/link';
@@ -21,13 +21,15 @@ const label: React.CSSProperties = {
 export default async function DebtsPage() {
   const user = await requireTeacher();
   const admin = isAdmin(user);
-  const [rows, passes, owners, price, claims] = await Promise.all([
+  const [rows, passes, owners, price, claims, packs] = await Promise.all([
     debtors(),
     allActivePasses(),
     admin ? passOwners() : [],
     lessonPrice(),
     admin ? pendingCash() : [],
+    passTypes(),
   ]);
+  const currency = price.currency;
   const total = rows.reduce((s, d) => s + Number(d.amount), 0);
 
   return (
@@ -121,17 +123,17 @@ export default async function DebtsPage() {
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <div>
-                  <label style={label} htmlFor="lessons">Занятий</label>
-                  <input style={field} id="lessons" name="lessons" type="number"
-                         min={1} max={100} defaultValue={8} required />
-                </div>
-                <div>
-                  <label style={label} htmlFor="months">Месяцев</label>
-                  <input style={field} id="months" name="months" type="number"
-                         min={1} max={24} defaultValue={3} required />
-                </div>
+              <div>
+                <label style={label} htmlFor="lessons">Абонемент</label>
+                <select style={field} id="lessons" name="lessons" required>
+                  {packs.map((t) => (
+                    <option key={t.lessons} value={t.lessons}>
+                      {t.lessons} {plural(t.lessons, 'занятие', 'занятия', 'занятий')}
+                      {' · '}{money(t.price, currency)}
+                      {' · '}{t.months} {plural(t.months, 'месяц', 'месяца', 'месяцев')}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>

@@ -9,6 +9,7 @@ export type MoneyKind =
   | 'charge_created'      // занятие посчитано
   | 'charge_removed'      // отметка снята, начисление убрано
   | 'charge_on_pass'      // списано с абонемента
+  | 'charge_off_pass'     // занятие вернули в абонемент
   | 'cash_taken'          // приняты наличные
   | 'cash_reverted'       // наличные отменены
   | 'pass_issued'         // продан абонемент

@@ -2,18 +2,30 @@
 
 import { useState } from 'react';
 import { saveJournal } from '@/app/admin/actions';
-import type { RosterRow } from '@/lib/studio';
+import type { PayWay, RosterRow } from '@/lib/studio';
 
-type Row = { present: boolean; cash: boolean };
+type Row = { present: boolean; pay: PayWay };
 
 /** Ждём ли этого человека: родитель записал или день отмечен в профиле. */
 function expected(r: RosterRow): boolean {
   return r.booked || r.preferred;
 }
 
+/** Абонемент можно выбрать, только если он есть или занятие уже на нём. */
+function ways(r: RosterRow): PayWay[] {
+  return r.has_pass || r.on_pass ? ['none', 'cash', 'pass'] : ['none', 'cash'];
+}
+
+/** Что уже проведено по деньгам: это и требует подтверждения при правке. */
+function settledWay(r: RosterRow): PayWay | null {
+  if (r.cash) return 'cash';
+  if (r.on_pass) return 'pass';
+  return null;
+}
+
 /**
- * Журнал одного занятия. Ожидаемые заранее отмечены, остальные нет.
- * Деньги считаются сами, руками ставятся только наличные.
+ * Журнал одного занятия. Кто был — отмечает Варя, статус оплаты
+ * подставляется сам: есть абонемент — «по абонементу», нет — «не оплачено».
  */
 export default function Journal({
   sessionId,
@@ -30,7 +42,12 @@ export default function Journal({
     Object.fromEntries(
       roster.map((r) => [
         r.participant_id,
-        { present: r.status === 'present', cash: r.cash },
+        {
+          present: r.status === 'present',
+          // Абонемент подставляем только тем, по кому занятие ещё не считали:
+          // сохранённое «не оплачено» подменять нельзя.
+          pay: settledWay(r) ?? (!r.locked && r.has_pass ? 'pass' : 'none'),
+        },
       ]),
     ),
   );
@@ -49,37 +66,46 @@ export default function Journal({
     // Никого не отмечаем заранее. Пока человек не отмечен, про деньги
     // говорить нечего: «пропуск» пишем только там, где журнал уже закрыт.
     if (!row.present) return r.status ? { text: 'пропуск', cls: 'money-off' } : null;
-    if (row.cash) return { text: 'оплачено налом', cls: 'money' };
-    // Оплату картой отсюда не снять, поэтому она и не переключается.
+    // Оплату картой из журнала не снять: деньги пришли через банк.
     if (r.paid && !r.cash) return { text: 'оплачено картой', cls: 'money' };
-    // Дальше — то, что станет правдой после сохранения, а не то, что
-    // лежит в базе сейчас: галочку наличных мы как раз собираемся снять.
-    if (r.on_pass && !r.cash) return { text: 'по абонементу', cls: 'money' };
-    if (r.has_pass) return { text: 'спишется с абонемента', cls: 'money' };
+    if (row.pay === 'cash') return { text: 'оплачено налом', cls: 'money' };
+    if (row.pay === 'pass') return { text: 'по абонементу', cls: 'money' };
     return { text: `не оплачено · ${price}`, cls: 'money-due' };
   }
 
-  function toggle(id: string, field: keyof Row) {
-    setRows((p) => ({ ...p, [id]: { ...p[id], [field]: !p[id][field] } }));
+  function togglePresent(id: string) {
+    setRows((p) => ({ ...p, [id]: { ...p[id], present: !p[id].present } }));
+  }
+
+  /** Клик по статусу оплаты гоняет его по кругу: три варианта или два. */
+  function nextWay(r: RosterRow) {
+    const list = ways(r);
+    setRows((p) => {
+      const row = p[r.participant_id];
+      const at = list.indexOf(row.pay);
+      return { ...p, [r.participant_id]: { ...row, pay: list[(at + 1) % list.length] } };
+    });
   }
 
   function line(r: RosterRow) {
     const row = rows[r.participant_id];
     const m = moneyFor(r);
-    const settled = (r.cash || r.paid || r.on_pass) && !unlocked.has(r.participant_id);
+    const card = r.paid && !r.cash;
+    const done = card ? 'card' : settledWay(r);
 
     // По проведённым деньгам сначала спрашиваем, потом пускаем.
-    if (settled) {
-      const text = r.cash ? 'оплачено налом'
-        : r.paid ? 'оплачено картой'
-        : 'списано с абонемента';
+    if (done && !unlocked.has(r.participant_id)) {
       const askingHere = asking === r.participant_id;
       return (
         <div key={r.participant_id} style={{ borderBottom: '1px solid var(--line-soft)' }}>
           <div className="mark" style={{ borderBottom: 0 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className={row.present ? 'nm' : 'nm-off'}>{r.who}</div>
-              <div className="money">{text} · записано</div>
+              <div className="money">
+                {done === 'cash' ? 'оплачено налом'
+                  : done === 'card' ? 'оплачено картой'
+                  : 'по абонементу'} · записано
+              </div>
             </div>
             <button
               type="button"
@@ -115,21 +141,22 @@ export default function Journal({
         </div>
       );
     }
+
     return (
       <div className="mark" key={r.participant_id}>
         <input type="hidden" name={`mark:${r.participant_id}`} value={row.present ? 'present' : 'absent'} />
-        <input type="hidden" name={`cash:${r.participant_id}`} value={row.cash ? '1' : '0'} />
+        <input type="hidden" name={`pay:${r.participant_id}`} value={row.pay} />
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <button type="button" className="plain" onClick={() => toggle(r.participant_id, 'present')}>
+          <button type="button" className="plain" onClick={() => togglePresent(r.participant_id)}>
             <span className={row.present ? 'nm' : 'nm-off'}>{r.who}</span>
           </button>
           {m && (
             <button
               type="button"
               className={`chip-money ${m.cls}`}
-              disabled={!row.present || (r.paid && !r.cash)}
-              onClick={() => toggle(r.participant_id, 'cash')}
+              disabled={!row.present || card}
+              onClick={() => nextWay(r)}
             >
               {m.text}
             </button>
@@ -141,7 +168,7 @@ export default function Journal({
           aria-label={`${r.who}: ${row.present ? 'снять отметку' : 'отметить'}`}
           aria-pressed={row.present}
           className={row.present ? 'dot-on' : 'dot-off'}
-          onClick={() => toggle(r.participant_id, 'present')}
+          onClick={() => togglePresent(r.participant_id)}
         >
           {row.present && (
             <svg viewBox="0 0 24 24">

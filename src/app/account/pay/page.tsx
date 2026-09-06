@@ -1,5 +1,5 @@
 import { isAdmin, requireUser } from '@/lib/session';
-import { lessonPrice, passBalances, unpaidCharges } from '@/lib/studio';
+import { lessonPrice, passBalances, passTypes, unpaidCharges } from '@/lib/studio';
 import { isConfigured } from '@/lib/payplus';
 import { dayMonth, money, plural } from '@/lib/format';
 import { STUDIO_TZ } from '@/lib/time';
@@ -9,7 +9,6 @@ import { buyPassAction, testPaymentAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 
-const PACKS = [4, 8, 12];
 
 export default async function PayPage({
   searchParams,
@@ -24,12 +23,14 @@ export default async function PayPage({
   const claim = await myPendingCash(user.id);
   const history = await paymentHistory(user.id);
   const mode = process.env.PAYPLUS_ENV === 'prod' ? 'боевая' : 'тестовая';
-  const [unpaid, passes, price] = await Promise.all([
+  const [unpaid, passes, price, packs] = await Promise.all([
     unpaidCharges(user.id),
     passBalances(user.id),
     lessonPrice(),
+    passTypes(),
   ]);
   const pass = passes.find((p) => p.left > 0) ?? null;
+  const months = packs[0]?.months ?? 3;
 
   return (
     <>
@@ -99,17 +100,25 @@ export default async function PayPage({
 
         {online ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {PACKS.map((n) => (
-              <form action={buyPassAction} key={n}>
-                <input type="hidden" name="lessons" value={n} />
-                <input type="hidden" name="months" value={3} />
+            {packs.map((t) => (
+              <form action={buyPassAction} key={t.lessons}>
+                <input type="hidden" name="lessons" value={t.lessons} />
                 <button className="btn-quiet" type="submit" style={{ width: '100%', justifyContent: 'space-between' }}>
-                  <span>{n}&nbsp;{plural(n, 'занятие', 'занятия', 'занятий')}</span>
-                  <span>{money(price.amount * n, price.currency)}</span>
+                  <span>{t.lessons}&nbsp;{plural(t.lessons, 'занятие', 'занятия', 'занятий')}</span>
+                  <span>
+                    {money(t.price, price.currency)}
+                    {t.price < price.amount * t.lessons && (
+                      <span className="hint">
+                        {' · '}{money(price.amount * t.lessons - t.price, price.currency)} выгоды
+                      </span>
+                    )}
+                  </span>
                 </button>
               </form>
             ))}
-            <p className="hint">Действует три месяца со дня покупки.</p>
+            <p className="hint">
+              Действует {months} {plural(months, 'месяц', 'месяца', 'месяцев')} со дня покупки.
+            </p>
           </div>
         ) : (
           <div className="note">

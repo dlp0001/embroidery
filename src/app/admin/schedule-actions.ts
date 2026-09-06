@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { confirmCash, declineCash } from '@/lib/billing';
 import { isAdmin, requireUser } from '@/lib/session';
 import {
-  addSession, createGroup, issuePass, resyncGroupSessions, setGroupActive,
+  addSession, createGroup, issuePass, passTypes, resyncGroupSessions, setGroupActive,
   setSessionStatus, updateGroup, type GroupInput,
 } from '@/lib/studio';
 
@@ -101,17 +101,16 @@ export async function setSessionStatusAction(form: FormData): Promise<void> {
 export async function issuePassAction(form: FormData): Promise<void> {
   const user = await requireAdmin();
   const lessons = Number(form.get('lessons'));
-  const months = Number(form.get('months'));
   const paid = String(form.get('paid'));
-  if (!Number.isInteger(lessons) || lessons < 1 || lessons > 100) throw new Error('BAD_LESSONS');
-  if (!Number.isInteger(months) || months < 1 || months > 24) throw new Error('BAD_MONTHS');
+  const type = (await passTypes()).find((t) => t.lessons === lessons);
+  if (!type) throw new Error('BAD_LESSONS');
   if (paid !== 'cash' && paid !== 'transfer' && paid !== 'unpaid') throw new Error('BAD_PAID');
 
   await issuePass(
     {
       ownerId: String(form.get('ownerId')),
-      lessons,
-      months,
+      lessons: type.lessons,
+      months: type.months,
       paid,
       coverDebt: form.get('coverDebt') === 'on',
     },

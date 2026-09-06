@@ -2,11 +2,11 @@ import { one, query, tx } from './db';
 import { plural } from './format';
 import { logMoneyIn } from './ledger';
 import { createPaymentLink, isConfigured } from './payplus';
-import { lessonPrice } from './studio';
+import { lessonPrice, passTypes } from './studio';
 
 export type Intent =
   | { kind: 'debt'; chargeIds?: string[] }
-  | { kind: 'pass'; lessons: number; months: number }
+  | { kind: 'pass'; lessons: number }
   | { kind: 'test' };
 
 /** Сумма проверочного платежа: маленькая, чтобы не жалко было вернуть. */
@@ -53,10 +53,12 @@ export async function startPayment(
     description = `Занятия в студии, ${debts.length}`;
     raw = { charge_ids: debts.map((c) => c.id) };
   } else {
-    if (intent.lessons < 1 || intent.lessons > 100) return { error: 'Странное число занятий.' };
-    amount = price.amount * intent.lessons;
-    description = `Абонемент на ${intent.lessons} занятий`;
-    raw = { lessons: intent.lessons, months: intent.months };
+    // Абонемент стоит своих денег, а не «занятий умножить на цену».
+    const type = (await passTypes()).find((t) => t.lessons === intent.lessons);
+    if (!type) return { error: 'Такого абонемента нет.' };
+    amount = type.price;
+    description = `Абонемент на ${type.lessons} занятий`;
+    raw = { lessons: type.lessons, months: type.months };
   }
 
   const payment = await one<{ id: string }>(

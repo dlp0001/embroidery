@@ -5,6 +5,27 @@ import { logMoneyIn } from './ledger';
 
 export type AttendanceStatus = 'present' | 'absent' | 'sick' | 'trial';
 
+export type PassType = { lessons: number; price: number; months: number };
+
+const DEFAULT_PASS_TYPES: PassType[] = [
+  { lessons: 4, price: 360, months: 3 },
+  { lessons: 8, price: 680, months: 3 },
+];
+
+/** Цена абонемента задана отдельно: он дешевле, чем те же занятия по одному. */
+export async function passTypes(): Promise<PassType[]> {
+  const row = await one<{ value: string }>(
+    `select value from settings where key = 'pass_types'`,
+  );
+  if (!row?.value) return DEFAULT_PASS_TYPES;
+  try {
+    const parsed = JSON.parse(row.value) as PassType[];
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : DEFAULT_PASS_TYPES;
+  } catch {
+    return DEFAULT_PASS_TYPES;
+  }
+}
+
 export type Participant = {
   id: string;
   name: string;
@@ -23,7 +44,7 @@ export async function lessonPrice(): Promise<{ amount: number; currency: string 
        from settings`,
   );
   return {
-    amount: Number(row?.amount ?? 60),
+    amount: Number(row?.amount ?? 100),
     currency: row?.currency ?? 'ILS',
   };
 }
@@ -62,7 +83,9 @@ async function pickPass(c: PoolClient, ownerId: string): Promise<string | null> 
   return rows[0]?.id ?? null;
 }
 
-export type Mark = { participantId: string; status: AttendanceStatus; cash?: boolean };
+export type PayWay = 'none' | 'cash' | 'pass';
+
+export type Mark = { participantId: string; status: AttendanceStatus; pay?: PayWay };
 
 /**
  * Сохраняет журнал занятия. Деньги считаются здесь и только здесь:
@@ -148,7 +171,15 @@ export async function saveAttendance(
     }
 
     // 4. Свободные занятия в абонементах — тоже разом, с запасом на списание.
-    const candidates = [...new Set([...owners.values()].flat())];
+    //    Абонемент может понадобиться и там, где занятие уже посчитано:
+    //    Варя вправе переставить оплату на абонемент задним числом.
+    const candidates = [...new Set([
+      ...[...owners.values()].flat(),
+      ...marks
+        .filter((m) => m.status === 'present')
+        .map((m) => charges.get(m.participantId)?.owner_id)
+        .filter((id): id is string => Boolean(id)),
+    ])];
     const passes = new Map<string, { id: string; left: number }[]>();
     if (candidates.length > 0) {
       const { rows } = await c.query<{ id: string; owner_id: string; left: number }>(
@@ -177,6 +208,15 @@ export async function saveAttendance(
       return pass.id;
     };
 
+    /** Возвращает занятие в абонемент: в тот же заход его можно отдать другому. */
+    const givePass = (ownerId: string, passId: string): void => {
+      const list = passes.get(ownerId) ?? [];
+      const pass = list.find((p) => p.id === passId);
+      if (pass) pass.left++;
+      else list.unshift({ id: passId, left: 1 });
+      passes.set(ownerId, list);
+    };
+
     for (const mark of marks) {
       let charge = charges.get(mark.participantId);
       const wasSettled = Boolean(charge && (charge.pass_id || charge.payment_id));
@@ -199,14 +239,14 @@ export async function saveAttendance(
       }
 
       stat.present++;
+      const way: PayWay = mark.pay ?? 'none';
 
       if (!charge) {
-        // Владельцем становится тот, у кого есть свободный абонемент,
-        // иначе первый по списку.
         const list = owners.get(mark.participantId) ?? [];
         if (list.length === 0) continue;
+        // Владелец — тот, у кого есть свободный абонемент, иначе первый.
         const owner = list.find((o) => (passes.get(o)?.length ?? 0) > 0) ?? list[0];
-        const passId = mark.cash ? null : takePass(owner);
+        const passId = way === 'pass' ? takePass(owner) : null;
         const inserted = await c.query<ChargeRow>(
           `insert into charges (participant_id, session_id, owner_id, amount, currency, pass_id)
            values ($1, $2, $3, $4, $5, $6)
@@ -223,16 +263,29 @@ export async function saveAttendance(
         });
       }
 
-      if (mark.cash) {
+      // Выбрали другой способ — занятие возвращается в абонемент.
+      if (way !== 'pass' && charge.pass_id) {
+        const freed = charge.pass_id;
+        await c.query('update charges set pass_id = null where id = $1', [charge.id]);
+        givePass(charge.owner_id, freed);
+        charge = { ...charge, pass_id: null };
+        await logMoneyIn(c, {
+          kind: 'charge_off_pass', actorId: actor.id, ownerId: charge.owner_id,
+          participantId: mark.participantId, sessionId, chargeId: charge.id,
+          passId: freed, amount, currency, note: 'занятие возвращено в абонемент',
+        });
+      }
+
+      // Наличные: заводим платёж.
+      if (way === 'cash') {
         if (!charge.payment_id) {
           const pay = await c.query<{ id: string }>(
             `insert into payments (provider, user_id, amount, currency, status, purpose)
              values ('cash', $1, $2, $3, 'paid', 'studio_lesson') returning id`,
             [charge.owner_id, amount, currency],
           );
-          await c.query('update charges set payment_id = $2, pass_id = null where id = $1', [
-            charge.id, pay.rows[0].id,
-          ]);
+          await c.query('update charges set payment_id = $2 where id = $1', [charge.id, pay.rows[0].id]);
+          charge = { ...charge, payment_id: pay.rows[0].id };
           await logMoneyIn(c, {
             kind: 'cash_taken', actorId: actor.id, ownerId: charge.owner_id,
             participantId: mark.participantId, sessionId, chargeId: charge.id,
@@ -243,22 +296,33 @@ export async function saveAttendance(
         continue;
       }
 
+      // Не наличные: если раньше были, платёж убираем.
       if (charge.payment_id) {
         const wasCash = await dropCashPayment(c, sessionId, mark.participantId, actor.id);
-        if (wasCash) {
-          const passId = await pickPass(c, charge.owner_id);
+        if (!wasCash) continue; // оплачено картой, руками не трогаем
+        charge = { ...charge, payment_id: null };
+      }
+
+      if (way === 'pass' && !charge.pass_id) {
+        const passId = takePass(charge.owner_id);
+        if (passId) {
           await c.query('update charges set pass_id = $2 where id = $1', [charge.id, passId]);
-          charge = { ...charge, pass_id: passId, payment_id: null };
-          if (passId) {
-            await logMoneyIn(c, {
-              kind: 'charge_on_pass', actorId: actor.id, ownerId: charge.owner_id,
-              participantId: mark.participantId, sessionId, chargeId: charge.id,
-              passId, amount, currency, note: 'после отмены наличных списано с абонемента',
-            });
-          }
-        } else {
-          continue;
+          charge = { ...charge, pass_id: passId };
+          await logMoneyIn(c, {
+            kind: 'charge_on_pass', actorId: actor.id, ownerId: charge.owner_id,
+            participantId: mark.participantId, sessionId, chargeId: charge.id,
+            passId, amount, currency, note: 'списано с абонемента',
+          });
         }
+      }
+
+      // Было проведено, стало «не оплачено» — это тоже движение денег.
+      if (way === 'none' && wasSettled && !charge.pass_id && !charge.payment_id) {
+        await logMoneyIn(c, {
+          kind: 'charge_created', actorId: actor.id, ownerId: charge.owner_id,
+          participantId: mark.participantId, sessionId, chargeId: charge.id,
+          amount, currency, note: 'занятие переведено в долг',
+        });
       }
 
       if (charge.pass_id) stat.onPass++;
@@ -974,6 +1038,9 @@ export type IssuePassInput = {
  */
 export async function issuePass(input: IssuePassInput, byUser: string): Promise<{ covered: number }> {
   const { amount, currency } = await lessonPrice();
+  // Абонемент стоит своих денег; если пакет нестандартный, считаем по занятиям.
+  const type = (await passTypes()).find((t) => t.lessons === input.lessons);
+  const total = type ? type.price : amount * input.lessons;
 
   return tx(async (c) => {
     let paymentId: string | null = null;
@@ -981,7 +1048,7 @@ export async function issuePass(input: IssuePassInput, byUser: string): Promise<
       const pay = await c.query<{ id: string }>(
         `insert into payments (provider, user_id, amount, currency, status, purpose, raw)
          values ($1, $2, $3, $4, 'paid', 'studio_pass', $5) returning id`,
-        [input.paid, input.ownerId, amount * input.lessons, currency,
+        [input.paid, input.ownerId, total, currency,
          JSON.stringify({ issued_by: byUser, lessons: input.lessons })],
       );
       paymentId = pay.rows[0].id;
@@ -997,7 +1064,7 @@ export async function issuePass(input: IssuePassInput, byUser: string): Promise<
 
     await logMoneyIn(c, {
       kind: 'pass_issued', actorId: byUser, ownerId: input.ownerId,
-      passId, paymentId, amount: amount * input.lessons, currency,
+      passId, paymentId, amount: total, currency,
       note: `абонемент на ${input.lessons} ${plural(input.lessons, 'занятие', 'занятия', 'занятий')}, ${
         input.paid === 'cash' ? 'наличными' : input.paid === 'transfer' ? 'переводом' : 'не оплачен'
       }`,

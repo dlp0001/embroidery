@@ -3,9 +3,10 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { canTeach, isAdmin, requireUser } from '@/lib/session';
-import { saveAttendance, sessionHead, type AttendanceStatus, type Mark } from '@/lib/studio';
+import { saveAttendance, sessionHead, type AttendanceStatus, type Mark, type PayWay } from '@/lib/studio';
 
 const STATUSES: AttendanceStatus[] = ['present', 'absent', 'sick', 'trial'];
+const WAYS: PayWay[] = ['none', 'cash', 'pass'];
 
 export async function saveJournal(formData: FormData): Promise<void> {
   const user = await requireUser();
@@ -23,10 +24,11 @@ export async function saveJournal(formData: FormData): Promise<void> {
     const status = String(value) as AttendanceStatus;
     if (!STATUSES.includes(status)) continue;
     const participantId = key.slice(5);
+    const way = String(formData.get(`pay:${participantId}`) ?? 'none') as PayWay;
     marks.push({
       participantId,
       status,
-      cash: formData.get(`cash:${participantId}`) === '1',
+      pay: WAYS.includes(way) ? way : 'none',
     });
   }
 
