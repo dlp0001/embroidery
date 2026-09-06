@@ -119,7 +119,14 @@ export async function checkoutUrl(paymentId: string, userId: string): Promise<st
   return row?.raw?.url ?? null;
 }
 
-export async function applyPayment(paymentId: string, transactionUid: string | null): Promise<void> {
+/** Каким путём деньги дошли: звонком PayPlus или нашей же проверкой. */
+export type PaidVia = 'callback' | 'return';
+
+export async function applyPayment(
+  paymentId: string,
+  transactionUid: string | null,
+  via: PaidVia = 'callback',
+): Promise<void> {
   await tx(async (c) => {
     const { rows } = await c.query<{
       id: string; user_id: string; status: string; purpose: string;
@@ -139,7 +146,7 @@ export async function applyPayment(paymentId: string, transactionUid: string | n
       amount: p.amount, currency: p.currency,
       note: p.purpose === 'studio_pass' ? 'оплачен абонемент'
         : p.purpose === 'studio_debt' ? 'оплачен долг' : 'проверочный платёж',
-      details: { provider: 'payplus', transaction: transactionUid },
+      details: { provider: 'payplus', transaction: transactionUid, via },
     });
 
     // Проверочный платёж ничего не выдаёт: он нужен только чтобы
@@ -236,7 +243,7 @@ export async function verifyPending(userId: string): Promise<PendingCheck> {
       continue;
     }
 
-    await applyPayment(p.id, check.transactionUid);
+    await applyPayment(p.id, check.transactionUid, 'return');
     out.paid++;
   }
 

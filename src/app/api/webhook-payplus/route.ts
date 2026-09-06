@@ -64,7 +64,7 @@ async function handle(params: {
     return Response.json({ received: true });
   }
 
-  await applyPayment(payment.id, check.transactionUid);
+  await applyPayment(payment.id, check.transactionUid, 'callback');
   console.log('payplus: платёж зачтён', payment.id);
   return Response.json({ received: true });
 }
