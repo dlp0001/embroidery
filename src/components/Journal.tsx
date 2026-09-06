@@ -20,14 +20,11 @@ export default function Journal({
   roster,
   price,
   saved,
-  canOverride,
 }: {
   sessionId: string;
   roster: RosterRow[];
   price: string;
   saved: boolean;
-  /** Суперадмин может править уже проведённые деньги. */
-  canOverride: boolean;
 }) {
   const [rows, setRows] = useState<Record<string, Row>>(() =>
     Object.fromEntries(
@@ -38,8 +35,11 @@ export default function Journal({
     ),
   );
 
+  // Строки с проведёнными деньгами открываются только после подтверждения.
+  const [unlocked, setUnlocked] = useState<Set<string>>(new Set());
+  const [asking, setAsking] = useState<string | null>(null);
+
   const present = Object.values(rows).filter((r) => r.present).length;
-  const frozenCount = roster.filter((r) => r.locked && !canOverride).length;
   const likely = roster.filter(expected);
   const rest = roster.filter((r) => !expected(r));
   const split = likely.length > 0 && rest.length > 0;
@@ -66,29 +66,52 @@ export default function Journal({
   function line(r: RosterRow) {
     const row = rows[r.participant_id];
     const m = moneyFor(r);
-    const frozen = r.locked && !canOverride;
+    const settled = (r.cash || r.paid || r.on_pass) && !unlocked.has(r.participant_id);
 
-    // Проведённые деньги показываем как есть, без переключателей.
-    if (frozen) {
+    // По проведённым деньгам сначала спрашиваем, потом пускаем.
+    if (settled) {
       const text = r.cash ? 'оплачено налом'
         : r.paid ? 'оплачено картой'
-        : r.on_pass ? 'по абонементу'
-        : `не оплачено · ${price}`;
+        : 'списано с абонемента';
+      const askingHere = asking === r.participant_id;
       return (
-        <div className="mark" key={r.participant_id} style={{ opacity: 0.75 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className={row.present ? 'nm' : 'nm-off'}>{r.who}</div>
-            <div className={r.cash || r.paid || r.on_pass ? 'money' : 'money-due'}>
-              {text} · записано
+        <div key={r.participant_id} style={{ borderBottom: '1px solid var(--line-soft)' }}>
+          <div className="mark" style={{ borderBottom: 0 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className={row.present ? 'nm' : 'nm-off'}>{r.who}</div>
+              <div className="money">{text} · записано</div>
             </div>
+            <button
+              type="button"
+              className="btn-quiet"
+              style={{ minHeight: 38, padding: '8px 14px' }}
+              onClick={() => setAsking(askingHere ? null : r.participant_id)}
+            >
+              Изменить
+            </button>
           </div>
-          <div className={row.present ? 'dot-on' : 'dot-off'} aria-label="записано, изменить нельзя">
-            {row.present && (
-              <svg viewBox="0 0 24 24">
-                <path d="M4 12.5 L9.5 18 L20 6" />
-              </svg>
-            )}
-          </div>
+
+          {askingHere && (
+            <div className="note" style={{ margin: '0 0 14px' }}>
+              По этому занятию деньги уже проведены. Изменение попадёт в реестр
+              и будет видно, кто его сделал.
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    setUnlocked((p) => new Set(p).add(r.participant_id));
+                    setAsking(null);
+                  }}
+                >
+                  Всё равно изменить
+                </button>
+                <button type="button" className="btn-quiet" onClick={() => setAsking(null)}>
+                  Отмена
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -152,10 +175,9 @@ export default function Journal({
       <button className="btn-wide" type="submit" style={{ marginTop: 14 }}>
         {saved ? 'Пересохранить' : 'Сохранить'} · отмечено {present}
       </button>
-      {frozenCount > 0 && (
+      {unlocked.size > 0 && (
         <p className="hint" style={{ marginTop: 12 }}>
-          {frozenCount === 1 ? 'Одна строка записана' : `Записанных строк: ${frozenCount}`}.
-          Деньги по ним уже проведены, изменить может только Дима.
+          Открыто для правки: {unlocked.size}. После сохранения изменение появится в реестре.
         </p>
       )}
     </form>

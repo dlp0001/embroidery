@@ -86,15 +86,15 @@ export type Mark = { participantId: string; status: AttendanceStatus; cash?: boo
  * присутствие заводит начисление, оно либо садится на абонемент,
  * либо остаётся долгом. Остальные статусы начисления снимают.
  */
-export type SaveActor = { id: string; canOverride: boolean };
+export type SaveActor = { id: string };
 
 export type SaveResult = {
   present: number;
   onPass: number;
   toDebt: number;
   cash: number;
-  /** Строки, которые не тронули: деньги по ним уже проведены. */
-  locked: number;
+  /** Сколько уже проведённых строк переписали: это видно в реестре. */
+  changed: number;
 };
 
 export async function saveAttendance(
@@ -105,7 +105,7 @@ export async function saveAttendance(
   const { amount, currency } = await lessonPrice();
 
   return tx(async (c) => {
-    const stat: SaveResult = { present: 0, onPass: 0, toDebt: 0, cash: 0, locked: 0 };
+    const stat: SaveResult = { present: 0, onPass: 0, toDebt: 0, cash: 0, changed: 0 };
 
     for (const mark of marks) {
       const existing = await c.query<{
@@ -116,12 +116,9 @@ export async function saveAttendance(
       );
       let charge = existing.rows[0];
 
-      // Проведённые деньги правит только суперадмин: иначе оплату можно
-      // было бы стереть задним числом, и следа бы не осталось.
-      if (charge && !actor.canOverride) {
-        stat.locked++;
-        continue;
-      }
+      // Проведённое переписать можно, но это заметный шаг: и в интерфейсе
+      // он требует подтверждения, и здесь оставляет след в реестре.
+      const wasSettled = Boolean(charge && (charge.pass_id || charge.payment_id));
 
       await c.query(
         `insert into attendance (session_id, participant_id, status, marked_by)
@@ -130,6 +127,8 @@ export async function saveAttendance(
          do update set status = excluded.status, marked_by = excluded.marked_by, marked_at = now()`,
         [sessionId, mark.participantId, mark.status, actor.id],
       );
+
+      if (wasSettled) stat.changed++;
 
       if (mark.status !== 'present') {
         if (charge) {

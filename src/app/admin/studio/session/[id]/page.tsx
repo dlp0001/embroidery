@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { isAdmin, isSuperadmin, requireTeacher } from '@/lib/session';
+import { isAdmin, requireTeacher } from '@/lib/session';
 import { lessonPrice, sessionHead, sessionRoster } from '@/lib/studio';
 import { dayMonth, hhmm, money } from '@/lib/format';
 import Journal from '@/components/Journal';
@@ -10,7 +10,6 @@ export const dynamic = 'force-dynamic';
 export default async function SessionPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireTeacher();
-  const superadmin = isSuperadmin(user);
   const head = await sessionHead(id);
   if (!head) notFound();
   if (!isAdmin(user) && head.teacher_id !== user.id) notFound();
@@ -38,7 +37,6 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
               roster={roster}
               price={money(price.amount, price.currency)}
               saved={head.status === 'done'}
-              canOverride={superadmin}
             />
             <p className="hint" style={{ marginTop: 18 }}>
               Нажмите на имя, чтобы снять отметку. Нажмите на строчку про деньги,

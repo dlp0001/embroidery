@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Journal from '@/components/Journal';
-import { isAdmin, isSuperadmin, requireTeacher } from '@/lib/session';
+import { isAdmin, requireTeacher } from '@/lib/session';
 import {
   debtors, ensureSessions, lessonPrice, nextSessions, sessionRoster, teacherSessions,
   unclosedBefore,
@@ -15,7 +15,6 @@ export default async function TodayPage({
   searchParams: Promise<{ saved?: string }>;
 }) {
   const user = await requireTeacher();
-  const superadmin = isSuperadmin(user);
   const { saved } = await searchParams;
   await ensureSessions();
 
@@ -75,7 +74,6 @@ export default async function TodayPage({
                   roster={rosters[i]}
                   price={priceLabel}
                   saved={s.marked > 0}
-                  canOverride={superadmin}
                 />
               </div>
             )}
