@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { canTeach, isAdmin, requireUser } from '@/lib/session';
+import { canTeach, isAdmin, isSuperadmin, requireUser } from '@/lib/session';
 import { saveAttendance, sessionHead, type AttendanceStatus, type Mark } from '@/lib/studio';
 
 const STATUSES: AttendanceStatus[] = ['present', 'absent', 'sick', 'trial'];
@@ -30,8 +30,12 @@ export async function saveJournal(formData: FormData): Promise<void> {
     });
   }
 
-  await saveAttendance(sessionId, marks, user.id);
+  const res = await saveAttendance(sessionId, marks, {
+    id: user.id,
+    canOverride: isSuperadmin(user),
+  });
   revalidatePath('/admin/studio');
   revalidatePath('/admin/studio/debts');
-  redirect(`/admin/studio?saved=${sessionId}`);
+  const locked = res.locked > 0 ? `&locked=${res.locked}` : '';
+  redirect(`/admin/studio?saved=${sessionId}${locked}`);
 }

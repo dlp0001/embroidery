@@ -1,6 +1,7 @@
 import { isAdmin, requireTeacher } from '@/lib/session';
 import { allActivePasses, debtors, lessonPrice, passOwners } from '@/lib/studio';
 import { dayMonth, money, plural } from '@/lib/format';
+import Link from 'next/link';
 import { issuePassAction } from '@/app/admin/schedule-actions';
 
 export const dynamic = 'force-dynamic';
@@ -31,7 +32,10 @@ export default async function DebtsPage() {
     <>
       <div className="top">
         <div className="kicker">Re.Create.Art · Деньги</div>
-        <h1 className="h1">Долги</h1>
+        <div className="row">
+          <h1 className="h1">Долги</h1>
+          {admin && <Link className="btn-quiet" href="/admin/studio/ledger">Реестр</Link>}
+        </div>
         {rows.length > 0 && (
           <p className="sub">
             {rows.length}&nbsp;{plural(rows.length, 'семья', 'семьи', 'семей')} на {money(total, rows[0].currency)}

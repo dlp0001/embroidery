@@ -20,11 +20,14 @@ export default function Journal({
   roster,
   price,
   saved,
+  canOverride,
 }: {
   sessionId: string;
   roster: RosterRow[];
   price: string;
   saved: boolean;
+  /** Суперадмин может править уже проведённые деньги. */
+  canOverride: boolean;
 }) {
   const [rows, setRows] = useState<Record<string, Row>>(() =>
     Object.fromEntries(
@@ -36,6 +39,7 @@ export default function Journal({
   );
 
   const present = Object.values(rows).filter((r) => r.present).length;
+  const frozenCount = roster.filter((r) => r.locked && !canOverride).length;
   const likely = roster.filter(expected);
   const rest = roster.filter((r) => !expected(r));
   const split = likely.length > 0 && rest.length > 0;
@@ -62,6 +66,32 @@ export default function Journal({
   function line(r: RosterRow) {
     const row = rows[r.participant_id];
     const m = moneyFor(r);
+    const frozen = r.locked && !canOverride;
+
+    // Проведённые деньги показываем как есть, без переключателей.
+    if (frozen) {
+      const text = r.cash ? 'оплачено налом'
+        : r.paid ? 'оплачено картой'
+        : r.on_pass ? 'по абонементу'
+        : `не оплачено · ${price}`;
+      return (
+        <div className="mark" key={r.participant_id} style={{ opacity: 0.75 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className={row.present ? 'nm' : 'nm-off'}>{r.who}</div>
+            <div className={r.cash || r.paid || r.on_pass ? 'money' : 'money-due'}>
+              {text} · записано
+            </div>
+          </div>
+          <div className={row.present ? 'dot-on' : 'dot-off'} aria-label="записано, изменить нельзя">
+            {row.present && (
+              <svg viewBox="0 0 24 24">
+                <path d="M4 12.5 L9.5 18 L20 6" />
+              </svg>
+            )}
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="mark" key={r.participant_id}>
         <input type="hidden" name={`mark:${r.participant_id}`} value={row.present ? 'present' : 'absent'} />
@@ -122,6 +152,12 @@ export default function Journal({
       <button className="btn-wide" type="submit" style={{ marginTop: 14 }}>
         {saved ? 'Пересохранить' : 'Сохранить'} · отмечено {present}
       </button>
+      {frozenCount > 0 && (
+        <p className="hint" style={{ marginTop: 12 }}>
+          {frozenCount === 1 ? 'Одна строка записана' : `Записанных строк: ${frozenCount}`}.
+          Деньги по ним уже проведены, изменить может только Дима.
+        </p>
+      )}
     </form>
   );
 }

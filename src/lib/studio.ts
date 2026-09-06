@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg';
 import { one, query, tx } from './db';
+import { logMoneyIn } from './ledger';
 
 export type AttendanceStatus = 'present' | 'absent' | 'sick' | 'trial';
 
@@ -85,55 +86,88 @@ export type Mark = { participantId: string; status: AttendanceStatus; cash?: boo
  * присутствие заводит начисление, оно либо садится на абонемент,
  * либо остаётся долгом. Остальные статусы начисления снимают.
  */
+export type SaveActor = { id: string; canOverride: boolean };
+
+export type SaveResult = {
+  present: number;
+  onPass: number;
+  toDebt: number;
+  cash: number;
+  /** Строки, которые не тронули: деньги по ним уже проведены. */
+  locked: number;
+};
+
 export async function saveAttendance(
   sessionId: string,
   marks: Mark[],
-  markedBy: string,
-): Promise<{ present: number; onPass: number; toDebt: number; cash: number }> {
+  actor: SaveActor,
+): Promise<SaveResult> {
   const { amount, currency } = await lessonPrice();
 
   return tx(async (c) => {
-    const stat = { present: 0, onPass: 0, toDebt: 0, cash: 0 };
+    const stat: SaveResult = { present: 0, onPass: 0, toDebt: 0, cash: 0, locked: 0 };
 
     for (const mark of marks) {
+      const existing = await c.query<{
+        id: string; owner_id: string; pass_id: string | null; payment_id: string | null;
+      }>(
+        'select id, owner_id, pass_id, payment_id from charges where session_id = $1 and participant_id = $2 for update',
+        [sessionId, mark.participantId],
+      );
+      let charge = existing.rows[0];
+
+      // Проведённые деньги правит только суперадмин: иначе оплату можно
+      // было бы стереть задним числом, и следа бы не осталось.
+      if (charge && !actor.canOverride) {
+        stat.locked++;
+        continue;
+      }
+
       await c.query(
         `insert into attendance (session_id, participant_id, status, marked_by)
          values ($1, $2, $3, $4)
          on conflict (session_id, participant_id)
          do update set status = excluded.status, marked_by = excluded.marked_by, marked_at = now()`,
-        [sessionId, mark.participantId, mark.status, markedBy],
+        [sessionId, mark.participantId, mark.status, actor.id],
       );
 
       if (mark.status !== 'present') {
-        await dropCashPayment(c, sessionId, mark.participantId);
-        await c.query(
-          `delete from charges
-            where session_id = $1 and participant_id = $2 and payment_id is null`,
-          [sessionId, mark.participantId],
-        );
+        if (charge) {
+          const wasCash = await dropCashPayment(c, sessionId, mark.participantId, actor.id);
+          const { rowCount } = await c.query(
+            `delete from charges where id = $1 and payment_id is null`, [charge.id]);
+          if (rowCount) {
+            await logMoneyIn(c, {
+              kind: 'charge_removed', actorId: actor.id, ownerId: charge.owner_id,
+              participantId: mark.participantId, sessionId, chargeId: charge.id,
+              amount, currency, note: wasCash ? 'снята отметка, наличные отменены' : 'снята отметка',
+            });
+          }
+        }
         continue;
       }
 
       stat.present++;
 
-      // Начисление заводим один раз, дальше только пересобираем оплату.
-      const existing = await c.query<{ id: string; owner_id: string; pass_id: string | null; payment_id: string | null }>(
-        'select id, owner_id, pass_id, payment_id from charges where session_id = $1 and participant_id = $2',
-        [sessionId, mark.participantId],
-      );
-
-      let charge = existing.rows[0];
       if (!charge) {
         const owner = await ownerFor(c, mark.participantId);
         if (!owner) continue;
         const passId = mark.cash ? null : await pickPass(c, owner);
-        const inserted = await c.query<{ id: string; owner_id: string; pass_id: string | null; payment_id: string | null }>(
+        const inserted = await c.query<{
+          id: string; owner_id: string; pass_id: string | null; payment_id: string | null;
+        }>(
           `insert into charges (participant_id, session_id, owner_id, amount, currency, pass_id)
            values ($1, $2, $3, $4, $5, $6)
            returning id, owner_id, pass_id, payment_id`,
           [mark.participantId, sessionId, owner, amount, currency, passId],
         );
         charge = inserted.rows[0];
+        await logMoneyIn(c, {
+          kind: passId ? 'charge_on_pass' : 'charge_created',
+          actorId: actor.id, ownerId: owner, participantId: mark.participantId,
+          sessionId, chargeId: charge.id, passId, amount, currency,
+          note: passId ? 'списано с абонемента' : 'занятие в долг',
+        });
       }
 
       if (mark.cash) {
@@ -144,23 +178,33 @@ export async function saveAttendance(
             [charge.owner_id, amount, currency],
           );
           await c.query('update charges set payment_id = $2, pass_id = null where id = $1', [
-            charge.id,
-            pay.rows[0].id,
+            charge.id, pay.rows[0].id,
           ]);
+          await logMoneyIn(c, {
+            kind: 'cash_taken', actorId: actor.id, ownerId: charge.owner_id,
+            participantId: mark.participantId, sessionId, chargeId: charge.id,
+            paymentId: pay.rows[0].id, amount, currency, note: 'приняты наличные, 1 занятие',
+          });
         }
         stat.cash++;
         continue;
       }
 
-      // Наличные сняли — платёж убираем и заново смотрим на абонемент.
       if (charge.payment_id) {
-        const wasCash = await dropCashPayment(c, sessionId, mark.participantId);
+        const wasCash = await dropCashPayment(c, sessionId, mark.participantId, actor.id);
         if (wasCash) {
           const passId = await pickPass(c, charge.owner_id);
           await c.query('update charges set pass_id = $2 where id = $1', [charge.id, passId]);
           charge = { ...charge, pass_id: passId, payment_id: null };
+          if (passId) {
+            await logMoneyIn(c, {
+              kind: 'charge_on_pass', actorId: actor.id, ownerId: charge.owner_id,
+              participantId: mark.participantId, sessionId, chargeId: charge.id,
+              passId, amount, currency, note: 'после отмены наличных списано с абонемента',
+            });
+          }
         } else {
-          continue; // оплачено картой, не трогаем
+          continue;
         }
       }
 
@@ -181,6 +225,7 @@ async function dropCashPayment(
   c: PoolClient,
   sessionId: string,
   participantId: string,
+  actorId: string,
 ): Promise<boolean> {
   const { rows } = await c.query<{ payment_id: string }>(
     `select ch.payment_id from charges ch
@@ -193,6 +238,10 @@ async function dropCashPayment(
     sessionId,
     participantId,
   ]);
+  await logMoneyIn(c, {
+    kind: 'cash_reverted', actorId, participantId, sessionId,
+    paymentId: rows[0].payment_id, note: 'наличные отменены',
+  });
   await c.query('delete from payments where id = $1', [rows[0].payment_id]);
   return true;
 }
@@ -464,6 +513,8 @@ export type RosterRow = {
   cash: boolean;
   booked: boolean;
   preferred: boolean;
+  /** Деньги уже проведены: менять может только суперадмин. */
+  locked: boolean;
 };
 
 export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
@@ -496,6 +547,7 @@ export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
             (c.pass_id is not null) as on_pass,
             (c.payment_id is not null) as paid,
             coalesce((select p.provider = 'cash' from payments p where p.id = c.payment_id), false) as cash,
+            (c.id is not null) as locked,
             coalesce(b.status = 'booked', false) as booked,
             (pd.weekday is not null) as preferred
        from owned o
@@ -911,6 +963,15 @@ export async function issuePass(input: IssuePassInput, byUser: string): Promise<
     );
     const passId = pass.rows[0].id;
 
+    await logMoneyIn(c, {
+      kind: 'pass_issued', actorId: byUser, ownerId: input.ownerId,
+      passId, paymentId, amount: amount * input.lessons, currency,
+      note: `абонемент на ${input.lessons} занятий, ${
+        input.paid === 'cash' ? 'наличными' : input.paid === 'transfer' ? 'переводом' : 'не оплачен'
+      }`,
+      details: { lessons: input.lessons, months: input.months, paid: input.paid },
+    });
+
     let covered = 0;
     if (input.coverDebt) {
       const debts = await c.query<{ id: string }>(
@@ -923,6 +984,10 @@ export async function issuePass(input: IssuePassInput, byUser: string): Promise<
       );
       for (const row of debts.rows) {
         await c.query('update charges set pass_id = $2 where id = $1', [row.id, passId]);
+        await logMoneyIn(c, {
+          kind: 'pass_covered_debt', actorId: byUser, ownerId: input.ownerId,
+          chargeId: row.id, passId, amount, currency, note: 'старое занятие закрыто абонементом',
+        });
         covered++;
       }
     }

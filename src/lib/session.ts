@@ -87,3 +87,8 @@ export function canTeach(user: CurrentUser): boolean {
 export function isAdmin(user: CurrentUser): boolean {
   return user.roles.some((r) => r === 'admin' || r === 'superadmin');
 }
+
+/** Только суперадмин трогает уже проведённые деньги. */
+export function isSuperadmin(user: CurrentUser): boolean {
+  return user.roles.includes('superadmin');
+}

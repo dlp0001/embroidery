@@ -1,4 +1,5 @@
 import { one, query, tx } from './db';
+import { logMoneyIn } from './ledger';
 import { createPaymentLink, isConfigured } from './payplus';
 import { lessonPrice } from './studio';
 
@@ -122,6 +123,13 @@ export async function applyPayment(paymentId: string, transactionUid: string | n
       `update payments set status = 'paid', provider_id = coalesce($2, provider_id) where id = $1`,
       [p.id, transactionUid],
     );
+    await logMoneyIn(c, {
+      kind: 'payment_paid', actorId: null, ownerId: p.user_id, paymentId: p.id,
+      amount: p.amount, currency: p.currency,
+      note: p.purpose === 'studio_pass' ? 'оплачен абонемент'
+        : p.purpose === 'studio_debt' ? 'оплачен долг' : 'проверочный платёж',
+      details: { provider: 'payplus', transaction: transactionUid },
+    });
 
     // Проверочный платёж ничего не выдаёт: он нужен только чтобы
     // убедиться, что деньги доходят и обратный вызов срабатывает.
@@ -130,11 +138,19 @@ export async function applyPayment(paymentId: string, transactionUid: string | n
     if (p.purpose === 'studio_debt') {
       const ids = (p.raw?.charge_ids as string[] | undefined) ?? [];
       if (ids.length > 0) {
-        await c.query(
+        const { rows: settled } = await c.query<{ id: string }>(
           `update charges set payment_id = $1
-            where id = any($2::uuid[]) and pass_id is null and payment_id is null`,
+            where id = any($2::uuid[]) and pass_id is null and payment_id is null
+            returning id`,
           [p.id, ids],
         );
+        for (const row of settled) {
+          await logMoneyIn(c, {
+            kind: 'payment_paid', actorId: null, ownerId: p.user_id,
+            chargeId: row.id, paymentId: p.id, amount: null, currency: p.currency,
+            note: 'занятие закрыто картой',
+          });
+        }
       }
       return;
     }
@@ -143,11 +159,18 @@ export async function applyPayment(paymentId: string, transactionUid: string | n
       const lessons = Number(p.raw?.lessons ?? 0);
       const months = Number(p.raw?.months ?? 3);
       if (lessons < 1) return;
-      await c.query(
+      const { rows: made } = await c.query<{ id: string }>(
         `insert into passes (owner_id, lessons_total, valid_from, valid_to, payment_id)
-         values ($1, $2, current_date, current_date + ($3 || ' months')::interval, $4)`,
+         values ($1, $2, current_date, current_date + ($3 || ' months')::interval, $4)
+         returning id`,
         [p.user_id, lessons, String(months), p.id],
       );
+      await logMoneyIn(c, {
+        kind: 'pass_issued', actorId: null, ownerId: p.user_id,
+        passId: made[0].id, paymentId: p.id, amount: p.amount, currency: p.currency,
+        note: `абонемент на ${lessons} занятий, оплачен картой`,
+        details: { lessons, months },
+      });
     }
   });
 }
