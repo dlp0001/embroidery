@@ -426,55 +426,6 @@ export type UpcomingRow = {
   booked: boolean;
 };
 
-export async function sessionsForUser(
-  userId: string,
-  from: string,
-  to: string,
-): Promise<UpcomingRow[]> {
-  return query<UpcomingRow>(
-    `select s.id as session_id, s.held_on::text, g.starts_at::text, g.id as group_id,
-            g.title as group_title, p.id as participant_id,
-            coalesce(c.name, u.name, 'Я') as who,
-            (b.id is not null and b.status = 'booked') as booked
-       from studio_members m
-       join participants p on p.id = m.participant_id
-       join studio_groups g on g.id = m.group_id
-       join studio_sessions s on s.group_id = g.id
-       left join children c on c.id = p.child_id
-       left join users u on u.id = p.user_id
-       left join bookings b on b.session_id = s.id and b.participant_id = p.id
-      where (p.user_id = $1 or p.child_id in (select child_id from guardians where user_id = $1))
-        and m.left_at is null
-        and s.held_on >= $2::date and s.held_on <= $3::date
-        and s.status <> 'cancelled'
-      order by s.held_on, g.starts_at`,
-    [userId, from, to],
-  );
-}
-
-export async function upcomingForUser(userId: string, days = 7): Promise<UpcomingRow[]> {
-  return query<UpcomingRow>(
-    `select s.id as session_id, s.held_on::text, g.starts_at::text, g.id as group_id,
-            g.title as group_title, p.id as participant_id,
-            coalesce(c.name, u.name, 'Я') as who,
-            (b.id is not null and b.status = 'booked') as booked
-       from studio_members m
-       join participants p on p.id = m.participant_id
-       join studio_groups g on g.id = m.group_id
-       join studio_sessions s on s.group_id = g.id
-       left join children c on c.id = p.child_id
-       left join users u on u.id = p.user_id
-       left join bookings b on b.session_id = s.id and b.participant_id = p.id
-      where (p.user_id = $1 or p.child_id in (select child_id from guardians where user_id = $1))
-        and m.left_at is null
-        and s.held_on >= current_date
-        and s.held_on < current_date + ($2 || ' days')::interval
-        and s.status <> 'cancelled'
-      order by s.held_on, g.starts_at`,
-    [userId, String(days)],
-  );
-}
-
 export async function setBooking(
   sessionId: string,
   participantId: string,
@@ -512,8 +463,16 @@ export async function teacherSessions(teacherId: string | null): Promise<Teacher
   return query<TeacherSession>(
     `select s.id as session_id, g.id as group_id, g.title as group_title,
             s.held_on::text, g.starts_at::text, s.status,
-            (select count(*)::int from studio_members m
-              where m.group_id = g.id and m.left_at is null) as people,
+            (select count(*)::int
+               from participants p
+              where ((g.audience = 'adults' and p.user_id is not null)
+                  or (g.audience = 'kids' and p.child_id is not null))
+                and (exists (select 1 from preferred_days pd
+                              where pd.participant_id = p.id
+                                and pd.weekday = extract(isodow from s.held_on)::int)
+                  or exists (select 1 from bookings b
+                              where b.session_id = s.id and b.participant_id = p.id
+                                and b.status = 'booked'))) as people,
             (select count(*)::int from attendance a where a.session_id = s.id) as marked
        from studio_sessions s
        join studio_groups g on g.id = s.group_id
@@ -535,13 +494,14 @@ export async function nextSessions(teacherId: string | null): Promise<TeacherSes
         where ($1::uuid is null or g.teacher_id = $1)
           and s.held_on > current_date
           and s.status <> 'cancelled'
-          and exists (select 1 from studio_members m
-                       where m.group_id = g.id and m.left_at is null)
      )
      select s.id as session_id, g.id as group_id, g.title as group_title,
             s.held_on::text, g.starts_at::text, s.status,
-            (select count(*)::int from studio_members m
-              where m.group_id = g.id and m.left_at is null) as people,
+            (select count(*)::int from participants p
+              where ((g.audience = 'adults' and p.user_id is not null)
+                  or (g.audience = 'kids' and p.child_id is not null))
+                and exists (select 1 from preferred_days pd
+                             where pd.participant_id = p.id and pd.weekday = g.weekday)) as people,
             (select count(*)::int from attendance a where a.session_id = s.id) as marked
        from studio_sessions s
        join studio_groups g on g.id = s.group_id
@@ -558,8 +518,11 @@ export async function unclosedBefore(teacherId: string | null): Promise<TeacherS
   return query<TeacherSession>(
     `select s.id as session_id, g.id as group_id, g.title as group_title,
             s.held_on::text, g.starts_at::text, s.status,
-            (select count(*)::int from studio_members m
-              where m.group_id = g.id and m.left_at is null) as people,
+            (select count(*)::int from participants p
+              where ((g.audience = 'adults' and p.user_id is not null)
+                  or (g.audience = 'kids' and p.child_id is not null))
+                and exists (select 1 from preferred_days pd
+                             where pd.participant_id = p.id and pd.weekday = g.weekday)) as people,
             0 as marked
        from studio_sessions s
        join studio_groups g on g.id = s.group_id
@@ -568,7 +531,6 @@ export async function unclosedBefore(teacherId: string | null): Promise<TeacherS
         and s.held_on > current_date - interval '30 days'
         and s.status <> 'cancelled'
         and not exists (select 1 from attendance a where a.session_id = s.id)
-        and exists (select 1 from studio_members m where m.group_id = g.id and m.left_at is null)
       order by s.held_on desc, g.starts_at`,
     [teacherId],
   );
@@ -591,22 +553,26 @@ export type RosterRow = {
 
 export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
   return query<RosterRow>(
-    `with roster as (
-       select m.participant_id, p.child_id, p.user_id,
-              coalesce(ch.name, u.name, 'Я') as who
-         from studio_sessions s
-         join studio_members m on m.group_id = s.group_id and m.left_at is null
-         join participants p on p.id = m.participant_id
-         left join children ch on ch.id = p.child_id
-         left join users u on u.id = p.user_id
+    `with ses as (
+       select s.id, g.audience, extract(isodow from s.held_on)::int as dow
+         from studio_sessions s join studio_groups g on g.id = s.group_id
         where s.id = $1
      ),
+     /* В журнале все, кто подходит занятию по типу: дети на детское,
+        взрослые на взрослое. Кого ждём, решают записи и дни, но это
+        только порядок в списке, а не право быть в нём. */
      owned as (
-       select r.*,
-              coalesce(r.user_id,
+       select p.id as participant_id,
+              coalesce(ch.name, u.name, 'Я') as who,
+              coalesce(p.user_id,
                        (select g.user_id from guardians g
-                         where g.child_id = r.child_id order by g.user_id limit 1)) as owner_id
-         from roster r
+                         where g.child_id = p.child_id order by g.user_id limit 1)) as owner_id
+         from participants p
+         cross join ses
+         left join children ch on ch.id = p.child_id
+         left join users u on u.id = p.user_id
+        where (ses.audience = 'adults' and p.user_id is not null)
+           or (ses.audience = 'kids' and p.child_id is not null)
      )
      select o.participant_id, o.who, o.owner_id,
             a.status,
@@ -618,19 +584,15 @@ export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
                      ) > 0, false) as has_pass,
             (c.pass_id is not null) as on_pass,
             (c.payment_id is not null) as paid,
-            coalesce((select p.provider = 'cash' from payments p where p.id = c.payment_id), false) as cash,
+            coalesce((select pay.provider = 'cash' from payments pay where pay.id = c.payment_id), false) as cash,
             (c.id is not null) as locked,
             coalesce(b.status = 'booked', false) as booked,
-            (pd.weekday is not null) as preferred
+            exists (select 1 from preferred_days pd cross join ses
+                     where pd.participant_id = o.participant_id and pd.weekday = ses.dow) as preferred
        from owned o
-       cross join studio_sessions ss
-       join studio_groups gg on gg.id = ss.group_id
        left join attendance a on a.session_id = $1 and a.participant_id = o.participant_id
        left join charges c on c.session_id = $1 and c.participant_id = o.participant_id
        left join bookings b on b.session_id = $1 and b.participant_id = o.participant_id
-       left join preferred_days pd
-              on pd.participant_id = o.participant_id and pd.weekday = gg.weekday
-      where ss.id = $1
       order by o.who`,
     [sessionId],
   );
@@ -693,13 +655,19 @@ export async function groupsOverview(teacherId: string | null) {
     starts_at: string; people: number; active_passes: number; audience: string;
   }>(
     `select g.id, g.title, g.age_hint, g.weekday, g.starts_at::text, g.audience,
-            (select count(*)::int from studio_members m where m.group_id = g.id and m.left_at is null) as people,
+            (select count(*)::int from participants p
+              where ((g.audience = 'adults' and p.user_id is not null)
+                  or (g.audience = 'kids' and p.child_id is not null))
+                and exists (select 1 from preferred_days pd
+                             where pd.participant_id = p.id and pd.weekday = g.weekday)) as people,
             (select count(distinct ps.id)::int
-               from studio_members m
-               join participants p on p.id = m.participant_id
+               from participants p
                left join guardians gd on gd.child_id = p.child_id
                join passes ps on ps.owner_id = coalesce(p.user_id, gd.user_id)
-              where m.group_id = g.id and m.left_at is null
+              where ((g.audience = 'adults' and p.user_id is not null)
+                  or (g.audience = 'kids' and p.child_id is not null))
+                and exists (select 1 from preferred_days pd
+                             where pd.participant_id = p.id and pd.weekday = g.weekday)
                 and (ps.valid_to is null or ps.valid_to >= current_date)
                 and (select count(*) from charges c2 where c2.pass_id = ps.id) < ps.lessons_total
             ) as active_passes
@@ -846,8 +814,11 @@ export async function allGroups(): Promise<GroupRow[]> {
   return query<GroupRow>(
     `select g.id, g.title, g.teacher_id, g.weekday, g.starts_at::text, g.duration_min,
             g.room, g.audience, g.age_hint, g.capacity, g.active,
-            (select count(*)::int from studio_members m
-              where m.group_id = g.id and m.left_at is null) as people
+            (select count(*)::int from participants p
+              where ((g.audience = 'adults' and p.user_id is not null)
+                  or (g.audience = 'kids' and p.child_id is not null))
+                and exists (select 1 from preferred_days pd
+                             where pd.participant_id = p.id and pd.weekday = g.weekday)) as people
        from studio_groups g
       order by g.active desc, g.weekday, g.starts_at`,
   );
@@ -917,8 +888,11 @@ export async function sessionsInRange(from: string, to: string): Promise<Calenda
     `select s.id as session_id, g.id as group_id, g.title as group_title,
             s.held_on::text, g.starts_at::text, s.status,
             (select count(*)::int from attendance a where a.session_id = s.id) as marked,
-            (select count(*)::int from studio_members m
-              where m.group_id = g.id and m.left_at is null) as people
+            (select count(*)::int from participants p
+              where ((g.audience = 'adults' and p.user_id is not null)
+                  or (g.audience = 'kids' and p.child_id is not null))
+                and exists (select 1 from preferred_days pd
+                             where pd.participant_id = p.id and pd.weekday = g.weekday)) as people
        from studio_sessions s
        join studio_groups g on g.id = s.group_id
       where s.held_on between $1::date and $2::date
@@ -1082,7 +1056,6 @@ export type FamilyChild = {
   child_id: string;
   participant_id: string;
   name: string;
-  groups: string[];
   days: number[];
 };
 
@@ -1092,7 +1065,6 @@ export type Family = {
   name: string | null;
   email: string;
   roles: string[];
-  own_groups: string[];
   own_days: number[];
   children: FamilyChild[];
 };
@@ -1104,10 +1076,6 @@ export async function families(): Promise<Family[]> {
             (select p.id from participants p where p.user_id = u.id) as participant_id,
             coalesce((select array_agg(r.role order by r.role) from user_roles r
                        where r.user_id = u.id), '{}') as roles,
-            coalesce((select array_agg(m.group_id::text)
-                        from studio_members m
-                        join participants p on p.id = m.participant_id
-                       where p.user_id = u.id and m.left_at is null), '{}') as own_groups,
             coalesce((select array_agg(pd.weekday order by pd.weekday)
                         from preferred_days pd
                         join participants p on p.id = pd.participant_id
@@ -1117,9 +1085,6 @@ export async function families(): Promise<Family[]> {
                        'child_id', ch.id,
                        'participant_id', p.id,
                        'name', ch.name,
-                       'groups', coalesce((select array_agg(m.group_id::text)
-                                             from studio_members m
-                                            where m.participant_id = p.id and m.left_at is null), '{}'),
                        'days', coalesce((select array_agg(pd.weekday order by pd.weekday)
                                            from preferred_days pd
                                           where pd.participant_id = p.id), '{}')
@@ -1182,21 +1147,3 @@ export async function removeChild(childId: string): Promise<{ ok: boolean; reaso
   return { ok: true };
 }
 
-export async function setMembership(
-  participantId: string,
-  groupId: string,
-  member: boolean,
-): Promise<void> {
-  if (member) {
-    await query(
-      `insert into studio_members (group_id, participant_id) values ($1, $2)
-       on conflict (group_id, participant_id) do update set left_at = null`,
-      [groupId, participantId],
-    );
-  } else {
-    await query(
-      'update studio_members set left_at = current_date where group_id = $1 and participant_id = $2',
-      [groupId, participantId],
-    );
-  }
-}

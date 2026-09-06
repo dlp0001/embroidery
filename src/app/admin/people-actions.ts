@@ -4,8 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { isAdmin, requireUser } from '@/lib/session';
 import {
-  addChildTo, createParent, removeChild, renameChildById, renameUser, setMembership,
-  setPreferredDay,
+  addChildTo, createParent, removeChild, renameChildById, renameUser, setPreferredDay,
 } from '@/lib/studio';
 
 async function requireAdmin() {
@@ -66,15 +65,6 @@ export async function removeChildAction(form: FormData): Promise<void> {
   redirect('/admin/studio/people');
 }
 
-export async function toggleMembershipAction(form: FormData): Promise<void> {
-  await requireAdmin();
-  await setMembership(
-    String(form.get('participantId')),
-    String(form.get('groupId')),
-    String(form.get('member')) === '1',
-  );
-  refresh();
-}
 
 /** Приоритетные дни правит и админ, не только сам родитель. */
 export async function toggleDayAction(form: FormData): Promise<void> {

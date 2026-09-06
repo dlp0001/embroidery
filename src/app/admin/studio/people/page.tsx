@@ -1,10 +1,10 @@
 import { isAdmin, requireTeacher } from '@/lib/session';
-import { allGroups, families } from '@/lib/studio';
-import { hhmm, plural } from '@/lib/format';
+import { families } from '@/lib/studio';
+import { plural } from '@/lib/format';
 import Toggles from '@/components/Toggles';
 import {
   addChildAction, createParentAction, removeChildAction, renameChildAction,
-  renameUserAction, toggleDayAction, toggleMembershipAction,
+  renameUserAction, toggleDayAction,
 } from '@/app/admin/people-actions';
 
 export const dynamic = 'force-dynamic';
@@ -17,7 +17,6 @@ function DayRow({ participantId, days }: { participantId: string | null; days: n
   if (!participantId) return null;
   return (
     <>
-      <div className="hint" style={{ marginTop: 12 }}>Обычно ходит по дням</div>
       <Toggles
         items={WEEK.map((n) => ({ id: String(n), label: WD[n] }))}
         active={days.map(String)}
@@ -33,29 +32,6 @@ const inline: React.CSSProperties = {
   flex: 1, minWidth: 0, border: 0, borderBottom: '1.5px solid transparent',
   background: 'none', outline: 'none', padding: '4px 0',
 };
-
-/** Переключатель участия в группе: одна кнопка на группу. */
-function GroupChips({
-  participantId,
-  groups,
-  current,
-}: {
-  participantId: string | null;
-  groups: { id: string; title: string; weekday: number; starts_at: string }[];
-  current: string[];
-}) {
-  if (!participantId) return null;
-  return (
-    <Toggles
-      items={groups.map((g) => ({ id: g.id, label: `${g.title} · ${WD[g.weekday]} ${hhmm(g.starts_at)}` }))}
-      active={current}
-      action={toggleMembershipAction}
-      fields={{ participantId }}
-      itemField="groupId"
-      size="wide"
-    />
-  );
-}
 
 export default async function PeoplePage({
   searchParams,
@@ -78,10 +54,7 @@ export default async function PeoplePage({
   }
 
   const { error, add } = await searchParams;
-  const [list, groups] = await Promise.all([families(), allGroups()]);
-  const active = groups.filter((g) => g.active);
-  const kidGroups = active.filter((g) => g.audience === 'kids');
-  const adultGroups = active.filter((g) => g.audience === 'adults');
+  const list = await families();
 
   return (
     <>
@@ -128,13 +101,8 @@ export default async function PeoplePage({
             </form>
             <div className="sub">{f.email}{f.roles.length ? ` · ${f.roles.join(', ')}` : ''}</div>
 
-            {adultGroups.length > 0 && (
-              <>
-                <div className="lbl" style={{ margin: '16px 0 0' }}>Ходит сам</div>
-                <GroupChips participantId={f.participant_id} groups={adultGroups} current={f.own_groups} />
-                <DayRow participantId={f.participant_id} days={f.own_days ?? []} />
-              </>
-            )}
+            <div className="lbl" style={{ margin: '16px 0 0' }}>Ходит сам</div>
+            <DayRow participantId={f.participant_id} days={f.own_days ?? []} />
 
             <div className="lbl" style={{ margin: '18px 0 0' }}>
               Дети: {f.children.length}&nbsp;{plural(f.children.length, 'ребёнок', 'ребёнка', 'детей')}
@@ -154,7 +122,6 @@ export default async function PeoplePage({
                     <button className="btn-quiet" type="submit" aria-label={`Удалить ${ch.name}`}>×</button>
                   </form>
                 </div>
-                <GroupChips participantId={ch.participant_id} groups={kidGroups} current={ch.groups} />
                 <DayRow participantId={ch.participant_id} days={ch.days ?? []} />
               </div>
             ))}
@@ -173,9 +140,9 @@ export default async function PeoplePage({
         {list.length === 0 && <p className="hint" style={{ marginTop: 20 }}>Пока никого нет.</p>}
 
         <p className="hint" style={{ marginTop: 18 }}>
-          Нажатие на группу добавляет или убирает участие. Дни — это те, в которые
-          человек обычно приходит: по ним журнал делит состав на «ждём» и «остальные».
-          Ребёнка с посещениями удалить нельзя, уберите его из групп.
+          Дни — это те, в которые человек обычно приходит. По ним он попадает в журнал
+          нужного занятия и в раздел «ждём». На конкретное занятие родитель записывается
+          сам, в своём кабинете. Ребёнка с посещениями удалить нельзя.
         </p>
       </div>
     </>
