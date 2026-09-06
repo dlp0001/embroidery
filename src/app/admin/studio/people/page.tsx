@@ -4,12 +4,30 @@ import { hhmm, plural } from '@/lib/format';
 import Toggles from '@/components/Toggles';
 import {
   addChildAction, createParentAction, removeChildAction, renameChildAction,
-  renameUserAction, toggleMembershipAction,
+  renameUserAction, toggleDayAction, toggleMembershipAction,
 } from '@/app/admin/people-actions';
 
 export const dynamic = 'force-dynamic';
 
 const WD = ['', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+const WEEK = [1, 2, 3, 4, 5, 6, 7];
+
+/** Дни, в которые человек обычно ходит: подсвечивают его в журнале. */
+function DayRow({ participantId, days }: { participantId: string | null; days: number[] }) {
+  if (!participantId) return null;
+  return (
+    <>
+      <div className="hint" style={{ marginTop: 12 }}>Обычно ходит по дням</div>
+      <Toggles
+        items={WEEK.map((n) => ({ id: String(n), label: WD[n] }))}
+        active={days.map(String)}
+        action={toggleDayAction}
+        fields={{ participantId }}
+        itemField="weekday"
+      />
+    </>
+  );
+}
 
 const inline: React.CSSProperties = {
   flex: 1, minWidth: 0, border: 0, borderBottom: '1.5px solid transparent',
@@ -114,6 +132,7 @@ export default async function PeoplePage({
               <>
                 <div className="lbl" style={{ margin: '16px 0 0' }}>Ходит сам</div>
                 <GroupChips participantId={f.participant_id} groups={adultGroups} current={f.own_groups} />
+                <DayRow participantId={f.participant_id} days={f.own_days ?? []} />
               </>
             )}
 
@@ -136,6 +155,7 @@ export default async function PeoplePage({
                   </form>
                 </div>
                 <GroupChips participantId={ch.participant_id} groups={kidGroups} current={ch.groups} />
+                <DayRow participantId={ch.participant_id} days={ch.days ?? []} />
               </div>
             ))}
 
@@ -153,8 +173,9 @@ export default async function PeoplePage({
         {list.length === 0 && <p className="hint" style={{ marginTop: 20 }}>Пока никого нет.</p>}
 
         <p className="hint" style={{ marginTop: 18 }}>
-          Нажатие на группу добавляет или убирает участие. Ребёнка с посещениями
-          удалить нельзя — уберите его из групп.
+          Нажатие на группу добавляет или убирает участие. Дни — это те, в которые
+          человек обычно приходит: по ним журнал делит состав на «ждём» и «остальные».
+          Ребёнка с посещениями удалить нельзя, уберите его из групп.
         </p>
       </div>
     </>

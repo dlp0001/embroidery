@@ -1083,6 +1083,7 @@ export type FamilyChild = {
   participant_id: string;
   name: string;
   groups: string[];
+  days: number[];
 };
 
 export type Family = {
@@ -1092,6 +1093,7 @@ export type Family = {
   email: string;
   roles: string[];
   own_groups: string[];
+  own_days: number[];
   children: FamilyChild[];
 };
 
@@ -1106,6 +1108,10 @@ export async function families(): Promise<Family[]> {
                         from studio_members m
                         join participants p on p.id = m.participant_id
                        where p.user_id = u.id and m.left_at is null), '{}') as own_groups,
+            coalesce((select array_agg(pd.weekday order by pd.weekday)
+                        from preferred_days pd
+                        join participants p on p.id = pd.participant_id
+                       where p.user_id = u.id), '{}') as own_days,
             coalesce((
               select json_agg(json_build_object(
                        'child_id', ch.id,
@@ -1113,7 +1119,10 @@ export async function families(): Promise<Family[]> {
                        'name', ch.name,
                        'groups', coalesce((select array_agg(m.group_id::text)
                                              from studio_members m
-                                            where m.participant_id = p.id and m.left_at is null), '{}')
+                                            where m.participant_id = p.id and m.left_at is null), '{}'),
+                       'days', coalesce((select array_agg(pd.weekday order by pd.weekday)
+                                           from preferred_days pd
+                                          where pd.participant_id = p.id), '{}')
                      ) order by ch.name)
                 from guardians g
                 join children ch on ch.id = g.child_id
