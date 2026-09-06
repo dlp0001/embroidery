@@ -27,14 +27,15 @@ if (!local && !process.argv.includes('--allow-remote')) {
 }
 
 /**
- * Кого оставляем. Почты Вари и Димы в локальной и боевой базах разные, а
- * учёток у каждого по нескольку, и какая останется навсегда — ещё не
- * решено. Поэтому здесь перечислены все, а чистка этот вопрос не решает.
+ * Кого оставляем. Почты Вари и Димы в локальной и боевой базах разные,
+ * поэтому здесь перечислены обе пары. Вторая учётка Димы на боевой,
+ * dmitriy@perlin.ru, в списке не значится: её решено удалить, чтобы Дима
+ * остался в одном экземпляре.
  * Список можно задать явно: --keep кто@то,ещё@кто-то
  */
 const DEFAULT_KEEP = [
   'varya@re-create.art', 'acidophline@gmail.com',
-  'id@perlin.ru', 'dmitriy@perlin.ru', 'dmitriy.perlin@gmail.com',
+  'id@perlin.ru', 'dmitriy.perlin@gmail.com',
 ];
 
 const keepArg = process.argv.find((a) => a.startsWith('--keep='));
