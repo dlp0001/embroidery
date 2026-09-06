@@ -17,8 +17,11 @@
     "payplus:methods": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.production.local scripts/payplus-methods.mjs",
     "visits": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.production.local scripts/test-visits.mjs",
     "reset:local": "node --env-file-if-exists=.env.local scripts/reset-local.mjs",
+    "reset:prod": "node --env-file-if-exists=.env.production.local scripts/reset-local.mjs --allow-remote",
     "payments": "node --env-file-if-exists=.env.local scripts/payment-check.mjs",
-    "payments:prod": "node --env-file-if-exists=.env.production.local scripts/payment-check.mjs"
+    "payments:prod": "node --env-file-if-exists=.env.production.local scripts/payment-check.mjs",
+    "inventory": "node --env-file-if-exists=.env.local scripts/db-inventory.mjs",
+    "inventory:prod": "node --env-file-if-exists=.env.production.local scripts/db-inventory.mjs"
   },
   "dependencies": {
     "googleapis": "^140.0.0",

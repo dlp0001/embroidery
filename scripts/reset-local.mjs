@@ -1,13 +1,15 @@
 #!/usr/bin/env node
-// Чистит локальную базу под ноль, оставляя только Варю и Диму: их учётки,
-// роли и открытые входы. Всё остальное — дети, семьи, группы, занятия,
-// деньги и реестр — удаляется. Цены в settings остаются.
+// Чистит базу под ноль, оставляя только Варю и Диму: их учётки, роли и
+// открытые входы. Всё остальное — дети, семьи, группы, занятия, деньги и
+// реестр — удаляется. Цены в settings остаются.
 //
 //   npm run reset:local            — показать, что уйдёт, ничего не трогая
 //   npm run reset:local -- --yes   — удалить
+//   npm run reset:prod             — то же самое для боевой базы
 //
-// Работает только с базой на localhost. Боевую базу трогать нельзя, и
-// скрипт это проверяет сам, а не полагается на внимательность.
+// По умолчанию скрипт работает только с базой на localhost, чтобы боевую
+// нельзя было задеть по невнимательности. Для неё нужен явный флаг
+// --allow-remote: он стоит в reset:prod и случайно не окажется нигде ещё.
 
 import pg from 'pg';
 
@@ -18,22 +20,33 @@ if (!url) {
 }
 
 const host = new URL(url).hostname;
-if (host !== 'localhost' && host !== '127.0.0.1' && host !== '::1') {
-  console.error(`База не локальная (${host}). Скрипт работает только с localhost.`);
+const local = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+if (!local && !process.argv.includes('--allow-remote')) {
+  console.error(`База не локальная (${host}). Без флага --allow-remote скрипт её не тронет.`);
   process.exit(1);
 }
 
-/** Кого оставляем. Всё, что не отсюда, будет удалено. */
-const KEEP = [
-  'varya@re-create.art',
-  // Учёток Димы две, и какая из них останется навсегда — ещё не решено,
-  // поэтому чистка этот вопрос не решает: остаются обе.
-  'id@perlin.ru',
-  'dmitriy.perlin@gmail.com',
+/**
+ * Кого оставляем. Почты Вари и Димы в локальной и боевой базах разные, а
+ * учёток у каждого по нескольку, и какая останется навсегда — ещё не
+ * решено. Поэтому здесь перечислены все, а чистка этот вопрос не решает.
+ * Список можно задать явно: --keep кто@то,ещё@кто-то
+ */
+const DEFAULT_KEEP = [
+  'varya@re-create.art', 'acidophline@gmail.com',
+  'id@perlin.ru', 'dmitriy@perlin.ru', 'dmitriy.perlin@gmail.com',
 ];
 
+const keepArg = process.argv.find((a) => a.startsWith('--keep='));
+const KEEP = keepArg
+  ? keepArg.slice(7).split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+  : DEFAULT_KEEP;
+
 const apply = process.argv.includes('--yes');
-const pool = new pg.Pool({ connectionString: url });
+const pool = new pg.Pool(
+  local ? { connectionString: url } : { connectionString: url, ssl: { rejectUnauthorized: true } },
+);
+if (!local) console.log(`База не локальная: ${host}\n`);
 
 // Порядок важен только там, где нет каскада; лишний delete не мешает.
 const WIPE = [
@@ -69,9 +82,13 @@ try {
     if (rows[0].n > 0) console.log(`  ${t}: ${rows[0].n}`);
   }
 
-  if (keep.length === 0) process.exit(1);
+  if (keep.length === 0) {
+    console.error('\nНи одна из перечисленных почт в базе не нашлась. Так чистить нельзя.');
+    process.exit(1);
+  }
   if (!apply) {
-    console.log('\nЭто был просмотр. Чтобы удалить: npm run reset:local -- --yes');
+    const cmd = local ? 'npm run reset:local -- --yes' : 'npm run reset:prod -- --yes';
+    console.log(`\nЭто был просмотр, база не изменилась. Чтобы удалить: ${cmd}`);
     process.exit(0);
   }
 
