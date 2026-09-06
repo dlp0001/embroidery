@@ -952,3 +952,119 @@ export async function allActivePasses(): Promise<PassRow[]> {
       order by p.valid_to nulls last, coalesce(u.name, u.email)`,
   );
 }
+
+// ── Люди: семьи, дети, состав групп ───────────────────────
+
+export type FamilyChild = {
+  child_id: string;
+  participant_id: string;
+  name: string;
+  groups: string[];
+};
+
+export type Family = {
+  user_id: string;
+  participant_id: string | null;
+  name: string | null;
+  email: string;
+  roles: string[];
+  own_groups: string[];
+  children: FamilyChild[];
+};
+
+/** Все взрослые с детьми и составом групп. */
+export async function families(): Promise<Family[]> {
+  const rows = await query<Family>(
+    `select u.id as user_id, u.name, u.email,
+            (select p.id from participants p where p.user_id = u.id) as participant_id,
+            coalesce((select array_agg(r.role order by r.role) from user_roles r
+                       where r.user_id = u.id), '{}') as roles,
+            coalesce((select array_agg(m.group_id::text)
+                        from studio_members m
+                        join participants p on p.id = m.participant_id
+                       where p.user_id = u.id and m.left_at is null), '{}') as own_groups,
+            coalesce((
+              select json_agg(json_build_object(
+                       'child_id', ch.id,
+                       'participant_id', p.id,
+                       'name', ch.name,
+                       'groups', coalesce((select array_agg(m.group_id::text)
+                                             from studio_members m
+                                            where m.participant_id = p.id and m.left_at is null), '{}')
+                     ) order by ch.name)
+                from guardians g
+                join children ch on ch.id = g.child_id
+                left join participants p on p.child_id = ch.id
+               where g.user_id = u.id), '[]') as children
+       from users u
+      where exists (select 1 from guardians g where g.user_id = u.id)
+         or exists (select 1 from user_roles r where r.user_id = u.id
+                     and r.role in ('parent', 'student'))
+      order by coalesce(u.name, u.email)`,
+  );
+  return rows.map((r) => ({ ...r, children: r.children ?? [] }));
+}
+
+export async function createParent(email: string, name: string): Promise<string> {
+  const row = await one<{ id: string }>(
+    `insert into users (email, name) values ($1, $2)
+     on conflict (email) do update set name = coalesce(excluded.name, users.name)
+     returning id`,
+    [email.trim().toLowerCase(), name.trim() || null],
+  );
+  await query(`insert into user_roles (user_id, role) values ($1, 'parent') on conflict do nothing`, [row!.id]);
+  await query('insert into participants (user_id) values ($1) on conflict do nothing', [row!.id]);
+  return row!.id;
+}
+
+export async function renameUser(userId: string, name: string): Promise<void> {
+  await query('update users set name = $2 where id = $1', [userId, name.trim() || null]);
+}
+
+export async function addChildTo(userId: string, name: string): Promise<void> {
+  await tx(async (c) => {
+    const { rows } = await c.query<{ id: string }>(
+      'insert into children (name) values ($1) returning id', [name.trim()]);
+    await c.query('insert into guardians (child_id, user_id) values ($1, $2)', [rows[0].id, userId]);
+    await c.query('insert into participants (child_id) values ($1)', [rows[0].id]);
+  });
+}
+
+export async function renameChildById(childId: string, name: string): Promise<void> {
+  await query('update children set name = $2 where id = $1', [childId, name.trim()]);
+}
+
+/** Убирает ребёнка совсем. Отметки и деньги держат его: тогда отказ. */
+export async function removeChild(childId: string): Promise<{ ok: boolean; reason?: string }> {
+  const used = await one<{ n: string }>(
+    `select (select count(*) from attendance a
+              join participants p on p.id = a.participant_id where p.child_id = $1)
+          + (select count(*) from charges ch
+              join participants p on p.id = ch.participant_id where p.child_id = $1) as n`,
+    [childId],
+  );
+  if (Number(used?.n ?? 0) > 0) {
+    return { ok: false, reason: 'У ребёнка есть посещения или начисления. Уберите его из групп вместо удаления.' };
+  }
+  await query('delete from children where id = $1', [childId]);
+  return { ok: true };
+}
+
+export async function setMembership(
+  participantId: string,
+  groupId: string,
+  member: boolean,
+): Promise<void> {
+  if (member) {
+    await query(
+      `insert into studio_members (group_id, participant_id) values ($1, $2)
+       on conflict (group_id, participant_id) do update set left_at = null`,
+      [groupId, participantId],
+    );
+  } else {
+    await query(
+      'update studio_members set left_at = current_date where group_id = $1 and participant_id = $2',
+      [groupId, participantId],
+    );
+  }
+}

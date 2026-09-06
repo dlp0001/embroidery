@@ -46,12 +46,12 @@ export default function Journal({
     // говорить нечего: «пропуск» пишем только там, где журнал уже закрыт.
     if (!row.present) return r.status ? { text: 'пропуск', cls: 'money-off' } : null;
     if (row.cash) return { text: 'оплачено налом', cls: 'money' };
-    // «По абонементу» — только когда занятие на пакет уже село.
-    if (r.on_pass) return { text: 'по абонементу', cls: 'money' };
-    if (r.paid) return { text: 'оплачено', cls: 'money' };
-    // Для тех, кого ждём, обещаем списание, если пакет у семьи есть.
-    // Для остальных не гадаем: по умолчанию не оплачено.
-    if (expected(r) && r.has_pass) return { text: 'спишется с абонемента', cls: 'money' };
+    // Оплату картой отсюда не снять, поэтому она и не переключается.
+    if (r.paid && !r.cash) return { text: 'оплачено картой', cls: 'money' };
+    // Дальше — то, что станет правдой после сохранения, а не то, что
+    // лежит в базе сейчас: галочку наличных мы как раз собираемся снять.
+    if (r.on_pass && !r.cash) return { text: 'по абонементу', cls: 'money' };
+    if (r.has_pass) return { text: 'спишется с абонемента', cls: 'money' };
     return { text: `не оплачено · ${price}`, cls: 'money-due' };
   }
 
@@ -75,7 +75,7 @@ export default function Journal({
             <button
               type="button"
               className={`chip-money ${m.cls}`}
-              disabled={!row.present}
+              disabled={!row.present || (r.paid && !r.cash)}
               onClick={() => toggle(r.participant_id, 'cash')}
             >
               {m.text}
