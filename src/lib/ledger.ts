@@ -13,7 +13,10 @@ export type MoneyKind =
   | 'cash_reverted'       // наличные отменены
   | 'pass_issued'         // продан абонемент
   | 'pass_covered_debt'   // абонементом закрыт старый долг
-  | 'payment_paid';       // платёж подтверждён провайдером
+  | 'payment_paid'        // платёж подтверждён провайдером
+  | 'cash_declared'       // родитель заявил, что заплатит наличными
+  | 'cash_confirmed'      // студия подтвердила, что деньги получены
+  | 'cash_declined';      // заявку отклонили
 
 export type MoneyEvent = {
   kind: MoneyKind;

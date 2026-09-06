@@ -2,7 +2,7 @@
 
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { startPayment, type Intent } from '@/lib/billing';
+import { declareCash, startPayment, type Intent } from '@/lib/billing';
 import { isAdmin, requireUser } from '@/lib/session';
 
 /** Адрес сайта берём из запроса, чтобы совпадал и на превью, и на проде. */
@@ -22,8 +22,20 @@ async function go(intent: Intent): Promise<never> {
   redirect(res.url);
 }
 
-export async function payDebtAction(): Promise<void> {
-  await go({ kind: 'debt' });
+/** Занятия, отмеченные галочками. Пусто — значит все. */
+function pickedCharges(form: FormData): string[] {
+  return form.getAll('charge').map(String).filter(Boolean);
+}
+
+export async function payDebtAction(form: FormData): Promise<void> {
+  await go({ kind: 'debt', chargeIds: pickedCharges(form) });
+}
+
+export async function declareCashAction(form: FormData): Promise<void> {
+  const user = await requireUser();
+  const res = await declareCash(user, pickedCharges(form));
+  if ('error' in res) redirect('/account/pay?error=' + encodeURIComponent(res.error));
+  redirect('/account/pay?cash=' + res.count);
 }
 
 /** Проверочный платёж на маленькую сумму. Только для админа. */

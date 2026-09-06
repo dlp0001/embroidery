@@ -1,10 +1,11 @@
 import { one, query, tx } from './db';
+import { plural } from './format';
 import { logMoneyIn } from './ledger';
 import { createPaymentLink, isConfigured } from './payplus';
 import { lessonPrice } from './studio';
 
 export type Intent =
-  | { kind: 'debt' }
+  | { kind: 'debt'; chargeIds?: string[] }
   | { kind: 'pass'; lessons: number; months: number }
   | { kind: 'test' };
 
@@ -33,11 +34,14 @@ export async function startPayment(
     description = 'Проверка оплаты';
     raw = {};
   } else if (intent.kind === 'debt') {
+    // Родитель может выбрать не всё: платим ровно за отмеченное.
+    const picked = intent.chargeIds?.length ? intent.chargeIds : null;
     const debts = await query<{ id: string; amount: string }>(
       `select id, amount::text from charges
         where owner_id = $1 and pass_id is null and payment_id is null
+          and ($2::uuid[] is null or id = any($2::uuid[]))
         order by created_at`,
-      [user.id],
+      [user.id, picked],
     );
     if (debts.length === 0) return { error: 'Нечего оплачивать.' };
     amount = debts.reduce((s, c) => s + Number(c.amount), 0);
@@ -168,9 +172,134 @@ export async function applyPayment(paymentId: string, transactionUid: string | n
       await logMoneyIn(c, {
         kind: 'pass_issued', actorId: null, ownerId: p.user_id,
         passId: made[0].id, paymentId: p.id, amount: p.amount, currency: p.currency,
-        note: `абонемент на ${lessons} занятий, оплачен картой`,
+        note: `абонемент на ${lessons} ${plural(lessons, 'занятие', 'занятия', 'занятий')}, оплачен картой`,
         details: { lessons, months },
       });
     }
   });
+}
+
+// ── Наличные по заявке родителя ───────────────────────────
+
+export type CashClaim = {
+  id: string;
+  amount: string;
+  currency: string;
+  created_at: string;
+  owner_name: string | null;
+  owner_email: string;
+  lessons: number;
+};
+
+/**
+ * Родитель заявляет, что заплатит наличными. Деньги не считаются
+ * полученными, пока студия не подтвердит: занятия остаются в долгу.
+ */
+export async function declareCash(
+  user: { id: string },
+  chargeIds: string[],
+): Promise<{ ok: true; count: number } | { error: string }> {
+  const picked = chargeIds.length ? chargeIds : null;
+  const debts = await query<{ id: string; amount: string; currency: string }>(
+    `select id, amount::text, currency from charges
+      where owner_id = $1 and pass_id is null and payment_id is null
+        and ($2::uuid[] is null or id = any($2::uuid[]))
+      order by created_at`,
+    [user.id, picked],
+  );
+  if (debts.length === 0) return { error: 'Нечего оплачивать.' };
+
+  const amount = debts.reduce((s, c) => s + Number(c.amount), 0);
+  const currency = debts[0].currency;
+
+  await tx(async (c) => {
+    const { rows } = await c.query<{ id: string }>(
+      `insert into payments (provider, user_id, amount, currency, status, purpose, raw)
+       values ('cash', $1, $2, $3, 'pending', 'studio_debt', $4) returning id`,
+      [user.id, amount, currency, JSON.stringify({ charge_ids: debts.map((d) => d.id) })],
+    );
+    await logMoneyIn(c, {
+      kind: 'cash_declared', actorId: user.id, ownerId: user.id,
+      paymentId: rows[0].id, amount, currency,
+      note: `родитель заявил оплату наличными за ${debts.length} ${plural(debts.length, 'занятие', 'занятия', 'занятий')}`,
+      details: { charge_ids: debts.map((d) => d.id) },
+    });
+  });
+
+  return { ok: true, count: debts.length };
+}
+
+/** Заявки, которые ждут подтверждения студии. */
+export async function pendingCash(): Promise<CashClaim[]> {
+  return query<CashClaim>(
+    `select p.id, p.amount::text, p.currency, p.created_at::text,
+            u.name as owner_name, u.email as owner_email,
+            coalesce(jsonb_array_length(p.raw -> 'charge_ids'), 0) as lessons
+       from payments p
+       join users u on u.id = p.user_id
+      where p.provider = 'cash' and p.status = 'pending' and p.purpose = 'studio_debt'
+      order by p.created_at`,
+  );
+}
+
+/** Студия подтверждает получение денег: занятия закрываются. */
+export async function confirmCash(paymentId: string, actorId: string): Promise<void> {
+  await tx(async (c) => {
+    const { rows } = await c.query<{
+      id: string; user_id: string; status: string; amount: string; currency: string;
+      raw: { charge_ids?: string[] } | null;
+    }>(
+      `select id, user_id, status, amount::text, currency, raw from payments
+        where id = $1 and provider = 'cash' and purpose = 'studio_debt' for update`,
+      [paymentId],
+    );
+    const p = rows[0];
+    if (!p || p.status !== 'pending') return;
+
+    await c.query(`update payments set status = 'paid' where id = $1`, [p.id]);
+    const ids = p.raw?.charge_ids ?? [];
+    if (ids.length > 0) {
+      await c.query(
+        `update charges set payment_id = $1
+          where id = any($2::uuid[]) and pass_id is null and payment_id is null`,
+        [p.id, ids],
+      );
+    }
+    await logMoneyIn(c, {
+      kind: 'cash_confirmed', actorId, ownerId: p.user_id, paymentId: p.id,
+      amount: p.amount, currency: p.currency,
+      note: `подтверждено получение наличных за ${ids.length} ${plural(ids.length, 'занятие', 'занятия', 'занятий')}`,
+    });
+  });
+}
+
+export async function declineCash(paymentId: string, actorId: string): Promise<void> {
+  await tx(async (c) => {
+    const { rows } = await c.query<{ id: string; user_id: string; status: string; amount: string; currency: string }>(
+      `select id, user_id, status, amount::text, currency from payments
+        where id = $1 and provider = 'cash' and purpose = 'studio_debt' for update`,
+      [paymentId],
+    );
+    const p = rows[0];
+    if (!p || p.status !== 'pending') return;
+    await c.query(`update payments set status = 'failed' where id = $1`, [p.id]);
+    await logMoneyIn(c, {
+      kind: 'cash_declined', actorId, ownerId: p.user_id, paymentId: p.id,
+      amount: p.amount, currency: p.currency, note: 'заявка на оплату наличными отклонена',
+    });
+  });
+}
+
+/** Заявка родителя, которая ещё ждёт подтверждения. */
+export async function myPendingCash(userId: string): Promise<CashClaim | null> {
+  return one<CashClaim>(
+    `select p.id, p.amount::text, p.currency, p.created_at::text,
+            u.name as owner_name, u.email as owner_email,
+            coalesce(jsonb_array_length(p.raw -> 'charge_ids'), 0) as lessons
+       from payments p join users u on u.id = p.user_id
+      where p.user_id = $1 and p.provider = 'cash'
+        and p.status = 'pending' and p.purpose = 'studio_debt'
+      order by p.created_at desc limit 1`,
+    [userId],
+  );
 }

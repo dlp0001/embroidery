@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { confirmCash, declineCash } from '@/lib/billing';
 import { isAdmin, requireUser } from '@/lib/session';
 import {
   addSession, createGroup, deleteSession, issuePass, resyncGroupSessions, setGroupActive,
@@ -125,5 +126,21 @@ export async function issuePassAction(form: FormData): Promise<void> {
   revalidatePath('/admin/studio/debts');
   revalidatePath('/admin/studio');
   revalidatePath('/account');
+  revalidatePath('/account/pay');
+}
+
+export async function confirmCashAction(form: FormData): Promise<void> {
+  const user = await requireAdmin();
+  await confirmCash(String(form.get('paymentId')), user.id);
+  revalidatePath('/admin/studio/debts');
+  revalidatePath('/admin/studio/ledger');
+  revalidatePath('/account/pay');
+}
+
+export async function declineCashAction(form: FormData): Promise<void> {
+  const user = await requireAdmin();
+  await declineCash(String(form.get('paymentId')), user.id);
+  revalidatePath('/admin/studio/debts');
+  revalidatePath('/admin/studio/ledger');
   revalidatePath('/account/pay');
 }

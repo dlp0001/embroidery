@@ -2,8 +2,9 @@ import { isAdmin, requireUser } from '@/lib/session';
 import { lessonPrice, passBalances, unpaidCharges } from '@/lib/studio';
 import { isConfigured } from '@/lib/payplus';
 import { dayMonth, money, plural } from '@/lib/format';
-import { lastTestPayment, TEST_AMOUNT } from '@/lib/billing';
-import { buyPassAction, payDebtAction, testPaymentAction } from './actions';
+import { lastTestPayment, myPendingCash, TEST_AMOUNT } from '@/lib/billing';
+import DebtPicker from './DebtPicker';
+import { buyPassAction, testPaymentAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,21 +13,20 @@ const PACKS = [4, 8, 12];
 export default async function PayPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; cash?: string }>;
 }) {
   const user = await requireUser();
-  const { error } = await searchParams;
+  const { error, cash } = await searchParams;
   const online = isConfigured();
   const admin = isAdmin(user);
   const lastTest = admin ? await lastTestPayment(user.id) : null;
+  const claim = await myPendingCash(user.id);
   const mode = process.env.PAYPLUS_ENV === 'prod' ? 'боевая' : 'тестовая';
   const [unpaid, passes, price] = await Promise.all([
     unpaidCharges(user.id),
     passBalances(user.id),
     lessonPrice(),
   ]);
-  const total = unpaid.reduce((s, c) => s + Number(c.amount), 0);
-  const currency = unpaid[0]?.currency ?? price.currency;
   const pass = passes.find((p) => p.left > 0) ?? null;
 
   return (
@@ -60,55 +60,32 @@ export default async function PayPage({
 
         <div className="lbl">Не покрыто абонементом</div>
 
+        {cash && (
+          <div className="note" style={{ marginBottom: 16 }}>
+            Заявка отправлена. Отдайте деньги Варе на занятии — она отметит получение,
+            и занятия станут оплаченными.
+          </div>
+        )}
+
+        {claim && (
+          <div className="card-lin">
+            <div className="what">Ждёт подтверждения</div>
+            <div className="sub">
+              Наличными за {claim.lessons}&nbsp;{plural(claim.lessons, 'занятие', 'занятия', 'занятий')} ·{' '}
+              {money(claim.amount, claim.currency)}
+            </div>
+            <p className="hint" style={{ marginTop: 10 }}>
+              Пока Варя не отметит получение, занятия числятся неоплаченными.
+            </p>
+          </div>
+        )}
+
         {unpaid.length === 0 ? (
           <p className="hint">
             Всё оплачено. Занятия, которые не покроет абонемент, появятся здесь.
           </p>
         ) : (
-          <>
-            {unpaid.map((c) => (
-              <div className="card" key={c.id}>
-                <div className="row">
-                  <div>
-                    <div className="when">{dayMonth(c.held_on)} · {c.group_title}</div>
-                    <div className="what">{c.who}</div>
-                  </div>
-                  <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 21 }}>
-                    {money(c.amount, c.currency)}
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-              padding: '20px 2px 22px', borderTop: '1px solid var(--line)', marginTop: 12,
-            }}>
-              <div style={{ fontSize: 12, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>
-                Итого за {unpaid.length}&nbsp;{plural(unpaid.length, 'занятие', 'занятия', 'занятий')}
-              </div>
-              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 34 }}>
-                {money(total, currency)}
-              </div>
-            </div>
-
-            {online ? (
-              <form action={payDebtAction}>
-                <button className="btn-wide" type="submit">
-                  Оплатить {money(total, currency)}
-                </button>
-              </form>
-            ) : (
-              <button className="btn-wide" disabled title="Оплата картой ещё не подключена">
-                Оплатить картой
-              </button>
-            )}
-            <p className="hint" style={{ marginTop: 14 }}>
-              {online
-                ? 'Оплата картой на странице банка. Квитанция придёт на почту.'
-                : 'Оплата картой скоро появится. Пока рассчитаться можно на занятии, наличными или переводом — Варя отметит это здесь.'}
-            </p>
-          </>
+          <DebtPicker charges={unpaid} online={online} />
         )}
 
         <div className="lbl">{pass ? 'Продлить абонемент' : 'Абонемент'}</div>

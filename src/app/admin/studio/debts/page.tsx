@@ -1,8 +1,9 @@
 import { isAdmin, requireTeacher } from '@/lib/session';
 import { allActivePasses, debtors, lessonPrice, passOwners } from '@/lib/studio';
+import { pendingCash } from '@/lib/billing';
 import { dayMonth, money, plural } from '@/lib/format';
 import Link from 'next/link';
-import { issuePassAction } from '@/app/admin/schedule-actions';
+import { confirmCashAction, declineCashAction, issuePassAction } from '@/app/admin/schedule-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,11 +21,12 @@ const label: React.CSSProperties = {
 export default async function DebtsPage() {
   const user = await requireTeacher();
   const admin = isAdmin(user);
-  const [rows, passes, owners, price] = await Promise.all([
+  const [rows, passes, owners, price, claims] = await Promise.all([
     debtors(),
     allActivePasses(),
     admin ? passOwners() : [],
     lessonPrice(),
+    admin ? pendingCash() : [],
   ]);
   const total = rows.reduce((s, d) => s + Number(d.amount), 0);
 
@@ -44,6 +46,32 @@ export default async function DebtsPage() {
       </div>
 
       <div className="body">
+        {claims.length > 0 && (
+          <>
+            <div className="lbl" style={{ marginTop: 0 }}>Ждут подтверждения</div>
+            {claims.map((cl) => (
+              <div className="card-lin" key={cl.id}>
+                <div className="what">{cl.owner_name ?? cl.owner_email}</div>
+                <div className="sub">
+                  наличными за {cl.lessons}&nbsp;
+                  {plural(cl.lessons, 'занятие', 'занятия', 'занятий')} ·{' '}
+                  {money(cl.amount, cl.currency)}
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                  <form action={confirmCashAction}>
+                    <input type="hidden" name="paymentId" value={cl.id} />
+                    <button className="btn" type="submit">Деньги получены</button>
+                  </form>
+                  <form action={declineCashAction}>
+                    <input type="hidden" name="paymentId" value={cl.id} />
+                    <button className="btn-quiet" type="submit">Отклонить</button>
+                  </form>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
         {rows.length === 0 && <p className="hint">Долгов нет.</p>}
         {rows.map((d) => (
           <div className="card" key={d.owner_id}>

@@ -1,5 +1,6 @@
 import type { PoolClient } from 'pg';
 import { one, query, tx } from './db';
+import { plural } from './format';
 import { logMoneyIn } from './ledger';
 
 export type AttendanceStatus = 'present' | 'absent' | 'sick' | 'trial';
@@ -1029,7 +1030,7 @@ export async function issuePass(input: IssuePassInput, byUser: string): Promise<
     await logMoneyIn(c, {
       kind: 'pass_issued', actorId: byUser, ownerId: input.ownerId,
       passId, paymentId, amount: amount * input.lessons, currency,
-      note: `абонемент на ${input.lessons} занятий, ${
+      note: `абонемент на ${input.lessons} ${plural(input.lessons, 'занятие', 'занятия', 'занятий')}, ${
         input.paid === 'cash' ? 'наличными' : input.paid === 'transfer' ? 'переводом' : 'не оплачен'
       }`,
       details: { lessons: input.lessons, months: input.months, paid: input.paid },
