@@ -16,9 +16,15 @@ export async function getSetting(key: string, fallback: string): Promise<string>
 }
 
 export async function lessonPrice(): Promise<{ amount: number; currency: string }> {
-  const amount = Number(await getSetting('studio_lesson_price', '60'));
-  const currency = await getSetting('studio_currency', 'ILS');
-  return { amount, currency };
+  const row = await one<{ amount: string | null; currency: string | null }>(
+    `select max(value) filter (where key = 'studio_lesson_price') as amount,
+            max(value) filter (where key = 'studio_currency') as currency
+       from settings`,
+  );
+  return {
+    amount: Number(row?.amount ?? 60),
+    currency: row?.currency ?? 'ILS',
+  };
 }
 
 /** Участники семьи: сам взрослый и его дети. */
@@ -36,30 +42,6 @@ export async function familyParticipants(userId: string): Promise<Participant[]>
       order by kind desc, name`,
     [userId],
   );
-}
-
-/**
- * Кому уходит счёт за посещение. Для взрослого это он сам, для ребёнка —
- * опекун. Если опекунов несколько, берём того, у кого есть свободный
- * абонемент; иначе первого.
- */
-async function ownerFor(c: PoolClient, participantId: string): Promise<string | null> {
-  const { rows } = await c.query<{ user_id: string }>(
-    `select p.user_id from participants p where p.id = $1 and p.user_id is not null
-      union all
-     select g.user_id
-       from participants p
-       join guardians g on g.child_id = p.child_id
-       join users u on u.id = g.user_id
-      where p.id = $1
-      order by 1`,
-    [participantId],
-  );
-  if (rows.length === 0) return null;
-  for (const r of rows) {
-    if (await pickPass(c, r.user_id)) return r.user_id;
-  }
-  return rows[0].user_id;
 }
 
 /** Действующий абонемент с остатком; берём тот, что раньше истекает. */
@@ -97,37 +79,106 @@ export type SaveResult = {
   changed: number;
 };
 
+type ChargeRow = {
+  id: string;
+  participant_id: string;
+  owner_id: string;
+  pass_id: string | null;
+  payment_id: string | null;
+};
+
+/**
+ * Сохраняет журнал занятия. Деньги считаются здесь и только здесь.
+ *
+ * Всё, что можно, делается пакетом: база в другом городе, и полсотни
+ * последовательных запросов складывались в заметную паузу. Поэтому
+ * начисления, владельцы и абонементы читаются разом, а отметки
+ * записываются одним запросом.
+ */
 export async function saveAttendance(
   sessionId: string,
   marks: Mark[],
   actor: SaveActor,
 ): Promise<SaveResult> {
   const { amount, currency } = await lessonPrice();
+  const ids = marks.map((m) => m.participantId);
 
   return tx(async (c) => {
     const stat: SaveResult = { present: 0, onPass: 0, toDebt: 0, cash: 0, changed: 0 };
+    if (ids.length === 0) return stat;
+
+    // 1. Что уже начислено по этому занятию.
+    const charges = new Map<string, ChargeRow>();
+    const { rows: existing } = await c.query<ChargeRow>(
+      `select id, participant_id, owner_id, pass_id, payment_id
+         from charges where session_id = $1 and participant_id = any($2::uuid[])
+         for update`,
+      [sessionId, ids],
+    );
+    for (const row of existing) charges.set(row.participant_id, row);
+
+    // 2. Отметки — одним запросом на всех.
+    await c.query(
+      `insert into attendance (session_id, participant_id, status, marked_by)
+       select $1, p, s, $4
+         from unnest($2::uuid[], $3::text[]) as t(p, s)
+       on conflict (session_id, participant_id)
+       do update set status = excluded.status, marked_by = excluded.marked_by, marked_at = now()`,
+      [sessionId, ids, marks.map((m) => m.status), actor.id],
+    );
+
+    // 3. Кому выставлять счёт: для взрослого он сам, для ребёнка опекун.
+    const needOwner = marks
+      .filter((m) => m.status === 'present' && !charges.has(m.participantId))
+      .map((m) => m.participantId);
+    const owners = new Map<string, string[]>();
+    if (needOwner.length > 0) {
+      const { rows } = await c.query<{ participant_id: string; owner_id: string }>(
+        `select p.id as participant_id, coalesce(p.user_id, g.user_id) as owner_id
+           from participants p
+           left join guardians g on g.child_id = p.child_id
+          where p.id = any($1::uuid[]) and coalesce(p.user_id, g.user_id) is not null
+          order by p.id, g.user_id`,
+        [needOwner],
+      );
+      for (const r of rows) {
+        owners.set(r.participant_id, [...(owners.get(r.participant_id) ?? []), r.owner_id]);
+      }
+    }
+
+    // 4. Свободные занятия в абонементах — тоже разом, с запасом на списание.
+    const candidates = [...new Set([...owners.values()].flat())];
+    const passes = new Map<string, { id: string; left: number }[]>();
+    if (candidates.length > 0) {
+      const { rows } = await c.query<{ id: string; owner_id: string; left: number }>(
+        `select p.id, p.owner_id,
+                p.lessons_total - (select count(*)::int from charges c where c.pass_id = p.id) as left
+           from passes p
+          where p.owner_id = any($1::uuid[])
+            and p.valid_from <= current_date
+            and (p.valid_to is null or p.valid_to >= current_date)
+          order by p.valid_to nulls last, p.created_at
+          for update`,
+        [candidates],
+      );
+      for (const r of rows) {
+        if (r.left > 0) passes.set(r.owner_id, [...(passes.get(r.owner_id) ?? []), { id: r.id, left: r.left }]);
+      }
+    }
+
+    /** Занимает одно занятие в абонементе владельца, если оно там есть. */
+    const takePass = (ownerId: string): string | null => {
+      const list = passes.get(ownerId);
+      if (!list || list.length === 0) return null;
+      const pass = list[0];
+      pass.left--;
+      if (pass.left <= 0) list.shift();
+      return pass.id;
+    };
 
     for (const mark of marks) {
-      const existing = await c.query<{
-        id: string; owner_id: string; pass_id: string | null; payment_id: string | null;
-      }>(
-        'select id, owner_id, pass_id, payment_id from charges where session_id = $1 and participant_id = $2 for update',
-        [sessionId, mark.participantId],
-      );
-      let charge = existing.rows[0];
-
-      // Проведённое переписать можно, но это заметный шаг: и в интерфейсе
-      // он требует подтверждения, и здесь оставляет след в реестре.
+      let charge = charges.get(mark.participantId);
       const wasSettled = Boolean(charge && (charge.pass_id || charge.payment_id));
-
-      await c.query(
-        `insert into attendance (session_id, participant_id, status, marked_by)
-         values ($1, $2, $3, $4)
-         on conflict (session_id, participant_id)
-         do update set status = excluded.status, marked_by = excluded.marked_by, marked_at = now()`,
-        [sessionId, mark.participantId, mark.status, actor.id],
-      );
-
       if (wasSettled) stat.changed++;
 
       if (mark.status !== 'present') {
@@ -149,18 +200,20 @@ export async function saveAttendance(
       stat.present++;
 
       if (!charge) {
-        const owner = await ownerFor(c, mark.participantId);
-        if (!owner) continue;
-        const passId = mark.cash ? null : await pickPass(c, owner);
-        const inserted = await c.query<{
-          id: string; owner_id: string; pass_id: string | null; payment_id: string | null;
-        }>(
+        // Владельцем становится тот, у кого есть свободный абонемент,
+        // иначе первый по списку.
+        const list = owners.get(mark.participantId) ?? [];
+        if (list.length === 0) continue;
+        const owner = list.find((o) => (passes.get(o)?.length ?? 0) > 0) ?? list[0];
+        const passId = mark.cash ? null : takePass(owner);
+        const inserted = await c.query<ChargeRow>(
           `insert into charges (participant_id, session_id, owner_id, amount, currency, pass_id)
            values ($1, $2, $3, $4, $5, $6)
-           returning id, owner_id, pass_id, payment_id`,
+           returning id, participant_id, owner_id, pass_id, payment_id`,
           [mark.participantId, sessionId, owner, amount, currency, passId],
         );
         charge = inserted.rows[0];
+        charges.set(mark.participantId, charge);
         await logMoneyIn(c, {
           kind: passId ? 'charge_on_pass' : 'charge_created',
           actorId: actor.id, ownerId: owner, participantId: mark.participantId,
@@ -320,23 +373,34 @@ export async function visitHistory(userId: string): Promise<VisitRow[]> {
   );
 }
 
-/** Создаёт занятия группы на несколько недель вперёд. */
+/**
+ * Создаёт занятия групп на несколько недель вперёд. Зовётся с каждого
+ * открытия экрана, поэтому чаще раза в час не работает: иначе на каждый
+ * показ страницы уходил бы тяжёлый запрос.
+ */
 export async function ensureSessions(weeksAhead = 6): Promise<number> {
+  const fresh = await one<{ recent: boolean }>(
+    `select value::timestamptz > now() - interval '1 hour' as recent
+       from settings where key = 'sessions_filled_at'`,
+  );
+  if (fresh?.recent) return 0;
+
   const rows = await query<{ n: string }>(
-    `with slots as (
-       select g.id as group_id,
-              (d::date) as held_on
+    `with made as (
+       insert into studio_sessions (group_id, held_on)
+       select g.id, d::date
          from studio_groups g
          cross join generate_series(current_date - interval '28 days',
                                     current_date + ($1 || ' weeks')::interval,
                                     interval '1 day') d
-        where g.active
-          and extract(isodow from d) = g.weekday
+        where g.active and extract(isodow from d) = g.weekday
+        on conflict (group_id, held_on) do nothing
+       returning 1
+     ), stamp as (
+       insert into settings (key, value) values ('sessions_filled_at', now()::text)
+       on conflict (key) do update set value = excluded.value
      )
-     insert into studio_sessions (group_id, held_on)
-     select group_id, held_on from slots
-     on conflict (group_id, held_on) do nothing
-     returning 1`,
+     select 1 as n from made`,
     [String(weeksAhead)],
   );
   return rows.length;
