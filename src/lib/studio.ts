@@ -8,8 +8,8 @@ export type AttendanceStatus = 'present' | 'absent' | 'sick' | 'trial';
 export type PassType = { lessons: number; price: number; months: number };
 
 const DEFAULT_PASS_TYPES: PassType[] = [
-  { lessons: 4, price: 360, months: 3 },
-  { lessons: 8, price: 680, months: 3 },
+  { lessons: 4, price: 360, months: 1 },
+  { lessons: 8, price: 680, months: 2 },
 ];
 
 /** Цена абонемента задана отдельно: он дешевле, чем те же занятия по одному. */

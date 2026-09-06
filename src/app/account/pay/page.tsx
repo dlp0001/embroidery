@@ -30,7 +30,6 @@ export default async function PayPage({
     passTypes(),
   ]);
   const pass = passes.find((p) => p.left > 0) ?? null;
-  const months = packs[0]?.months ?? 3;
 
   return (
     <>
@@ -104,7 +103,12 @@ export default async function PayPage({
               <form action={buyPassAction} key={t.lessons}>
                 <input type="hidden" name="lessons" value={t.lessons} />
                 <button className="btn-quiet" type="submit" style={{ width: '100%', justifyContent: 'space-between' }}>
-                  <span>{t.lessons}&nbsp;{plural(t.lessons, 'занятие', 'занятия', 'занятий')}</span>
+                  <span>
+                    {t.lessons}&nbsp;{plural(t.lessons, 'занятие', 'занятия', 'занятий')}
+                    <span className="hint">
+                      {' · на '}{t.months}&nbsp;{plural(t.months, 'месяц', 'месяца', 'месяцев')}
+                    </span>
+                  </span>
                   <span>
                     {money(t.price, price.currency)}
                     {t.price < price.amount * t.lessons && (
@@ -116,9 +120,7 @@ export default async function PayPage({
                 </button>
               </form>
             ))}
-            <p className="hint">
-              Действует {months} {plural(months, 'месяц', 'месяца', 'месяцев')} со дня покупки.
-            </p>
+            <p className="hint">Срок считается со дня покупки.</p>
           </div>
         ) : (
           <div className="note">
