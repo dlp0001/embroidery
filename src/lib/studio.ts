@@ -524,6 +524,7 @@ export type TeacherSession = {
   held_on: string;
   starts_at: string;
   status: string;
+  audience: string;
   people: number;
   marked: number;
 };
@@ -532,7 +533,7 @@ export type TeacherSession = {
 export async function teacherSessions(teacherId: string | null): Promise<TeacherSession[]> {
   return query<TeacherSession>(
     `select s.id as session_id, g.id as group_id, g.title as group_title,
-            s.held_on::text, g.starts_at::text, s.status,
+            s.held_on::text, g.starts_at::text, s.status, g.audience,
             (select count(*)::int
                from participants p
               where ((g.audience = 'adults' and p.user_id is not null)
@@ -566,7 +567,7 @@ export async function nextSessions(teacherId: string | null): Promise<TeacherSes
           and s.status <> 'cancelled'
      )
      select s.id as session_id, g.id as group_id, g.title as group_title,
-            s.held_on::text, g.starts_at::text, s.status,
+            s.held_on::text, g.starts_at::text, s.status, g.audience,
             (select count(*)::int from participants p
               where ((g.audience = 'adults' and p.user_id is not null)
                   or (g.audience = 'kids' and p.child_id is not null))
@@ -587,7 +588,7 @@ export async function nextSessions(teacherId: string | null): Promise<TeacherSes
 export async function unclosedBefore(teacherId: string | null): Promise<TeacherSession[]> {
   return query<TeacherSession>(
     `select s.id as session_id, g.id as group_id, g.title as group_title,
-            s.held_on::text, g.starts_at::text, s.status,
+            s.held_on::text, g.starts_at::text, s.status, g.audience,
             (select count(*)::int from participants p
               where ((g.audience = 'adults' and p.user_id is not null)
                   or (g.audience = 'kids' and p.child_id is not null))
@@ -676,13 +677,14 @@ export type SessionHead = {
   held_on: string;
   starts_at: string;
   status: string;
+  audience: string;
   teacher_id: string | null;
 };
 
 export async function sessionHead(sessionId: string): Promise<SessionHead | null> {
   return one<SessionHead>(
     `select s.id as session_id, g.title as group_title, g.age_hint,
-            s.held_on::text, g.starts_at::text, s.status, g.teacher_id
+            s.held_on::text, g.starts_at::text, s.status, g.audience, g.teacher_id
        from studio_sessions s join studio_groups g on g.id = s.group_id
       where s.id = $1`,
     [sessionId],
@@ -966,7 +968,7 @@ export type CalendarSession = {
 export async function sessionsInRange(from: string, to: string): Promise<CalendarSession[]> {
   return query<CalendarSession>(
     `select s.id as session_id, g.id as group_id, g.title as group_title,
-            s.held_on::text, g.starts_at::text, s.status,
+            s.held_on::text, g.starts_at::text, s.status, g.audience,
             (select count(*)::int from attendance a where a.session_id = s.id) as marked,
             (select count(*)::int from attendance a
               where a.session_id = s.id and a.status = 'present') as came,
@@ -1281,6 +1283,119 @@ export async function retireChild(childId: string): Promise<RetireResult> {
   await query('update children set archived_at = now() where id = $1 and archived_at is null',
     [childId]);
   return { removed: false, name: row.name };
+}
+
+/**
+ * Ребёнок, которого привели на занятие прямо сейчас. Родителя у него ещё
+ * нет: заводим саму запись и сразу ставим «был». Денег это не считает —
+ * начислять некому, пока ребёнка не привязали к взрослому.
+ */
+export async function addWalkIn(
+  sessionId: string, name: string, actorId: string,
+): Promise<{ ok: boolean; reason?: string }> {
+  const ses = await one<{ audience: string }>(
+    `select g.audience from studio_sessions s
+       join studio_groups g on g.id = s.group_id where s.id = $1`,
+    [sessionId],
+  );
+  if (!ses) return { ok: false, reason: 'Занятие не найдено.' };
+  if (ses.audience !== 'kids') {
+    return { ok: false, reason: 'На взрослое занятие человека заводят через «Люди»: ему нужен вход в кабинет.' };
+  }
+
+  await tx(async (c) => {
+    const child = await c.query<{ id: string }>(
+      'insert into children (name) values ($1) returning id', [name]);
+    const part = await c.query<{ id: string }>(
+      'insert into participants (child_id) values ($1) returning id', [child.rows[0].id]);
+    await c.query(
+      `insert into attendance (session_id, participant_id, status, marked_by)
+       values ($1, $2, 'present', $3)
+       on conflict (session_id, participant_id) do nothing`,
+      [sessionId, part.rows[0].id, actorId]);
+  });
+  return { ok: true };
+}
+
+export type OrphanChild = {
+  child_id: string;
+  participant_id: string;
+  name: string;
+  visits: number;
+  last_seen: string | null;
+};
+
+/** Дети без родителя: за них некому платить, поэтому их видно отдельно. */
+export async function orphanChildren(): Promise<OrphanChild[]> {
+  return query<OrphanChild>(
+    `select ch.id as child_id, p.id as participant_id, ch.name,
+            (select count(*)::int from attendance a
+              where a.participant_id = p.id and a.status = 'present') as visits,
+            (select max(s.held_on)::text from attendance a
+               join studio_sessions s on s.id = a.session_id
+              where a.participant_id = p.id and a.status = 'present') as last_seen
+       from children ch
+       join participants p on p.child_id = ch.id
+      where ch.archived_at is null
+        and not exists (select 1 from guardians g where g.child_id = ch.id)
+      order by ch.name`,
+  );
+}
+
+/** Сколько посещений висит без начисления: деньги за них не посчитаны. */
+export async function unbilledVisits(): Promise<number> {
+  const row = await one<{ n: number }>(
+    `select count(*)::int as n
+       from attendance a
+       join participants p on p.id = a.participant_id
+       join children ch on ch.id = p.child_id
+      where a.status = 'present'
+        and not exists (select 1 from guardians g where g.child_id = ch.id)`,
+  );
+  return row?.n ?? 0;
+}
+
+/**
+ * Привязывает ребёнка к взрослому. Если попросили, задним числом считает
+ * деньги за уже случившиеся посещения: до привязки платить было некому.
+ * Цена берётся сегодняшняя, историческую мы не храним.
+ */
+export async function linkChild(
+  childId: string, userId: string, chargePast: boolean, byUser: string,
+): Promise<{ charged: number }> {
+  const { amount, currency } = await lessonPrice();
+
+  return tx(async (c) => {
+    await c.query(
+      'insert into guardians (child_id, user_id) values ($1, $2) on conflict do nothing',
+      [childId, userId]);
+    if (!chargePast) return { charged: 0 };
+
+    const { rows } = await c.query<{ participant_id: string; session_id: string }>(
+      `select a.participant_id, a.session_id
+         from attendance a
+         join participants p on p.id = a.participant_id
+        where p.child_id = $1 and a.status = 'present'
+          and not exists (select 1 from charges ch
+                           where ch.participant_id = a.participant_id
+                             and ch.session_id = a.session_id)
+        order by a.session_id`,
+      [childId]);
+
+    for (const r of rows) {
+      const made = await c.query<{ id: string }>(
+        `insert into charges (participant_id, session_id, owner_id, amount, currency)
+         values ($1, $2, $3, $4, $5) returning id`,
+        [r.participant_id, r.session_id, userId, amount, currency]);
+      await logMoneyIn(c, {
+        kind: 'charge_created', actorId: byUser, ownerId: userId,
+        participantId: r.participant_id, sessionId: r.session_id,
+        chargeId: made.rows[0].id, amount, currency,
+        note: 'занятие посчитано после привязки к родителю',
+      });
+    }
+    return { charged: rows.length };
+  });
 }
 
 /** Возвращает скрытого ребёнка обратно в списки. */

@@ -2,9 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { plural } from '@/lib/format';
 import { isAdmin, requireUser } from '@/lib/session';
 import {
-  addChildTo, createParent, renameChildById, restoreChild, retireChild,
+  addChildTo, createParent, linkChild, renameChildById, restoreChild, retireChild,
   saveParent, setPreferredDay,
 } from '@/lib/studio';
 
@@ -75,6 +76,24 @@ export async function retireChildAction(form: FormData): Promise<void> {
       `${res.name} скрыт: у него есть посещения или начисления, стереть их нельзя.`));
   }
   redirect('/admin/studio/people');
+}
+
+/**
+ * Привязывает ребёнка, которого привели без родителя, к взрослому.
+ * По умолчанию считает деньги за уже случившиеся посещения: до привязки
+ * платить было некому, и эти занятия нигде не учтены.
+ */
+export async function linkChildAction(form: FormData): Promise<void> {
+  const admin = await requireAdmin();
+  const childId = String(form.get('childId'));
+  const userId = String(form.get('userId'));
+  if (!userId) return;
+  const res = await linkChild(childId, userId, form.get('chargePast') === 'on', admin.id);
+  refresh();
+  redirect('/admin/studio/people?note=' + encodeURIComponent(
+    res.charged > 0
+      ? `Привязали. Начислено за ${res.charged} ${plural(res.charged, 'занятие', 'занятия', 'занятий')}.`
+      : 'Привязали. Прошлые занятия не начисляли.'));
 }
 
 export async function restoreChildAction(form: FormData): Promise<void> {

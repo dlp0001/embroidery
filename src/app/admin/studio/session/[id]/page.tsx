@@ -37,6 +37,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
               roster={roster}
               price={money(price.amount, price.currency)}
               saved={head.status === 'done'}
+              kids={head.audience === 'kids'}
             />
             <p className="hint" style={{ marginTop: 18 }}>
               Нажмите на имя, чтобы снять отметку. Нажмите на строчку про деньги,

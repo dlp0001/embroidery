@@ -2,10 +2,36 @@
 
 import { revalidatePath } from 'next/cache';
 import { canTeach, isAdmin, requireUser } from '@/lib/session';
-import { saveAttendance, sessionHead, type AttendanceStatus, type Mark, type PayWay } from '@/lib/studio';
+import {
+  addWalkIn, saveAttendance, sessionHead,
+  type AttendanceStatus, type Mark, type PayWay,
+} from '@/lib/studio';
 
 const STATUSES: AttendanceStatus[] = ['present', 'absent', 'sick', 'trial'];
 const WAYS: PayWay[] = ['none', 'cash', 'pass'];
+
+/**
+ * Ребёнок, которого привели прямо на занятие. Заводим и сразу отмечаем,
+ * родителя привяжем потом в «Людях».
+ */
+export async function addWalkInAction(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  if (!canTeach(user)) throw new Error('FORBIDDEN');
+
+  const sessionId = String(formData.get('sessionId'));
+  const name = String(formData.get('name') ?? '').trim().slice(0, 120);
+  if (!name) return;
+
+  const head = await sessionHead(sessionId);
+  if (!head) throw new Error('NOT_FOUND');
+  if (!isAdmin(user) && head.teacher_id !== user.id) throw new Error('FORBIDDEN');
+
+  const res = await addWalkIn(sessionId, name, user.id);
+  revalidatePath('/admin/studio');
+  revalidatePath('/admin/studio/people');
+  revalidatePath(`/admin/studio/session/${sessionId}`);
+  if (!res.ok) throw new Error(res.reason ?? 'BAD_SESSION');
+}
 
 export async function saveJournal(formData: FormData): Promise<void> {
   const user = await requireUser();

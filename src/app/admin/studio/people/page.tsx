@@ -1,9 +1,9 @@
 import { isAdmin, requireTeacher } from '@/lib/session';
-import { families } from '@/lib/studio';
-import { plural } from '@/lib/format';
+import { families, orphanChildren } from '@/lib/studio';
+import { dayMonth, plural } from '@/lib/format';
 import Toggles from '@/components/Toggles';
 import {
-  addChildAction, createParentAction, renameChildAction, renameUserAction,
+  addChildAction, createParentAction, linkChildAction, renameChildAction, renameUserAction,
   restoreChildAction, retireChildAction, toggleDayAction,
 } from '@/app/admin/people-actions';
 
@@ -54,7 +54,7 @@ export default async function PeoplePage({
   }
 
   const { error, note, add } = await searchParams;
-  const list = await families();
+  const [list, orphans] = await Promise.all([families(), orphanChildren()]);
 
   return (
     <>
@@ -69,6 +69,56 @@ export default async function PeoplePage({
       <div className="body">
         {error && <p className="err">{error}</p>}
         {note && <p className="note">{note}</p>}
+
+        {orphans.length > 0 && (
+          <div className="card" style={{ borderColor: 'var(--rose-light)' }}>
+            <div className="what" style={{ marginBottom: 6 }}>Дети без родителя</div>
+            <p className="hint" style={{ marginBottom: 16 }}>
+              Их привели на занятие и отметили, но платить за них пока некому.
+              Занятия не посчитаны, пока ребёнок не привязан к взрослому.
+            </p>
+
+            {orphans.map((ch) => (
+              <form
+                action={linkChildAction}
+                key={ch.child_id}
+                style={{ padding: '14px 0', borderTop: '1px solid var(--line-soft)' }}
+              >
+                <input type="hidden" name="childId" value={ch.child_id} />
+                <div className="what" style={{ fontSize: 20 }}>{ch.name}</div>
+                <div className="sub" style={{ marginBottom: 12 }}>
+                  {ch.visits > 0
+                    ? `${ch.visits} ${plural(ch.visits, 'посещение', 'посещения', 'посещений')}${
+                        ch.last_seen ? `, последнее ${dayMonth(ch.last_seen)}` : ''}`
+                    : 'посещений пока нет'}
+                </div>
+
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div className="field" style={{ flex: '1 1 200px', marginBottom: 0, minWidth: 0 }}>
+                    <label htmlFor={`to-${ch.child_id}`}>Чей это ребёнок</label>
+                    <select id={`to-${ch.child_id}`} name="userId" required>
+                      <option value="">выберите родителя</option>
+                      {list.map((f) => (
+                        <option key={f.user_id} value={f.user_id}>{f.name ?? f.email}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button className="btn-quiet" type="submit">Привязать</button>
+                </div>
+
+                {ch.visits > 0 && (
+                  <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 14, cursor: 'pointer' }}>
+                    <input type="checkbox" name="chargePast" defaultChecked
+                           style={{ width: 20, height: 20, marginTop: 2 }} />
+                    <span className="hint">
+                      Начислить за прошлые посещения по сегодняшней цене
+                    </span>
+                  </label>
+                )}
+              </form>
+            ))}
+          </div>
+        )}
 
         {add && (
           <div className="card" style={{ borderStyle: 'dashed' }}>

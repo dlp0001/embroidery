@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
-import { saveJournal } from '@/app/admin/actions';
+import { addWalkInAction, saveJournal } from '@/app/admin/actions';
 import type { PayWay, RosterRow } from '@/lib/studio';
 
 type Row = { present: boolean; pay: PayWay };
@@ -33,30 +33,32 @@ function settledWay(r: RosterRow): PayWay | null {
  * Журнал одного занятия. Кто был — отмечает Варя, статус оплаты
  * подставляется сам: есть абонемент — «по абонементу», нет — «не оплачено».
  */
+/** Что показываем до того, как Варя что-то тронула. */
+function defaults(r: RosterRow): Row {
+  return {
+    present: r.status === 'present',
+    // Абонемент подставляем только тем, по кому занятие ещё не считали:
+    // сохранённое «не оплачено» подменять нельзя.
+    pay: settledWay(r) ?? (!r.locked && r.has_pass ? 'pass' : 'none'),
+  };
+}
+
 export default function Journal({
   sessionId,
   roster,
   price,
   saved,
+  kids = false,
 }: {
   sessionId: string;
   roster: RosterRow[];
   price: string;
   saved: boolean;
+  /** Детское занятие: сюда можно завести ребёнка прямо с порога. */
+  kids?: boolean;
 }) {
-  const [rows, setRows] = useState<Record<string, Row>>(() =>
-    Object.fromEntries(
-      roster.map((r) => [
-        r.participant_id,
-        {
-          present: r.status === 'present',
-          // Абонемент подставляем только тем, по кому занятие ещё не считали:
-          // сохранённое «не оплачено» подменять нельзя.
-          pay: settledWay(r) ?? (!r.locked && r.has_pass ? 'pass' : 'none'),
-        },
-      ]),
-    ),
-  );
+  const [edits, setEdits] = useState<Record<string, Row>>({});
+  const rowFor = (r: RosterRow): Row => edits[r.participant_id] ?? defaults(r);
 
   // Строки с проведёнными деньгами открываются только после подтверждения.
   const [unlocked, setUnlocked] = useState<Set<string>>(new Set());
@@ -73,13 +75,17 @@ export default function Journal({
     0,
   );
 
-  const present = Object.values(rows).filter((r) => r.present).length;
+  const present = roster.filter((r) => rowFor(r).present).length;
   const likely = roster.filter(expected);
   const rest = roster.filter((r) => !expected(r));
   const split = likely.length > 0 && rest.length > 0;
 
   function moneyFor(r: RosterRow): { text: string; cls: string } | null {
-    const row = rows[r.participant_id];
+    const row = rowFor(r);
+    // Ребёнка привели на занятие, а родителя у него ещё нет: платить некому.
+    if (!r.owner_id) {
+      return row.present ? { text: 'родитель не привязан', cls: 'money-off' } : null;
+    }
     // Никого не отмечаем заранее. Пока человек не отмечен, про деньги
     // говорить нечего: «пропуск» пишем только там, где журнал уже закрыт.
     if (!row.present) return r.status ? { text: 'пропуск', cls: 'money-off' } : null;
@@ -90,22 +96,21 @@ export default function Journal({
     return { text: `не оплачено · ${price}`, cls: 'money-due' };
   }
 
-  function togglePresent(id: string) {
-    setRows((p) => ({ ...p, [id]: { ...p[id], present: !p[id].present } }));
+  function togglePresent(r: RosterRow) {
+    const row = rowFor(r);
+    setEdits((p) => ({ ...p, [r.participant_id]: { ...row, present: !row.present } }));
   }
 
   /** Клик по статусу оплаты гоняет его по кругу: три варианта или два. */
   function nextWay(r: RosterRow) {
     const list = ways(r);
-    setRows((p) => {
-      const row = p[r.participant_id];
-      const at = list.indexOf(row.pay);
-      return { ...p, [r.participant_id]: { ...row, pay: list[(at + 1) % list.length] } };
-    });
+    const row = rowFor(r);
+    const at = list.indexOf(row.pay);
+    setEdits((p) => ({ ...p, [r.participant_id]: { ...row, pay: list[(at + 1) % list.length] } }));
   }
 
   function line(r: RosterRow) {
-    const row = rows[r.participant_id];
+    const row = rowFor(r);
     const m = moneyFor(r);
     const card = r.paid && !r.cash;
     const settled = Boolean(card || settledWay(r));
@@ -126,7 +131,7 @@ export default function Journal({
           <input type="hidden" name={`pay:${r.participant_id}`} value={row.pay} />
 
           <div style={{ flex: 1, minWidth: 0 }}>
-            <button type="button" className="plain" onClick={guard(() => togglePresent(r.participant_id))}>
+            <button type="button" className="plain" onClick={guard(() => togglePresent(r))}>
               <span className={row.present ? 'nm' : 'nm-off'}>{r.who}</span>
             </button>
             <Booked on={r.booked} />
@@ -134,7 +139,7 @@ export default function Journal({
               <button
                 type="button"
                 className={`chip-money ${m.cls}`}
-                disabled={!row.present || card}
+                disabled={!row.present || card || !r.owner_id}
                 onClick={guard(() => nextWay(r))}
               >
                 {m.text}
@@ -147,7 +152,7 @@ export default function Journal({
             aria-label={`${r.who}: ${row.present ? 'снять отметку' : 'отметить'}`}
             aria-pressed={row.present}
             className={row.present ? 'dot-on' : 'dot-off'}
-            onClick={guard(() => togglePresent(r.participant_id))}
+            onClick={guard(() => togglePresent(r))}
           >
             {row.present && (
               <svg viewBox="0 0 24 24">
@@ -183,7 +188,8 @@ export default function Journal({
   }
 
   return (
-    <form action={submit}>
+    <>
+      <form action={submit}>
       <input type="hidden" name="sessionId" value={sessionId} />
 
       {/* Заголовки нужны, только когда список действительно разделён */}
@@ -214,6 +220,26 @@ export default function Journal({
           Открыто для правки: {unlocked.size}. После сохранения изменение появится в реестре.
         </p>
       )}
-    </form>
+      </form>
+
+      {kids && (
+        <form
+          action={addWalkInAction}
+          style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginTop: 18 }}
+        >
+          <input type="hidden" name="sessionId" value={sessionId} />
+          <div className="field" style={{ flex: 1, marginBottom: 0 }}>
+            <label htmlFor={`walkin-${sessionId}`}>Привели нового</label>
+            <input
+              id={`walkin-${sessionId}`}
+              name="name"
+              maxLength={120}
+              placeholder="Имя и фамилия"
+            />
+          </div>
+          <button className="btn-quiet" type="submit">Добавить</button>
+        </form>
+      )}
+    </>
   );
 }

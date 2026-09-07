@@ -69,6 +69,7 @@ export default async function TodayPage() {
                   roster={rosters[i]}
                   price={priceLabel}
                   saved={s.marked > 0}
+                  kids={s.audience === 'kids'}
                 />
               </div>
             )}

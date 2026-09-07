@@ -1,5 +1,7 @@
 import { isAdmin, requireTeacher } from '@/lib/session';
-import { allActivePasses, debtors, lessonPrice, passOwners, passTypes } from '@/lib/studio';
+import {
+  allActivePasses, debtors, lessonPrice, passOwners, passTypes, unbilledVisits,
+} from '@/lib/studio';
 import { pendingCash } from '@/lib/billing';
 import { dayMonth, money, plural } from '@/lib/format';
 import Link from 'next/link';
@@ -29,6 +31,7 @@ export default async function DebtsPage() {
     admin ? pendingCash() : [],
     passTypes(),
   ]);
+  const unbilled = await unbilledVisits();
   const currency = price.currency;
   const total = rows.reduce((s, d) => s + Number(d.amount), 0);
 
@@ -48,6 +51,14 @@ export default async function DebtsPage() {
       </div>
 
       <div className="body">
+        {unbilled > 0 && (
+          <div className="note" style={{ marginBottom: 18 }}>
+            {unbilled}&nbsp;{plural(unbilled, 'посещение', 'посещения', 'посещений')} не
+            посчитано: у детей нет родителя, и платить за них некому.{' '}
+            <Link href="/admin/studio/people">Привязать в «Людях»</Link>.
+          </div>
+        )}
+
         {claims.length > 0 && (
           <>
             <div className="lbl" style={{ marginTop: 0 }}>Ждут подтверждения</div>
