@@ -36,10 +36,13 @@ async function call(method, body = {}) {
 }
 
 const info = await call('auth/info', { get_company_info: true });
-const company = info.company_info ?? {};
-console.log(`счёт    ${company.company_name ?? info.cid ?? '—'}`);
-console.log(`ח.פ/ע.מ  ${company.company_id ?? '—'}`);
-console.log(`от имени ${info.user ?? '—'}\n`);
+const c = info.company_info ?? {};
+console.log(`счёт     ${c.businessName ?? info.cid ?? '—'}`);
+console.log(`ע.מ/ח.פ  ${c.vat_id ?? '—'}`);
+console.log(`от имени ${info.user ?? '—'}`);
+// Осек патур не платит НДС и выписывает квитанцию, а не налоговый счёт.
+// Если счёт вдруг не патур, выбранный тип документа надо пересмотреть.
+console.log(`налоги   ${c.is_tax_exempt ? 'осек патур, без НДС' : 'с НДС'}\n`);
 
 const { doctypes } = await call('doc/types', { list_type: 'object' });
 const list = Object.values(doctypes ?? {});
