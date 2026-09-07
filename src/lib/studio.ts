@@ -955,8 +955,12 @@ export type CalendarSession = {
   held_on: string;
   starts_at: string;
   status: string;
+  /** Журнал закрыт: хоть одна отметка есть, неважно какая. */
   marked: number;
-  people: number;
+  /** Пришли: только те, у кого стоит «был». */
+  came: number;
+  /** Ждали: записанные на занятие плюс те, у кого этот день в профиле. */
+  expected: number;
 };
 
 export async function sessionsInRange(from: string, to: string): Promise<CalendarSession[]> {
@@ -964,11 +968,21 @@ export async function sessionsInRange(from: string, to: string): Promise<Calenda
     `select s.id as session_id, g.id as group_id, g.title as group_title,
             s.held_on::text, g.starts_at::text, s.status,
             (select count(*)::int from attendance a where a.session_id = s.id) as marked,
-            (select count(*)::int from participants p
-              where ((g.audience = 'adults' and p.user_id is not null)
+            (select count(*)::int from attendance a
+              where a.session_id = s.id and a.status = 'present') as came,
+            /* Кого ждали — ровно те, кто в журнале попадает в блок «ждём». */
+            (select count(*)::int
+               from participants p
+               left join children ch on ch.id = p.child_id
+               left join users u on u.id = p.user_id
+              where ch.archived_at is null
+                and ((g.audience = 'adults' and p.user_id is not null and u.attends)
                   or (g.audience = 'kids' and p.child_id is not null))
-                and exists (select 1 from preferred_days pd
-                             where pd.participant_id = p.id and pd.weekday = g.weekday)) as people
+                and (exists (select 1 from preferred_days pd
+                              where pd.participant_id = p.id and pd.weekday = g.weekday)
+                  or exists (select 1 from bookings b
+                              where b.session_id = s.id and b.participant_id = p.id
+                                and b.status = 'booked'))) as expected
        from studio_sessions s
        join studio_groups g on g.id = s.group_id
       where s.held_on between $1::date and $2::date
