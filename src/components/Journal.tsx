@@ -108,93 +108,76 @@ export default function Journal({
     const row = rows[r.participant_id];
     const m = moneyFor(r);
     const card = r.paid && !r.cash;
-    const done = card ? 'card' : settledWay(r);
+    const settled = Boolean(card || settledWay(r));
+    // Проведённые деньги не запрещают правку, но спрашивают перед ней.
+    const locked = settled && !unlocked.has(r.participant_id);
+    const askingHere = asking === r.participant_id;
 
-    // По проведённым деньгам сначала спрашиваем, потом пускаем.
-    if (done && !unlocked.has(r.participant_id)) {
-      const askingHere = asking === r.participant_id;
-      return (
-        <div key={r.participant_id} style={{ borderBottom: '1px solid var(--line-soft)' }}>
-          <div className="mark" style={{ borderBottom: 0 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div className={row.present ? 'nm' : 'nm-off'}>{r.who}</div>
-              <Booked on={r.booked} />
-              <div className="money">
-                {done === 'cash' ? 'оплачено наличными или переводом'
-                  : done === 'card' ? 'оплачено картой'
-                  : 'по абонементу'} · записано
-              </div>
-            </div>
-            <button
-              type="button"
-              className="btn-quiet"
-              style={{ minHeight: 38, padding: '8px 14px' }}
-              onClick={() => setAsking(askingHere ? null : r.participant_id)}
-            >
-              Изменить
-            </button>
-          </div>
-
-          {askingHere && (
-            <div className="note" style={{ margin: '0 0 14px' }}>
-              По этому занятию деньги уже проведены. Изменение попадёт в реестр
-              и будет видно, кто его сделал.
-              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => {
-                    setUnlocked((p) => new Set(p).add(r.participant_id));
-                    setAsking(null);
-                  }}
-                >
-                  Всё равно изменить
-                </button>
-                <button type="button" className="btn-quiet" onClick={() => setAsking(null)}>
-                  Отмена
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      );
-    }
+    /** Любое касание закрытой строки сначала спрашивает, потом делает. */
+    const guard = (act: () => void) => () => {
+      if (locked) setAsking(askingHere ? null : r.participant_id);
+      else act();
+    };
 
     return (
-      <div className="mark" key={r.participant_id}>
-        <input type="hidden" name={`mark:${r.participant_id}`} value={row.present ? 'present' : 'absent'} />
-        <input type="hidden" name={`pay:${r.participant_id}`} value={row.pay} />
+      <div key={r.participant_id}>
+        <div className="mark">
+          <input type="hidden" name={`mark:${r.participant_id}`} value={row.present ? 'present' : 'absent'} />
+          <input type="hidden" name={`pay:${r.participant_id}`} value={row.pay} />
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <button type="button" className="plain" onClick={() => togglePresent(r.participant_id)}>
-            <span className={row.present ? 'nm' : 'nm-off'}>{r.who}</span>
-          </button>
-          <Booked on={r.booked} />
-          {m && (
-            <button
-              type="button"
-              className={`chip-money ${m.cls}`}
-              disabled={!row.present || card}
-              onClick={() => nextWay(r)}
-            >
-              {m.text}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <button type="button" className="plain" onClick={guard(() => togglePresent(r.participant_id))}>
+              <span className={row.present ? 'nm' : 'nm-off'}>{r.who}</span>
             </button>
-          )}
+            <Booked on={r.booked} />
+            {m && (
+              <button
+                type="button"
+                className={`chip-money ${m.cls}`}
+                disabled={!row.present || card}
+                onClick={guard(() => nextWay(r))}
+              >
+                {m.text}
+              </button>
+            )}
+          </div>
+
+          <button
+            type="button"
+            aria-label={`${r.who}: ${row.present ? 'снять отметку' : 'отметить'}`}
+            aria-pressed={row.present}
+            className={row.present ? 'dot-on' : 'dot-off'}
+            onClick={guard(() => togglePresent(r.participant_id))}
+          >
+            {row.present && (
+              <svg viewBox="0 0 24 24">
+                <path d="M4 12.5 L9.5 18 L20 6" />
+              </svg>
+            )}
+          </button>
         </div>
 
-        <button
-          type="button"
-          aria-label={`${r.who}: ${row.present ? 'снять отметку' : 'отметить'}`}
-          aria-pressed={row.present}
-          className={row.present ? 'dot-on' : 'dot-off'}
-          onClick={() => togglePresent(r.participant_id)}
-        >
-          {row.present && (
-            <svg viewBox="0 0 24 24">
-              <path d="M4 12.5 L9.5 18 L20 6" />
-            </svg>
-          )}
-        </button>
+        {askingHere && (
+          <div className="note" style={{ margin: '0 0 14px' }}>
+            По этому занятию деньги уже проведены. Изменение попадёт в реестр
+            и будет видно, кто его сделал.
+            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setUnlocked((p) => new Set(p).add(r.participant_id));
+                  setAsking(null);
+                }}
+              >
+                Всё равно изменить
+              </button>
+              <button type="button" className="btn-quiet" onClick={() => setAsking(null)}>
+                Отмена
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
