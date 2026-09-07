@@ -22,6 +22,7 @@
   .nav-logo span { color: var(--rose); }
   .nav-back { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm-gray); text-decoration: none; white-space: nowrap; transition: color 0.2s; }
   .nav-back:hover { color: var(--rose); }
+  .nav-side { display: flex; align-items: center; gap: 20px; }
   .nav-cta { font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; padding: 10px 24px; background: var(--rose); color: #fff; text-decoration: none; transition: background 0.2s; }
   .nav-cta:hover { background: var(--rose-dark); }
 
@@ -84,10 +85,21 @@
   .footer-links a { font-size: 12px; color: rgba(250,247,242,0.5); text-decoration: none; transition: color 0.2s; }
   .footer-links a:hover { color: var(--rose-light); }
 
+  /* Совсем узкие экраны: логотип не уменьшаем, ужимаем всё вокруг него. */
+  @media (max-width: 360px) {
+    nav { padding: 14px 14px; }
+    .nav-cta { padding: 9px 12px; font-size: 9px; letter-spacing: 0.1em; }
+    .nav-side { gap: 6px; }
+  }
   @media (max-width: 900px) {
     nav { padding: 14px 20px; }
     .nav-logo { font-size: 15px; }
-    .nav-back { letter-spacing: 0.12em; }
+    /* Одна стрелка вместо слов: иначе логотип уезжает на вторую строку.
+       По той же причине справа всё жмётся: место нужно логотипу. */
+    .nav-side { gap: 10px; }
+    .nav-back { letter-spacing: 0; font-size: 17px; padding: 8px 2px; }
+    .nav-word { display: none; }
+    .hero-pretitle { letter-spacing: 0.2em; }
     .nav-cta { padding: 9px 16px; letter-spacing: 0.15em; }
     .hero { grid-template-columns: 1fr; }
     .hero-left { padding: 56px 28px; }
@@ -107,8 +119,8 @@
 
 <nav>
   <a href="/" class="nav-logo">Re.Create.Art · <span>Варя Перлина</span></a>
-  <div style="display:flex; align-items:center; gap:20px;">
-    <a href="/" class="nav-back">← На главную</a>
+  <div class="nav-side">
+    <a href="/" class="nav-back" aria-label="На главную">←<span class="nav-word"> На главную</span></a>
     <a href="/login" class="nav-cta">Кабинет</a>
   </div>
 </nav>
