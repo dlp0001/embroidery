@@ -1,9 +1,10 @@
 /**
  * PayPlus. Две операции: создать платёжную страницу и проверить транзакцию.
  *
- * Обратному вызову мы не верим на слово: подписи в документации нет,
- * поэтому после каждого уведомления сами спрашиваем у PayPlus, что
- * произошло на самом деле, через /PaymentPages/ipn.
+ * Обратному вызову мы не верим на слово. Подпись у него есть, заголовок
+ * hash считается от тела на секретном ключе, но проще и надёжнее после
+ * каждого уведомления самим спросить у PayPlus, что произошло на самом
+ * деле, через /PaymentPages/ipn. Оттуда же берём данные для квитанции.
  */
 
 import type { Card } from './icount';
@@ -136,42 +137,53 @@ export async function fetchTransaction(params: {
 
   const raw = await call<Record<string, unknown>>('/PaymentPages/ipn', body);
 
-  // Форма ответа у PayPlus плавает между обёртками, поэтому ищем в обеих.
-  const holder = (raw.data ?? raw) as Record<string, unknown>;
-  const tx = ((holder.transaction ?? holder) ?? {}) as Record<string, unknown>;
+  // Форма ответа у PayPlus плавает. На проверку он отвечает плоским
+  // объектом внутри data, а в обратном вызове те же поля разложены по
+  // transaction и card_information, да ещё и названы иначе. Поэтому
+  // складываем все места в стопку и ищем ключ по всей стопке сразу.
+  const holder = obj(raw.data ?? raw);
+  const tx = obj(holder.transaction ?? holder);
+  const where = [tx, holder, obj(tx.card_information ?? holder.card_information), obj(tx.payments)];
 
-  const statusCode = typeof tx.status_code === 'string' ? tx.status_code : null;
-  const amount = typeof tx.amount === 'number' ? tx.amount : Number(tx.amount ?? NaN);
+  const statusCode = text(where, 'status_code');
+  const amount = number(where, 'amount');
+
+  const card: Card = {
+    fourDigits: text(where, 'four_digits'),
+    brand: text(where, 'brand_name'),
+    approvalNumber: text(where, 'approval_num', 'approval_number', 'voucher_num', 'voucher_number'),
+    payments: number(where, 'number_of_payments'),
+  };
 
   return {
     paid: statusCode === '000',
     statusCode,
-    amount: Number.isFinite(amount) ? amount : null,
-    transactionUid: typeof tx.uid === 'string' ? tx.uid : null,
-    reference: typeof tx.more_info === 'string' ? tx.more_info : null,
-    card: cardOf(holder, tx),
+    amount,
+    transactionUid: text(where, 'transaction_uid', 'uid'),
+    reference: text(where, 'more_info'),
+    // Без хвоста карты квитанция всё равно законна, поэтому пусто — не беда.
+    card: Object.values(card).some((v) => v !== null) ? card : null,
   };
 }
 
-/**
- * Данные карты для квитанции. PayPlus кладёт их то в корень, то в data,
- * то не кладёт вовсе, поэтому каждое поле необязательное: без хвоста
- * карты квитанция всё равно законна, а без суммы — нет, но сумму мы
- * берём не отсюда.
- */
-function cardOf(holder: Record<string, unknown>, tx: Record<string, unknown>): Card | null {
-  const data = (holder.data ?? holder) as Record<string, unknown>;
-  const info = (data.card_information ?? holder.card_information ?? {}) as Record<string, unknown>;
-  const payments = (tx.payments ?? {}) as Record<string, unknown>;
-
-  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
-  const count = Number(payments.number_of_payments);
-
-  const card: Card = {
-    fourDigits: str(info.four_digits),
-    brand: str(info.brand_name),
-    approvalNumber: str(tx.approval_number) ?? str(tx.voucher_number),
-    payments: Number.isFinite(count) && count > 0 ? count : null,
-  };
-  return Object.values(card).some((v) => v !== null) ? card : null;
+function obj(v: unknown): Record<string, unknown> {
+  return v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
 }
+
+/** Первое непустое значение ключа по всем местам, где PayPlus его прячет. */
+function text(where: Record<string, unknown>[], ...keys: string[]): string | null {
+  for (const key of keys) {
+    for (const place of where) {
+      const v = place[key];
+      if (typeof v === 'string' && v.trim()) return v.trim();
+      if (typeof v === 'number') return String(v);
+    }
+  }
+  return null;
+}
+
+function number(where: Record<string, unknown>[], ...keys: string[]): number | null {
+  const found = Number(text(where, ...keys));
+  return Number.isFinite(found) ? found : null;
+}
+
