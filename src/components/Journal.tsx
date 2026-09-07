@@ -11,6 +11,12 @@ function expected(r: RosterRow): boolean {
   return r.booked || r.preferred;
 }
 
+/** Родитель записал ребёнка именно на это занятие, а не «обычно ходит». */
+function Booked({ on }: { on: boolean }) {
+  if (!on) return null;
+  return <div className="signed">записан</div>;
+}
+
 /** Абонемент можно выбрать, только если он есть или занятие уже на нём. */
 function ways(r: RosterRow): PayWay[] {
   return r.has_pass || r.on_pass ? ['none', 'cash', 'pass'] : ['none', 'cash'];
@@ -112,6 +118,7 @@ export default function Journal({
           <div className="mark" style={{ borderBottom: 0 }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div className={row.present ? 'nm' : 'nm-off'}>{r.who}</div>
+              <Booked on={r.booked} />
               <div className="money">
                 {done === 'cash' ? 'оплачено наличными или переводом'
                   : done === 'card' ? 'оплачено картой'
@@ -162,6 +169,7 @@ export default function Journal({
           <button type="button" className="plain" onClick={() => togglePresent(r.participant_id)}>
             <span className={row.present ? 'nm' : 'nm-off'}>{r.who}</span>
           </button>
+          <Booked on={r.booked} />
           {m && (
             <button
               type="button"
