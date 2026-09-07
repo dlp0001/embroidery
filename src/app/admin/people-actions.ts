@@ -4,8 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { isAdmin, requireUser } from '@/lib/session';
 import {
-  addChildTo, createParent, renameChildById, renameUser, restoreChild, retireChild,
-  setPreferredDay,
+  addChildTo, createParent, renameChildById, restoreChild, retireChild,
+  saveParent, setPreferredDay,
 } from '@/lib/studio';
 
 async function requireAdmin() {
@@ -38,7 +38,14 @@ export async function createParentAction(form: FormData): Promise<void> {
 
 export async function renameUserAction(form: FormData): Promise<void> {
   await requireAdmin();
-  await renameUser(String(form.get('userId')), text(form, 'name'));
+  const billing = text(form, 'billingName');
+  // Квитанции уходят в израильскую отчётность, там все имена пишутся
+  // одинаково. Кириллицу и иврит в это поле не пускаем.
+  if (billing && /[^\u0020-\u007E]/.test(billing)) {
+    redirect('/admin/studio/people?error='
+      + encodeURIComponent('Имя для квитанции пишется латиницей'));
+  }
+  await saveParent(String(form.get('userId')), text(form, 'name'), billing);
   refresh();
 }
 

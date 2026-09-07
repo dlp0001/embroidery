@@ -74,6 +74,9 @@ export type Card = {
   payments: number | null;
 };
 
+/** Цена за штуку, вместе с налогом, если он когда-нибудь появится. */
+export type ReceiptItem = { description: string; quantity: number; price: number };
+
 export type ReceiptInput = {
   /** Наш идентификатор платежа: по нему iCount и отбивает повторную выписку. */
   paymentId: string;
@@ -81,7 +84,8 @@ export type ReceiptInput = {
   userId: string;
   customerName: string;
   email: string;
-  description: string;
+  items: ReceiptItem[];
+  /** Что списала касса. Может не совпасть с суммой позиций только из-за скидки. */
   amount: number;
   currency: string;
   method: Method;
@@ -112,13 +116,13 @@ export async function createReceipt(input: ReceiptInput): Promise<Receipt> {
     email: input.email,
     currency_code: input.currency,
     ...(e.lang ? { doc_lang: e.lang } : {}),
-    items: [{
-      description: input.description,
-      // Цена всегда та, что заплатил родитель. У осек патур НДС нулевой,
-      // а если студия однажды перестанет им быть, iCount вычтет налог сам.
-      unitprice_incvat: input.amount,
-      quantity: 1,
-    }],
+    // Цена идёт та, что заплатил родитель. У осек патур НДС нулевой,
+    // а если студия однажды перестанет им быть, iCount вычтет налог сам.
+    items: input.items.map((i) => ({
+      description: i.description,
+      unitprice_incvat: i.price,
+      quantity: i.quantity,
+    })),
     ...(input.method === 'cc' ? { cc: paid } : { cash: { sum: input.amount } }),
     // Письмо с квитанцией отправляет сам iCount: своей рассылки у нас нет.
     send_email: true,

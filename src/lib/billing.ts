@@ -2,7 +2,7 @@ import { one, query, tx } from './db';
 import { plural } from './format';
 import {
   ALREADY_ISSUED, createReceipt, ICountError,
-  isConfigured as receiptsConfigured, type Card,
+  isConfigured as receiptsConfigured, type Card, type ReceiptItem,
 } from './icount';
 import { logMoneyIn } from './ledger';
 import { createPaymentLink, fetchTransaction, isConfigured } from './payplus';
@@ -15,6 +15,18 @@ export type Intent =
 
 /** Сумма проверочного платежа: маленькая, чтобы не жалко было вернуть. */
 export const TEST_AMOUNT = 5;
+
+/**
+ * Как человек назван в документах и на кассе. Первым идёт имя, которое
+ * завёл админ: по нему сходятся квитанции, выписки PayPlus и бухгалтерия.
+ */
+async function documentName(user: { id: string; email: string; name: string | null }): Promise<string> {
+  const row = await one<{ billing_name: string | null }>(
+    'select billing_name from users where id = $1',
+    [user.id],
+  );
+  return row?.billing_name ?? user.name ?? user.email;
+}
 
 /**
  * Заводит платёж в состоянии «ждёт» и отдаёт ссылку на страницу PayPlus.
@@ -77,7 +89,7 @@ export async function startPayment(
     const link = await createPaymentLink({
       amount,
       currency: price.currency,
-      customerName: user.name ?? user.email,
+      customerName: await documentName(user),
       email: user.email,
       description,
       reference: payment!.id,
@@ -199,27 +211,63 @@ export async function applyPayment(
 
 // ── Квитанции iCount ──────────────────────────────────────
 
-/** Как платёж назван в квитанции: теми же словами, что и на кассе. */
-function receiptFor(purpose: string | null, raw: Record<string, unknown> | null): string {
-  if (purpose === 'studio_pass') {
-    const lessons = Number(raw?.lessons ?? 0);
-    return `Абонемент на ${lessons} ${plural(lessons, 'занятие', 'занятия', 'занятий')}`;
-  }
-  if (purpose === 'studio_debt') {
-    const ids = raw?.charge_ids;
-    const count = Array.isArray(ids) ? ids.length : 0;
-    return count > 0 ? `Занятия в студии, ${count}` : 'Занятия в студии';
-  }
-  return 'Проверка оплаты';
+/** Русский родителю, иврит бухгалтерии. */
+function line(ru: string, he: string): string {
+  return `${ru} | ${he}`;
 }
+
+const LESSON = line('Занятие', 'שיעור');
 
 type ToBill = {
   id: string; amount: string; currency: string; purpose: string | null;
-  raw: Record<string, unknown> | null; user_id: string; name: string | null; email: string;
+  raw: Record<string, unknown> | null; user_id: string; email: string;
+  name: string | null; billing_name: string | null;
 };
 
+/**
+ * Позиции квитанции. Занятия идут одной строкой с количеством, а не
+ * списком: так родителю видно цену за занятие. Если посреди долга
+ * занятие подорожало, строк будет столько, сколько было цен.
+ */
+async function receiptItems(p: ToBill): Promise<ReceiptItem[]> {
+  const total = Number(p.amount);
+
+  if (p.purpose === 'studio_pass') {
+    const n = Number(p.raw?.lessons ?? 0);
+    return [{
+      description: line(
+        `Абонемент на ${n} ${plural(n, 'занятие', 'занятия', 'занятий')}`,
+        n === 1 ? 'מנוי לשיעור אחד' : `מנוי ל-${n} שיעורים`,
+      ),
+      quantity: 1,
+      price: total,
+    }];
+  }
+
+  if (p.purpose === 'studio_debt') {
+    const groups = await query<{ price: string; count: number }>(
+      `select amount::text as price, count(*)::int as count
+         from charges where payment_id = $1 group by amount order by amount`,
+      [p.id],
+    );
+    const sum = groups.reduce((s, g) => s + Number(g.price) * g.count, 0);
+    // Начисления могли и не сойтись с платежом: тогда честнее одна строка
+    // на всю сумму, чем красивая разбивка, которая врёт в итоге.
+    if (groups.length > 0 && Math.abs(sum - total) < 0.01) {
+      return groups.map((g) => ({
+        description: LESSON, quantity: g.count, price: Number(g.price),
+      }));
+    }
+    return [{ description: LESSON, quantity: 1, price: total }];
+  }
+
+  return [{
+    description: line('Проверка оплаты', 'בדיקת תשלום'), quantity: 1, price: total,
+  }];
+}
+
 const UNBILLED = `select p.id, p.amount::text, p.currency, p.purpose, p.raw,
-            u.id as user_id, u.name, u.email
+            u.id as user_id, u.name, u.billing_name, u.email
        from payments p join users u on u.id = p.user_id
       where p.status = 'paid' and p.invoice_url is null and p.raw -> 'receipt' is null`;
 
@@ -240,9 +288,11 @@ export async function issueReceipt(paymentId: string, card?: Card | null): Promi
     const doc = await createReceipt({
       paymentId: p.id,
       userId: p.user_id,
-      customerName: p.name ?? p.email,
+      // В квитанции человек назван так, как его завёл админ: имена в
+      // отчётности должны сходиться между собой, а не с кабинетом.
+      customerName: p.billing_name ?? p.name ?? p.email,
       email: p.email,
-      description: receiptFor(p.purpose, p.raw),
+      items: await receiptItems(p),
       amount: Number(p.amount),
       currency: p.currency,
       method: 'cc',

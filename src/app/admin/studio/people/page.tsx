@@ -93,14 +93,21 @@ export default async function PeoplePage({
 
         {list.map((f) => (
           <div className="card" key={f.user_id}>
-            <form action={renameUserAction} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <form action={renameUserAction}>
               <input type="hidden" name="userId" value={f.user_id} />
-              <input name="name" defaultValue={f.name ?? ''} aria-label="Имя"
-                     placeholder="без имени"
-                     style={{ ...inline, fontFamily: "'Cormorant Garamond', serif", fontSize: 23 }} />
-              <button className="btn-quiet" type="submit">Переименовать</button>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <input name="name" defaultValue={f.name ?? ''} aria-label="Имя"
+                       placeholder="без имени"
+                       style={{ ...inline, fontFamily: "'Cormorant Garamond', serif", fontSize: 23 }} />
+                <button className="btn-quiet" type="submit">Сохранить</button>
+              </div>
+              <div className="sub">{f.email}{f.roles.length ? ` · ${f.roles.join(', ')}` : ''}</div>
+              <div className="field" style={{ margin: '12px 0 0' }}>
+                <label htmlFor={`bill-${f.user_id}`}>Имя для квитанции</label>
+                <input id={`bill-${f.user_id}`} name="billingName" maxLength={120}
+                       defaultValue={f.billing_name ?? ''} placeholder="Tanya Liberman" />
+              </div>
             </form>
-            <div className="sub">{f.email}{f.roles.length ? ` · ${f.roles.join(', ')}` : ''}</div>
 
             {f.attends ? (
               <>
@@ -160,6 +167,12 @@ export default async function PeoplePage({
         ))}
 
         {list.length === 0 && <p className="hint" style={{ marginTop: 20 }}>Пока никого нет.</p>}
+
+        <p className="hint" style={{ marginTop: 18 }}>
+          Имя для квитанции печатается в чеке и уходит в бухгалтерию. Пишется
+          латиницей и одинаково у всех, потому что по нему сходятся документы.
+          Пусто — в квитанцию пойдёт обычное имя.
+        </p>
 
         <p className="hint" style={{ marginTop: 18 }}>
           Дни сохраняются сразу, отдельная кнопка им не нужна.
