@@ -22,6 +22,12 @@ function ways(r: RosterRow): PayWay[] {
   return r.has_pass || r.on_pass ? ['none', 'cash', 'pass'] : ['none', 'cash'];
 }
 
+/** Ребёнка привели, а родителя у него ещё нет: платить пока некому. */
+function NoParent({ on }: { on: boolean }) {
+  if (!on) return null;
+  return <div className="money-off">родитель не привязан</div>;
+}
+
 /** Что уже проведено по деньгам: это и требует подтверждения при правке. */
 function settledWay(r: RosterRow): PayWay | null {
   if (r.cash) return 'cash';
@@ -82,10 +88,6 @@ export default function Journal({
 
   function moneyFor(r: RosterRow): { text: string; cls: string } | null {
     const row = rowFor(r);
-    // Ребёнка привели на занятие, а родителя у него ещё нет: платить некому.
-    if (!r.owner_id) {
-      return row.present ? { text: 'родитель не привязан', cls: 'money-off' } : null;
-    }
     // Никого не отмечаем заранее. Пока человек не отмечен, про деньги
     // говорить нечего: «пропуск» пишем только там, где журнал уже закрыт.
     if (!row.present) return r.status ? { text: 'пропуск', cls: 'money-off' } : null;
@@ -135,11 +137,12 @@ export default function Journal({
               <span className={row.present ? 'nm' : 'nm-off'}>{r.who}</span>
             </button>
             <Booked on={r.booked} />
+            <NoParent on={!r.owner_id} />
             {m && (
               <button
                 type="button"
                 className={`chip-money ${m.cls}`}
-                disabled={!row.present || card || !r.owner_id}
+                disabled={!row.present || card}
                 onClick={guard(() => nextWay(r))}
               >
                 {m.text}

@@ -108,10 +108,10 @@ export default async function PeoplePage({
 
                 {ch.visits > 0 && (
                   <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 14, cursor: 'pointer' }}>
-                    <input type="checkbox" name="chargePast" defaultChecked
+                    <input type="checkbox" name="takePast" defaultChecked
                            style={{ width: 20, height: 20, marginTop: 2 }} />
                     <span className="hint">
-                      Начислить за прошлые посещения по сегодняшней цене
+                      Записать на него и прошлые занятия вместе с их оплатой
                     </span>
                   </label>
                 )}

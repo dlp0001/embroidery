@@ -106,7 +106,8 @@ export type SaveResult = {
 type ChargeRow = {
   id: string;
   participant_id: string;
-  owner_id: string;
+  /** Пусто, пока ребёнка не привязали к взрослому: платить некому. */
+  owner_id: string | null;
   pass_id: string | null;
   payment_id: string | null;
 };
@@ -243,10 +244,10 @@ export async function saveAttendance(
 
       if (!charge) {
         const list = owners.get(mark.participantId) ?? [];
-        if (list.length === 0) continue;
         // Владелец — тот, у кого есть свободный абонемент, иначе первый.
-        const owner = list.find((o) => (passes.get(o)?.length ?? 0) > 0) ?? list[0];
-        const passId = way === 'pass' ? takePass(owner) : null;
+        // Пусто — ребёнка привели без родителя: начисление ждёт плательщика.
+        const owner = list.find((o) => (passes.get(o)?.length ?? 0) > 0) ?? list[0] ?? null;
+        const passId = way === 'pass' && owner ? takePass(owner) : null;
         const inserted = await c.query<ChargeRow>(
           `insert into charges (participant_id, session_id, owner_id, amount, currency, pass_id)
            values ($1, $2, $3, $4, $5, $6)
@@ -259,7 +260,9 @@ export async function saveAttendance(
           kind: passId ? 'charge_on_pass' : 'charge_created',
           actorId: actor.id, ownerId: owner, participantId: mark.participantId,
           sessionId, chargeId: charge.id, passId, amount, currency,
-          note: passId ? 'списано с абонемента' : 'занятие в долг',
+          note: passId ? 'списано с абонемента'
+            : owner ? 'занятие в долг'
+            : 'занятие посчитано, плательщик пока не известен',
         });
       }
 
@@ -267,7 +270,7 @@ export async function saveAttendance(
       if (way !== 'pass' && charge.pass_id) {
         const freed = charge.pass_id;
         await c.query('update charges set pass_id = null where id = $1', [charge.id]);
-        givePass(charge.owner_id, freed);
+        if (charge.owner_id) givePass(charge.owner_id, freed);
         charge = { ...charge, pass_id: null };
         await logMoneyIn(c, {
           kind: 'charge_off_pass', actorId: actor.id, ownerId: charge.owner_id,
@@ -303,7 +306,7 @@ export async function saveAttendance(
         charge = { ...charge, payment_id: null };
       }
 
-      if (way === 'pass' && !charge.pass_id) {
+      if (way === 'pass' && !charge.pass_id && charge.owner_id) {
         const passId = takePass(charge.owner_id);
         if (passId) {
           await c.query('update charges set pass_id = $2 where id = $1', [charge.id, passId]);
@@ -1342,59 +1345,57 @@ export async function orphanChildren(): Promise<OrphanChild[]> {
   );
 }
 
-/** Сколько посещений висит без начисления: деньги за них не посчитаны. */
+/** Занятия, за которые некому платить: ребёнок пока без родителя. */
 export async function unbilledVisits(): Promise<number> {
   const row = await one<{ n: number }>(
-    `select count(*)::int as n
-       from attendance a
-       join participants p on p.id = a.participant_id
-       join children ch on ch.id = p.child_id
-      where a.status = 'present'
-        and not exists (select 1 from guardians g where g.child_id = ch.id)`,
+    `select count(*)::int as n from charges
+      where owner_id is null and payment_id is null`,
   );
   return row?.n ?? 0;
 }
 
 /**
- * Привязывает ребёнка к взрослому. Если попросили, задним числом считает
- * деньги за уже случившиеся посещения: до привязки платить было некому.
- * Цена берётся сегодняшняя, историческую мы не храним.
+ * Привязывает ребёнка к взрослому. Занятия, которые он уже отходил, к
+ * этому моменту посчитаны, но лежат без плательщика: если попросили,
+ * они переезжают на этого взрослого вместе со своей ценой и оплатой.
  */
 export async function linkChild(
-  childId: string, userId: string, chargePast: boolean, byUser: string,
-): Promise<{ charged: number }> {
-  const { amount, currency } = await lessonPrice();
-
+  childId: string, userId: string, takePast: boolean, byUser: string,
+): Promise<{ moved: number }> {
   return tx(async (c) => {
     await c.query(
       'insert into guardians (child_id, user_id) values ($1, $2) on conflict do nothing',
       [childId, userId]);
-    if (!chargePast) return { charged: 0 };
+    if (!takePast) return { moved: 0 };
 
-    const { rows } = await c.query<{ participant_id: string; session_id: string }>(
-      `select a.participant_id, a.session_id
-         from attendance a
-         join participants p on p.id = a.participant_id
-        where p.child_id = $1 and a.status = 'present'
-          and not exists (select 1 from charges ch
-                           where ch.participant_id = a.participant_id
-                             and ch.session_id = a.session_id)
-        order by a.session_id`,
-      [childId]);
+    const { rows } = await c.query<{
+      id: string; participant_id: string; session_id: string;
+      amount: string; currency: string; payment_id: string | null;
+    }>(
+      `update charges ch set owner_id = $2
+         from participants p
+        where p.id = ch.participant_id and p.child_id = $1 and ch.owner_id is null
+        returning ch.id, ch.participant_id, ch.session_id, ch.amount::text, ch.currency,
+                  ch.payment_id`,
+      [childId, userId]);
 
     for (const r of rows) {
-      const made = await c.query<{ id: string }>(
-        `insert into charges (participant_id, session_id, owner_id, amount, currency)
-         values ($1, $2, $3, $4, $5) returning id`,
-        [r.participant_id, r.session_id, userId, amount, currency]);
+      // Наличные, принятые до привязки, тоже обретают плательщика.
+      if (r.payment_id) {
+        await c.query('update payments set user_id = $2 where id = $1 and user_id is null',
+          [r.payment_id, userId]);
+      }
       await logMoneyIn(c, {
-        kind: 'charge_created', actorId: byUser, ownerId: userId,
+        kind: r.payment_id ? 'cash_taken' : 'charge_created',
+        actorId: byUser, ownerId: userId,
         participantId: r.participant_id, sessionId: r.session_id,
-        chargeId: made.rows[0].id, amount, currency,
-        note: 'занятие посчитано после привязки к родителю',
+        chargeId: r.id, paymentId: r.payment_id, amount: r.amount, currency: r.currency,
+        note: r.payment_id
+          ? 'оплаченное занятие закреплено за родителем'
+          : 'занятие закреплено за родителем',
       });
     }
-    return { charged: rows.length };
+    return { moved: rows.length };
   });
 }
 

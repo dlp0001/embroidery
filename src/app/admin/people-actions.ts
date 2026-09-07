@@ -80,20 +80,21 @@ export async function retireChildAction(form: FormData): Promise<void> {
 
 /**
  * Привязывает ребёнка, которого привели без родителя, к взрослому.
- * По умолчанию считает деньги за уже случившиеся посещения: до привязки
- * платить было некому, и эти занятия нигде не учтены.
+ * По умолчанию переносит на него и уже случившиеся занятия: до привязки
+ * они посчитаны, но лежат без плательщика.
  */
 export async function linkChildAction(form: FormData): Promise<void> {
   const admin = await requireAdmin();
   const childId = String(form.get('childId'));
   const userId = String(form.get('userId'));
   if (!userId) return;
-  const res = await linkChild(childId, userId, form.get('chargePast') === 'on', admin.id);
+  const res = await linkChild(childId, userId, form.get('takePast') === 'on', admin.id);
   refresh();
+  revalidatePath('/admin/studio/debts');
   redirect('/admin/studio/people?note=' + encodeURIComponent(
-    res.charged > 0
-      ? `Привязали. Начислено за ${res.charged} ${plural(res.charged, 'занятие', 'занятия', 'занятий')}.`
-      : 'Привязали. Прошлые занятия не начисляли.'));
+    res.moved > 0
+      ? `Привязали. ${res.moved} ${plural(res.moved, 'занятие', 'занятия', 'занятий')} записано на этого родителя.`
+      : 'Привязали. Прошлые занятия остались без плательщика.'));
 }
 
 export async function restoreChildAction(form: FormData): Promise<void> {
