@@ -31,8 +31,17 @@
   .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 17px; color: var(--charcoal); letter-spacing: 0.06em; text-decoration: none; }
   .nav-logo span { color: var(--rose); }
   .nav-right { display: flex; align-items: center; gap: 24px; }
-  .nav-link { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm-gray); text-decoration: none; transition: color 0.2s; }
-  .nav-link:hover { color: var(--rose); }
+  /* Единственная ссылка в шапке, и она должна быть заметна. Подсветка
+     сделана цветом и подчёркиванием: коробку ссылки это не меняет,
+     поэтому высота шапки остаётся прежней. */
+  .nav-link {
+    font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--rose); text-decoration: underline;
+    text-decoration-thickness: 1px; text-underline-offset: 6px;
+    text-decoration-color: var(--rose-light);
+    transition: color 0.2s, text-decoration-color 0.2s;
+  }
+  .nav-link:hover { color: var(--rose-dark); text-decoration-color: var(--rose-dark); }
 
   .hero { display: grid; grid-template-columns: 1fr 1fr; min-height: 560px; margin-top: 60px; }
   .hero-left { padding: 100px 64px; display: flex; flex-direction: column; justify-content: center; }
