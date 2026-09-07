@@ -28,7 +28,9 @@
     "children": "node --env-file-if-exists=.env.local scripts/wipe-children.mjs",
     "children:prod": "node --env-file-if-exists=.env.production.local scripts/wipe-children.mjs --allow-remote",
     "sessions": "node --env-file-if-exists=.env.local scripts/wipe-sessions.mjs",
-    "sessions:prod": "node --env-file-if-exists=.env.production.local scripts/wipe-sessions.mjs --allow-remote"
+    "sessions:prod": "node --env-file-if-exists=.env.production.local scripts/wipe-sessions.mjs --allow-remote",
+    "user": "node --env-file-if-exists=.env.local scripts/wipe-user.mjs",
+    "user:prod": "node --env-file-if-exists=.env.production.local scripts/wipe-user.mjs --allow-remote"
   },
   "dependencies": {
     "googleapis": "^140.0.0",
