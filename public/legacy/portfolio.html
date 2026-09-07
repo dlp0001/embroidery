@@ -32,7 +32,7 @@
   nav {
     position: sticky; top: 0; z-index: 100;
     display: flex; justify-content: space-between; align-items: center;
-    padding: 20px 52px;
+    padding: 18px 52px; min-height: 72px;
     background: rgba(255,255,255,0.95);
     backdrop-filter: blur(12px);
     border-bottom: 1px solid rgba(233,30,140,0.12);
@@ -41,6 +41,17 @@
   .nav-logo span { color: var(--rose); }
   .nav-back { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm-gray); text-decoration: none; transition: color 0.2s; }
   .nav-back:hover { color: var(--rose); }
+
+  /* Шапка одной высоты со всем сайтом: 72 на большом экране, 56 на телефоне. */
+  @media (max-width: 900px) {
+    nav { padding: 11px 16px; min-height: 56px; }
+    .nav-logo { font-size: 15px; }
+    .nav-back {
+      letter-spacing: 0; font-size: 17px; line-height: 1; padding: 0 8px;
+      display: flex; align-items: center; min-height: 32px;
+    }
+    .nav-word { display: none; }
+  }
 
   /* HERO */
   .hero {
@@ -282,7 +293,6 @@
   .fade-up.visible { opacity: 1; transform: translateY(0); }
 
   @media (max-width: 860px) {
-    nav { padding: 16px 24px; }
     .hero { padding: 64px 28px 80px; }
     .hero-inner { grid-template-columns: 1fr; gap: 40px; }
     .hero-photo { max-width: 320px; margin: 0 auto; }
@@ -303,7 +313,7 @@
 
 <nav>
   <a href="/" class="nav-logo">Re.Create.Art · <span>Варя Перлина</span></a>
-  <a href="/" class="nav-back">← На главную</a>
+  <a href="/" class="nav-back" aria-label="На главную">←<span class="nav-word"> На главную</span></a>
 </nav>
 
 <!-- HERO -->

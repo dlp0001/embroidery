@@ -17,13 +17,13 @@
   }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--cream); color: var(--charcoal); font-family: 'Jost', sans-serif; font-weight: 300; line-height: 1.7; overflow-x: hidden; }
-  nav { position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; padding: 20px 52px; background: rgba(255,255,255,0.97); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(233,30,140,0.08); }
+  nav { position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; align-items: center; padding: 18px 52px; min-height: 72px; background: rgba(255,255,255,0.97); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(233,30,140,0.08); }
   .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 17px; color: var(--charcoal); letter-spacing: 0.06em; text-decoration: none; }
   .nav-logo span { color: var(--rose); }
   .nav-back { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm-gray); text-decoration: none; white-space: nowrap; transition: color 0.2s; }
   .nav-back:hover { color: var(--rose); }
   .nav-side { display: flex; align-items: center; gap: 20px; }
-  .nav-cta { font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; padding: 10px 24px; background: var(--rose); color: #fff; text-decoration: none; transition: background 0.2s; }
+  .nav-cta { font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; padding: 9px 24px; background: var(--rose); color: #fff; text-decoration: none; transition: background 0.2s; }
   .nav-cta:hover { background: var(--rose-dark); }
 
   .hero { display: grid; grid-template-columns: 1fr 1fr; min-height: 520px; }
@@ -32,6 +32,13 @@
   .hero-title { font-family: 'Cormorant Garamond', serif; font-size: clamp(40px, 4.6vw, 64px); font-weight: 300; line-height: 1.05; color: var(--charcoal); }
   .hero-title-italic { font-family: 'Cormorant Garamond', serif; font-size: clamp(40px, 4.6vw, 64px); font-weight: 300; font-style: italic; line-height: 1.05; color: var(--rose); margin-bottom: 32px; }
   .hero-desc { font-size: 15px; color: var(--warm-gray); max-width: 450px; line-height: 1.9; }
+  .hero-cta {
+    align-self: flex-start; margin-top: 34px; padding: 16px 40px;
+    background: var(--charcoal); color: #fff; text-decoration: none;
+    font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase;
+    transition: background 0.3s;
+  }
+  .hero-cta:hover { background: var(--rose); }
   .hero-right { position: relative; overflow: hidden; }
   .hero-right img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
@@ -110,6 +117,7 @@
     }
     .hero { grid-template-columns: 1fr; }
     .hero-left { padding: 56px 28px; }
+    .hero-cta { align-self: stretch; text-align: center; padding: 16px 24px; }
     .hero-right { height: 320px; }
     .wrap, .split-text { padding: 60px 28px; }
     .sked-row { grid-template-columns: 1fr; gap: 4px; padding: 22px 0; }
@@ -138,6 +146,7 @@
     <h1 class="hero-title">Студия свободного</h1>
     <div class="hero-title-italic">творчества</div>
     <p class="hero-desc">Авторское пространство, где можно творить во все стороны и во всех техниках сразу — ради того, чтобы дать идее жить. Мы на Старом Севере Тель-Авива.</p>
+    <a href="/login" class="hero-cta">Регистрация или вход</a>
   </div>
   <div class="hero-right">
     <img src="studio.jpg" alt="Студия Свободного Творчества — занятие с детьми">
@@ -152,18 +161,18 @@
   <div class="sked">
     <div class="sked-row">
       <div class="sked-days">Пн · Вт · Чт</div>
-      <div class="sked-time">с 15:00</div>
+      <div class="sked-time">15:00 — 18:00</div>
       <div class="sked-what">
         Детские занятия
-        <span class="sked-note">Не меньше 90 минут: работу можно довести до конца, а не бросить на середине.</span>
+        <span class="sked-note">Да, три часа. И можно опаздывать.</span>
       </div>
     </div>
     <div class="sked-row">
       <div class="sked-days">Пятница</div>
-      <div class="sked-time">с 12:00</div>
+      <div class="sked-time">12:30 — 15:00</div>
       <div class="sked-what">
         Подростки
-        <span class="sked-note">90 минут.</span>
+        <span class="sked-note">Чтобы успеть до шаббата.</span>
       </div>
     </div>
     <div class="sked-row">
@@ -171,7 +180,9 @@
       <div class="sked-time">с 17:00</div>
       <div class="sked-what">
         Взрослые<span class="sked-tag">Только по записи</span>
-        <span class="sked-note">90 минут. Записаться нужно заранее, в кабинете или письмом.</span>
+        <span class="sked-note">
+          Продолжительность — как пойдёт. Записаться нужно заранее, в кабинете или в чате.
+        </span>
       </div>
     </div>
   </div>
@@ -205,7 +216,7 @@
       </div>
     </div>
 
-    <p class="after">Платить можно наличными, картой, битом или пейбоксом. Абонемент покупается у Вари на занятии; сколько занятий в нём осталось и до какого числа он действует — видно в кабинете.</p>
+    <p class="after">Платить можно картой, Apple Pay или Google Pay, битом, пейбоксом или наличными. Абонемент покупается на сайте или у Вари на занятии; сколько занятий в нём осталось и до какого числа он действует — видно в кабинете.</p>
   </div>
 </section>
 
@@ -237,6 +248,28 @@
     <div class="rule">
       <div class="rule-t">Первый раз</div>
       <p class="rule-d">Напишите на <a class="mail" href="mailto:info@re-create.art">info@re-create.art</a>: договоримся о дне, заведём вас в кабинете и расскажем, что взять с собой. Материалы студийные.</p>
+    </div>
+  </div>
+</section>
+
+<section class="wrap wrap-tint">
+  <div class="inner">
+    <div class="eyebrow">Пространство, оно же база</div>
+    <h2 class="h2">Старый Север Тель-Авива,<br><em>улица Shimon HaTarsi</em></h2>
+    <div class="rules" style="margin-top: 40px;">
+      <div class="rule">
+        <div class="rule-t">Что приносить</div>
+        <p class="rule-d">
+          Ничего. Материалы и инструменты студийные, всё нужное уже здесь.
+        </p>
+      </div>
+      <div class="rule">
+        <div class="rule-t">Кроме того, что захочется</div>
+        <p class="rule-d">
+          Скетчбук. Вещь, которую давно хочется раскрасить. Печенье.
+          Картонную коробку от холодильника.
+        </p>
+      </div>
     </div>
   </div>
 </section>
