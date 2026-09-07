@@ -25,6 +25,11 @@ export function isConfigured(): boolean {
   return Boolean(env().token);
 }
 
+/** Каким документом закрываются платежи. Не секрет, показывается в здоровье. */
+export function doctype(): string {
+  return env().doctype;
+}
+
 /** Причина отказа нужна вызывающему: по ней он отличает повтор от поломки. */
 export class ICountError extends Error {
   constructor(readonly reason: string, description: string) {

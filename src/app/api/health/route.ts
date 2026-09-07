@@ -1,4 +1,5 @@
 import { one } from '@/lib/db';
+import { doctype, isConfigured as icountReady } from '@/lib/icount';
 import { isConfigured as payplusReady } from '@/lib/payplus';
 
 export const runtime = 'nodejs';
@@ -34,6 +35,8 @@ export async function GET() {
       resend: Boolean(process.env.RESEND_API_KEY),
       payplus: payplusReady(),
       payplusEnv: process.env.PAYPLUS_ENV === 'prod' ? 'prod' : 'test',
+      icount: icountReady(),
+      icountDoctype: doctype(),
       sheets: Boolean(process.env.GOOGLE_SERVICE_ACCOUNT && process.env.GOOGLE_SHEET_ID),
       bunny: Boolean(process.env.BUNNY_TOKEN_KEY),
     },
