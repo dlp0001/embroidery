@@ -102,10 +102,11 @@ export default async function PeoplePage({
                 <button className="btn-quiet" type="submit">Сохранить</button>
               </div>
               <div className="sub">{f.email}{f.roles.length ? ` · ${f.roles.join(', ')}` : ''}</div>
-              <div className="field" style={{ margin: '12px 0 0' }}>
-                <label htmlFor={`bill-${f.user_id}`}>Имя для квитанции</label>
+              <div className="sub" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                <label htmlFor={`bill-${f.user_id}`}>Имя для квитанции:</label>
                 <input id={`bill-${f.user_id}`} name="billingName" maxLength={120}
-                       defaultValue={f.billing_name ?? ''} placeholder="Tanya Liberman" />
+                       defaultValue={f.billing_name ?? ''} placeholder="Tanya Liberman"
+                       style={{ ...inline, font: 'inherit', color: 'inherit' }} />
               </div>
             </form>
 
