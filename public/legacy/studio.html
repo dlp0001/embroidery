@@ -87,20 +87,27 @@
 
   /* Совсем узкие экраны: логотип не уменьшаем, ужимаем всё вокруг него. */
   @media (max-width: 360px) {
-    nav { padding: 14px 14px; }
+    nav { padding: 12px 12px; }
     .nav-cta { padding: 9px 12px; font-size: 9px; letter-spacing: 0.1em; }
     .nav-side { gap: 6px; }
   }
   @media (max-width: 900px) {
-    nav { padding: 14px 20px; }
+    nav { padding: 11px 16px; min-height: 56px; }
     .nav-logo { font-size: 15px; }
     /* Одна стрелка вместо слов: иначе логотип уезжает на вторую строку.
        По той же причине справа всё жмётся: место нужно логотипу. */
     .nav-side { gap: 10px; }
-    .nav-back { letter-spacing: 0; font-size: 17px; padding: 8px 2px; }
+    /* Стрелке нужна площадь под палец, но не выше шапки. */
+    .nav-back {
+      letter-spacing: 0; font-size: 17px; line-height: 1; padding: 0 8px;
+      display: flex; align-items: center; min-height: 32px;
+    }
     .nav-word { display: none; }
     .hero-pretitle { letter-spacing: 0.2em; }
-    .nav-cta { padding: 9px 16px; letter-spacing: 0.15em; }
+    .nav-cta {
+      padding: 0 16px; letter-spacing: 0.15em;
+      display: inline-flex; align-items: center; min-height: 32px;
+    }
     .hero { grid-template-columns: 1fr; }
     .hero-left { padding: 56px 28px; }
     .hero-right { height: 320px; }
