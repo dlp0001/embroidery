@@ -49,10 +49,11 @@ export default async function StatsPage({
   const sum = (c: Cell[]) => c.reduce((s, x) => s + x.sum, 0);
   const cnt = (c: Cell[]) => c.reduce((s, x) => s + x.count, 0);
 
-  const paid = stats.rows.filter((r) => r.key !== 'due');
-  const gotLessons = sum(paid.map((r) => r.lessons));
-  const gotPasses = sum(paid.map((r) => r.passes));
+  // Итог — вся выручка месяца, вместе с тем, что ещё не заплатили.
+  const allLessons = sum(stats.rows.map((r) => r.lessons));
+  const allPasses = sum(stats.rows.map((r) => r.passes));
   const dueRow = stats.rows.find((r) => r.key === 'due')!;
+  const due = dueRow.lessons.sum + dueRow.passes.sum;
 
   /** Ячейка: сумма крупно, число строк под ней мелко. */
   function Money({ c, what }: { c: Cell; what: 'занятие' | 'абонемент' }) {
@@ -60,7 +61,7 @@ export default async function StatsPage({
     return (
       <>
         {money(c.sum, cur)}
-        <div className="hint" style={{ marginTop: 2 }}>
+        <div className="hint rep-cnt">
           {c.count}&nbsp;
           {what === 'занятие'
             ? plural(c.count, 'занятие', 'занятия', 'занятий')
@@ -113,20 +114,20 @@ export default async function StatsPage({
                 </tr>
               ))}
               <tr className="total">
-                <td>Получено</td>
-                <td>{money(gotLessons, cur)}</td>
-                <td>{money(gotPasses, cur)}</td>
-                <td>{money(gotLessons + gotPasses, cur)}</td>
+                <td>Итого</td>
+                <td>{money(allLessons, cur)}</td>
+                <td>{money(allPasses, cur)}</td>
+                <td>{money(allLessons + allPasses, cur)}</td>
               </tr>
             </tbody>
           </table>
         </div>
 
         <p className="hint" style={{ marginTop: 22 }}>
-          «Получено» — деньги, которые дошли до студии в этом месяце.
-          Не оплачено сейчас {money(dueRow.lessons.sum + dueRow.passes.sum, cur)} за{' '}
-          {cnt([dueRow.lessons, dueRow.passes])}&nbsp;
-          {plural(cnt([dueRow.lessons, dueRow.passes]), 'позицию', 'позиции', 'позиций')}.
+          «Итого» — вся выручка месяца, вместе с тем, что ещё не заплатили.
+          Из неё {money(due, cur)} за {cnt([dueRow.lessons, dueRow.passes])}&nbsp;
+          {plural(cnt([dueRow.lessons, dueRow.passes]), 'позицию', 'позиции', 'позиций')} пока
+          не получено, остальное на руках.
         </p>
 
         <div className="card-lin" style={{ marginTop: 18 }}>
