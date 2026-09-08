@@ -725,35 +725,6 @@ export async function debtors(): Promise<Debtor[]> {
   );
 }
 
-export async function groupsOverview(teacherId: string | null) {
-  return query<{
-    id: string; title: string; age_hint: string | null; weekday: number;
-    starts_at: string; people: number; active_passes: number; audience: string;
-  }>(
-    `select g.id, g.title, g.age_hint, g.weekday, g.starts_at::text, g.audience,
-            (select count(*)::int from participants p
-              where ((g.audience = 'adults' and p.user_id is not null)
-                  or (g.audience = 'kids' and p.child_id is not null))
-                and exists (select 1 from preferred_days pd
-                             where pd.participant_id = p.id and pd.weekday = g.weekday)) as people,
-            (select count(distinct ps.id)::int
-               from participants p
-               left join guardians gd on gd.child_id = p.child_id
-               join passes ps on ps.owner_id = coalesce(p.user_id, gd.user_id)
-              where ((g.audience = 'adults' and p.user_id is not null)
-                  or (g.audience = 'kids' and p.child_id is not null))
-                and exists (select 1 from preferred_days pd
-                             where pd.participant_id = p.id and pd.weekday = g.weekday)
-                and (ps.valid_to is null or ps.valid_to >= current_date)
-                and (select count(*) from charges c2 where c2.pass_id = ps.id) < ps.lessons_total
-            ) as active_passes
-       from studio_groups g
-      where g.active and ($1::uuid is null or g.teacher_id = $1)
-      order by g.weekday, g.starts_at`,
-    [teacherId],
-  );
-}
-
 // ── Расписание для родителя ───────────────────────────────
 
 export type SlotRow = {
@@ -772,10 +743,6 @@ export type SlotRow = {
   preferred: boolean;
 };
 
-/**
- * Занятия за период и для каждого — те члены семьи, кому оно подходит
- * по типу: на детское ходят дети, на взрослое взрослые.
- */
 export async function slotsForUser(userId: string, from: string, to: string): Promise<SlotRow[]> {
   return query<SlotRow>(
     `select s.id as session_id, s.held_on::text, g.starts_at::text, g.title as group_title,
@@ -895,8 +862,13 @@ export async function allGroups(): Promise<GroupRow[]> {
   return query<GroupRow>(
     `select g.id, g.title, g.teacher_id, g.weekday, g.starts_at::text, g.duration_min,
             g.room, g.audience, g.age_hint, g.capacity, g.active,
+            /* Те же люди, что и в журнале: скрытые дети и взрослые,
+               которые сами не ходят, в счёт не идут. */
             (select count(*)::int from participants p
-              where ((g.audience = 'adults' and p.user_id is not null)
+               left join children ch on ch.id = p.child_id
+               left join users u on u.id = p.user_id
+              where ch.archived_at is null
+                and ((g.audience = 'adults' and p.user_id is not null and u.attends)
                   or (g.audience = 'kids' and p.child_id is not null))
                 and exists (select 1 from preferred_days pd
                              where pd.participant_id = p.id and pd.weekday = g.weekday)) as people
