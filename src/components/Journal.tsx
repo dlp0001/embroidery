@@ -82,7 +82,11 @@ export default function Journal({
   );
 
   const present = roster.filter((r) => rowFor(r).present).length;
-  const likely = roster.filter(expected);
+  // Записавшиеся — первыми: их ждут наверняка, остальных по привычке.
+  // Сортировка устойчивая, поэтому внутри каждой части имена по алфавиту.
+  const likely = roster.filter(expected)
+    .slice()
+    .sort((a, b) => Number(b.booked) - Number(a.booked));
   const rest = roster.filter((r) => !expected(r));
   const split = likely.length > 0 && rest.length > 0;
 
