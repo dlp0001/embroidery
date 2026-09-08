@@ -40,8 +40,13 @@ export default async function DebtsPage() {
       <div className="top">
         <div className="kicker">Re.Create.Art · Деньги</div>
         <div className="row">
-          <h1 className="h1">Долги</h1>
-          {admin && <Link className="btn-quiet" href="/admin/studio/ledger">Реестр</Link>}
+          <h1 className="h1">Финансы</h1>
+          {admin && (
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Link className="btn-quiet" href="/admin/studio/stats">Статистика</Link>
+              <Link className="btn-quiet" href="/admin/studio/ledger">Реестр</Link>
+            </div>
+          )}
         </div>
         {rows.length > 0 && (
           <p className="sub">

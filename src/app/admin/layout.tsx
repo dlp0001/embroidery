@@ -9,7 +9,7 @@ const TABS: Tab[] = [
   { href: '/admin/studio/calendar', icon: 'cal', label: 'Расписание' },
   { href: '/admin/studio/groups', icon: 'groups', label: 'Группы' },
   { href: '/admin/studio/people', icon: 'person', label: 'Люди' },
-  { href: '/admin/studio/debts', icon: 'pay', label: 'Долги' },
+  { href: '/admin/studio/debts', icon: 'pay', label: 'Финансы' },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
