@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { isAdmin, requireTeacher } from '@/lib/session';
-import { allGroups, ensureSessions, sessionsInRange } from '@/lib/studio';
+import {
+  allGroups, ensureSessions, sessionsInRange, type CalendarSession,
+} from '@/lib/studio';
 import { hhmm, todayISO, weekdayDayMonth } from '@/lib/format';
 import {
   addSessionAction, setSessionStatusAction,
@@ -22,6 +24,27 @@ function shift(month: string, by: number) {
   const [y, m] = month.split('-').map(Number);
   const d = new Date(Date.UTC(y, m - 1 + by, 1));
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`;
+}
+
+/**
+ * Строчка под названием занятия. Пока журнал не заполнен, интересно, кто
+ * придёт: записавшиеся отдельно от тех, кого ждём по дням недели. Когда
+ * журнал закрыт, интересно уже другое — сколько человек дошло.
+ */
+function note(s: CalendarSession): string {
+  if (s.status === 'cancelled') return 'отменено';
+  if (s.marked > 0) {
+    if (s.expected === 0) return `пришли ${s.came}`;
+    // Пришло больше, чем ждали: «11 из 6» выглядит как ошибка, хотя это правда.
+    return s.came > s.expected
+      ? `пришли ${s.came}, ждали ${s.expected}`
+      : `пришли ${s.came} из ${s.expected}`;
+  }
+  const rest = Math.max(0, s.expected - s.booked);
+  if (s.booked > 0 && rest > 0) return `${s.booked} записано, ещё ожидаем ${rest}`;
+  if (s.booked > 0) return `${s.booked} записано`;
+  if (rest > 0) return `ждём ${rest}, записи пока нет`;
+  return 'журнал пуст';
 }
 
 export default async function AdminCalendarPage({
@@ -103,17 +126,7 @@ export default async function AdminCalendarPage({
               <div>
                 <div className="when">{hhmm(s.starts_at)}</div>
                 <div className="what">{s.group_title}</div>
-<div className="sub">
-                  {s.status === 'cancelled'
-                    ? 'отменено'
-                    : s.marked > 0
-                      ? s.expected > 0
-                        ? `пришли ${s.came} из ${s.expected}`
-                        : `пришли ${s.came}`
-                      : s.expected > 0
-                        ? `ждём ${s.expected}, журнал пуст`
-                        : 'журнал пуст'}
-                </div>
+<div className="sub">{note(s)}</div>
               </div>
               {s.status !== 'cancelled' && (
                 <Link

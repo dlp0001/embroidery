@@ -966,6 +966,8 @@ export type CalendarSession = {
   came: number;
   /** Ждали: записанные на занятие плюс те, у кого этот день в профиле. */
   expected: number;
+  /** Из них записались сами: сказали, что придут именно на это занятие. */
+  booked: number;
 };
 
 export async function sessionsInRange(from: string, to: string): Promise<CalendarSession[]> {
@@ -987,7 +989,16 @@ export async function sessionsInRange(from: string, to: string): Promise<Calenda
                               where pd.participant_id = p.id and pd.weekday = g.weekday)
                   or exists (select 1 from bookings b
                               where b.session_id = s.id and b.participant_id = p.id
-                                and b.status = 'booked'))) as expected
+                                and b.status = 'booked'))) as expected,
+            (select count(*)::int
+               from bookings b
+               join participants p on p.id = b.participant_id
+               left join children ch on ch.id = p.child_id
+               left join users u on u.id = p.user_id
+              where b.session_id = s.id and b.status = 'booked'
+                and ch.archived_at is null
+                and ((g.audience = 'adults' and p.user_id is not null and u.attends)
+                  or (g.audience = 'kids' and p.child_id is not null))) as booked
        from studio_sessions s
        join studio_groups g on g.id = s.group_id
       where s.held_on between $1::date and $2::date
