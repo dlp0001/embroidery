@@ -1,5 +1,5 @@
 import { isAdmin, requireTeacher } from '@/lib/session';
-import { families, orphanChildren } from '@/lib/studio';
+import { families, orphanChildren, peopleCount } from '@/lib/studio';
 import { dayMonth, plural } from '@/lib/format';
 import Toggles from '@/components/Toggles';
 import {
@@ -54,7 +54,9 @@ export default async function PeoplePage({
   }
 
   const { error, note, add } = await searchParams;
-  const [list, orphans] = await Promise.all([families(), orphanChildren()]);
+  const [list, orphans, count] = await Promise.all([
+    families(), orphanChildren(), peopleCount(),
+  ]);
 
   return (
     <>
@@ -64,6 +66,11 @@ export default async function PeoplePage({
           <h1 className="h1">Люди</h1>
           {!add && <a className="btn" href="/admin/studio/people?add=1">Новый</a>}
         </div>
+        <p className="sub">
+          {count.adults}&nbsp;{plural(count.adults, 'взрослый', 'взрослых', 'взрослых')} и{' '}
+          {count.children}&nbsp;{plural(count.children, 'ребёнок', 'ребёнка', 'детей')}.
+          Варя и админы не в счёт
+        </p>
       </div>
 
       <div className="body">

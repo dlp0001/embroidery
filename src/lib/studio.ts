@@ -1328,13 +1328,42 @@ export async function orphanChildren(): Promise<OrphanChild[]> {
   );
 }
 
-/** Занятия, за которые некому платить: ребёнок пока без родителя. */
+/**
+ * Посещения, за которые некому платить: ребёнок пока без родителя.
+ *
+ * Считаем по самим посещениям, а не по начислениям. Ребёнка, которого
+ * привели прямо на занятие, отмечают сразу, а начисление появляется
+ * только когда Варя сохранит журнал: по начислениям такое посещение
+ * пропало бы из счёта, хотя деньги за него никто не считал.
+ */
 export async function unbilledVisits(): Promise<number> {
   const row = await one<{ n: number }>(
-    `select count(*)::int as n from charges
-      where owner_id is null and payment_id is null`,
+    `select count(*)::int as n
+       from attendance a
+       join participants p on p.id = a.participant_id
+       join children ch on ch.id = p.child_id
+      where a.status = 'present'
+        and not exists (select 1 from guardians g where g.child_id = ch.id)
+        and not exists (select 1 from charges x
+                         where x.participant_id = a.participant_id
+                           and x.session_id = a.session_id
+                           and x.payment_id is not null)`,
   );
   return row?.n ?? 0;
+}
+
+/** Сколько в студии людей. Варю и админов не считаем: они не ученики. */
+export async function peopleCount(): Promise<{ adults: number; children: number }> {
+  const row = await one<{ adults: number; children: number }>(
+    `select (select count(*)::int from users u
+              where exists (select 1 from user_roles r
+                             where r.user_id = u.id and r.role in ('parent', 'student'))
+                and not exists (select 1 from user_roles r
+                                 where r.user_id = u.id
+                                   and r.role in ('admin', 'superadmin', 'teacher'))) as adults,
+            (select count(*)::int from children where archived_at is null) as children`,
+  );
+  return { adults: row?.adults ?? 0, children: row?.children ?? 0 };
 }
 
 /**
