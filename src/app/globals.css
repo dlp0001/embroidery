@@ -150,14 +150,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .box svg { width: 15px; height: 15px; fill: none; stroke: #fff; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 .pick-name { font-family: 'Cormorant Garamond', serif; font-size: 22px; color: rgba(26, 26, 46, 0.55); }
 
-/* Антиква по умолчанию рисует минускульные цифры: 1000 читается как IOOO,
-   а для денег это никуда не годится. Везде, где в антикве бывают числа,
-   просим обычные. */
-.h1, .what, .nm, .nm-off, .pick-name, .sum {
-  font-variant-numeric: lining-nums;
-  font-feature-settings: 'lnum' 1;
-}
-/* Сумма: одна и та же вещь на всех экранах. */
+/* Сумма: одна и та же вещь на всех экранах. Цифры оставляем как рисует
+   антиква — минускульные, они здесь к месту. */
 .sum {
   font-family: 'Cormorant Garamond', serif;
   font-size: 21px; white-space: nowrap;
