@@ -73,11 +73,7 @@ export default async function LedgerPage() {
                   <div className="sub">{r.actor ? `отметил: ${r.actor}` : 'автоматически'}</div>
                 </div>
                 {r.amount && (
-                  <div style={{
-                    fontFamily: "'Cormorant Garamond', serif", fontSize: 20,
-                    color: k.good ? 'var(--charcoal)' : 'var(--rose-dark)',
-                    whiteSpace: 'nowrap',
-                  }}>
+                  <div className={k.good ? 'sum' : 'sum sum-due'}>
                     {money(r.amount, r.currency ?? 'ILS')}
                   </div>
                 )}

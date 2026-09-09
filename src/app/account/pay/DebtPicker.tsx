@@ -60,9 +60,7 @@ export default function DebtPicker({
                   <div className="what">{c.who}</div>
                   <div className="money">будет оплачено наличными или переводом</div>
                 </div>
-                <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20 }}>
-                  {money(c.amount, c.currency)}
-                </div>
+                <div className="sum">{money(c.amount, c.currency)}</div>
               </div>
             </div>
           );
@@ -85,9 +83,7 @@ export default function DebtPicker({
                 </span>
                 <span className={on ? 'pick-name pick-on' : 'pick-name'}>{c.who}</span>
               </span>
-              <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20 }}>
-                {money(c.amount, c.currency)}
-              </span>
+              <span className="sum">{money(c.amount, c.currency)}</span>
             </button>
           </div>
         );
@@ -100,9 +96,7 @@ export default function DebtPicker({
         <div style={{ fontSize: 12, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>
           Итого за {picked.size}&nbsp;{plural(picked.size, 'занятие', 'занятия', 'занятий')}
         </div>
-        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 34 }}>
-          {money(total, currency)}
-        </div>
+        <div className="sum sum-big">{money(total, currency)}</div>
       </div>
 
       {payable.length === 0 && (

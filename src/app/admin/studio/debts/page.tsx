@@ -100,9 +100,7 @@ export default async function DebtsPage() {
                   {d.who} · {d.lessons}&nbsp;{plural(d.lessons, 'занятие', 'занятия', 'занятий')} с {dayMonth(d.since)}
                 </div>
               </div>
-              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 21, color: 'var(--rose-dark)' }}>
-                {money(d.amount, d.currency)}
-              </div>
+              <div className="sum sum-due">{money(d.amount, d.currency)}</div>
             </div>
           </div>
         ))}

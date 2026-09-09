@@ -185,10 +185,7 @@ export default async function PayPage({
                         </div>
                       )}
                     </div>
-                    <div style={{
-                      fontFamily: "'Cormorant Garamond', serif", fontSize: 20,
-                      opacity: h.status === 'paid' ? 1 : 0.6,
-                    }}>
+                    <div className="sum" style={{ opacity: h.status === 'paid' ? 1 : 0.6 }}>
                       {money(h.amount, h.currency)}
                     </div>
                   </div>
