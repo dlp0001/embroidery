@@ -76,19 +76,16 @@ async function call<T>(method: string, body: Record<string, unknown>): Promise<T
  */
 export type Method = 'cc' | 'cash' | 'app';
 
-/** Какое именно приложение. Название уходит в документ как есть. */
+/** Какое именно приложение. Значения — коды iCount, не наши выдумки. */
 export type PayApp = 'bit' | 'paybox';
 
 /**
- * Как называется блок платёжного приложения в doc/create.
- *
- * ВНИМАНИЕ: имя поля взято по аналогии с остальными блоками, публичной
- * документации iCount в открытом доступе нет. Если квитанция за Bit не
- * выписывается, смотреть надо сюда: правится одной строкой, деньги от
- * этого не зависят — выписка живёт отдельно от зачёта платежа.
+ * Приложения идут не своим блоком, а через общий payments: ключ — код
+ * способа оплаты из payment_method/get_list, а какое именно приложение,
+ * кладётся в card_brand. Коды взяты у самого iCount, посмотреть их можно
+ * командой npm run icount:methods.
  */
-const APP_BLOCK = 'payment_app';
-const APP_NAME: Record<PayApp, string> = { bit: 'Bit', paybox: 'PayBox' };
+const APP_METHOD = 'payment_app';
 
 export type Card = {
   fourDigits: string | null;
@@ -150,7 +147,11 @@ export async function createReceipt(input: ReceiptInput): Promise<Receipt> {
     })),
     ...(input.method === 'cc' ? { cc: paid }
       : input.method === 'app'
-        ? { [APP_BLOCK]: { sum: input.amount, type: APP_NAME[input.app ?? 'bit'] } }
+        ? {
+            payments: {
+              [APP_METHOD]: { sum: input.amount, card_brand: input.app ?? 'bit' },
+            },
+          }
         : { cash: { sum: input.amount } }),
     // Письмо с квитанцией отправляет сам iCount: своей рассылки у нас нет.
     send_email: true,
