@@ -68,6 +68,25 @@ try {
     `select coalesce(u.name, u.email) as who, p.amount::text, p.created_at::text
        from payments p join users u on u.id = p.user_id
       where p.provider = 'cash' and p.status = 'pending'`);
+  const { rows: lost } = await c.query(
+    `select coalesce(cd.name, u.name, '?') as who, s.held_on::text as day,
+            exists (select 1 from guardians g where g.child_id = p.child_id) as has_parent
+       from attendance a
+       join participants p on p.id = a.participant_id
+       join studio_sessions s on s.id = a.session_id
+       left join children cd on cd.id = p.child_id
+       left join users u on u.id = p.user_id
+      where a.status = 'present'
+        and not exists (select 1 from charges x
+                         where x.participant_id = a.participant_id
+                           and x.session_id = a.session_id)
+      order by s.held_on`);
+  console.log('\nПосещения без начисления (деньги нигде не учтены):');
+  for (const l of lost) {
+    console.log(`  ${l.day} · ${l.who}${l.has_parent ? ' · родитель есть' : ' · родителя нет'}`);
+  }
+  if (lost.length === 0) console.log('  таких нет');
+
   console.log('\nЖдут подтверждения:');
   for (const cl of claims) console.log(`  ${cl.who}: ${cl.amount} ₪ от ${cl.created_at.slice(0,10)}`);
   if (claims.length === 0) console.log('  ни одной заявки');

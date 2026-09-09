@@ -30,7 +30,9 @@
     "sessions": "node --env-file-if-exists=.env.local scripts/wipe-sessions.mjs",
     "sessions:prod": "node --env-file-if-exists=.env.production.local scripts/wipe-sessions.mjs --allow-remote",
     "user": "node --env-file-if-exists=.env.local scripts/wipe-user.mjs",
-    "user:prod": "node --env-file-if-exists=.env.production.local scripts/wipe-user.mjs --allow-remote"
+    "user:prod": "node --env-file-if-exists=.env.production.local scripts/wipe-user.mjs --allow-remote",
+    "child": "node --env-file-if-exists=.env.local scripts/child-check.mjs",
+    "child:prod": "node --env-file-if-exists=.env.production.local scripts/child-check.mjs"
   },
   "dependencies": {
     "googleapis": "^140.0.0",
