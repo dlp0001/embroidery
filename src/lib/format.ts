@@ -23,7 +23,8 @@ export function hhmm(time: string): string {
 export function money(amount: string | number, currency = 'ILS'): string {
   const n = Math.round(Number(amount) * 100) / 100;
   const sign = currency === 'ILS' ? '₪' : currency;
-  return `${Number.isInteger(n) ? n : n.toFixed(2)} ${sign}`;
+  // Неразрывный пробел: сумма и знак валюты не должны расходиться по строкам.
+  return `${Number.isInteger(n) ? n : n.toFixed(2)}\u00a0${sign}`;
 }
 
 /** Сегодняшняя дата по времени студии, а не по времени сервера. */
