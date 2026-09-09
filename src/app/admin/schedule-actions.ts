@@ -122,9 +122,18 @@ export async function issuePassAction(form: FormData): Promise<void> {
   revalidatePath('/account/pay');
 }
 
+const HOW = ['cash', 'bit', 'paybox'] as const;
+
 export async function confirmCashAction(form: FormData): Promise<void> {
   const user = await requireAdmin();
-  await confirmCash(String(form.get('paymentId')), user.id);
+  const raw = String(form.get('payMethod') ?? 'cash');
+  const method = (HOW as readonly string[]).includes(raw)
+    ? (raw as (typeof HOW)[number])
+    : 'cash';
+  await confirmCash(String(form.get('paymentId')), user.id, {
+    method,
+    receipt: form.get('receipt') === 'on',
+  });
   revalidatePath('/admin/studio/debts');
   revalidatePath('/admin/studio/ledger');
   revalidatePath('/account/pay');

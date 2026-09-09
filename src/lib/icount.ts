@@ -69,8 +69,26 @@ async function call<T>(method: string, body: Record<string, unknown>): Promise<T
   return data;
 }
 
-/** Чем заплатили: карта на кассе PayPlus или деньги напрямую студии. */
-export type Method = 'cc' | 'cash';
+/**
+ * Чем заплатили: карта на кассе PayPlus, наличные или платёжное
+ * приложение. Приложение налоговая просит указывать отдельно от наличных,
+ * поэтому Bit и PayBox идут своим блоком, а не как деньги в кассу.
+ */
+export type Method = 'cc' | 'cash' | 'app';
+
+/** Какое именно приложение. Название уходит в документ как есть. */
+export type PayApp = 'bit' | 'paybox';
+
+/**
+ * Как называется блок платёжного приложения в doc/create.
+ *
+ * ВНИМАНИЕ: имя поля взято по аналогии с остальными блоками, публичной
+ * документации iCount в открытом доступе нет. Если квитанция за Bit не
+ * выписывается, смотреть надо сюда: правится одной строкой, деньги от
+ * этого не зависят — выписка живёт отдельно от зачёта платежа.
+ */
+const APP_BLOCK = 'payment_app';
+const APP_NAME: Record<PayApp, string> = { bit: 'Bit', paybox: 'PayBox' };
 
 export type Card = {
   fourDigits: string | null;
@@ -95,6 +113,8 @@ export type ReceiptInput = {
   currency: string;
   method: Method;
   card?: Card | null;
+  /** Только для method: 'app'. */
+  app?: PayApp | null;
 };
 
 export type Receipt = { docnum: number | null; url: string | null };
@@ -128,7 +148,10 @@ export async function createReceipt(input: ReceiptInput): Promise<Receipt> {
       unitprice_incvat: i.price,
       quantity: i.quantity,
     })),
-    ...(input.method === 'cc' ? { cc: paid } : { cash: { sum: input.amount } }),
+    ...(input.method === 'cc' ? { cc: paid }
+      : input.method === 'app'
+        ? { [APP_BLOCK]: { sum: input.amount, type: APP_NAME[input.app ?? 'bit'] } }
+        : { cash: { sum: input.amount } }),
     // Письмо с квитанцией отправляет сам iCount: своей рассылки у нас нет.
     send_email: true,
     sanity_string: sanity(input.paymentId),

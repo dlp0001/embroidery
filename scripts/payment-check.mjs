@@ -22,7 +22,9 @@ try {
   const { rows: pays } = await c.query(
     `select p.id, p.provider, p.purpose, p.status, p.amount::text, p.currency,
             p.provider_id, p.created_at::text, u.email,
-            (p.raw ->> 'lessons') as lessons
+            (p.raw ->> 'lessons') as lessons,
+            (p.raw ->> 'pay_method') as pay_method,
+            (p.raw ->> 'receipt_wanted') as receipt_wanted
        from payments p left join users u on u.id = p.user_id
       order by p.created_at desc limit $1`, [limit]);
 
@@ -30,6 +32,9 @@ try {
   for (const p of pays) {
     console.log(`  ${p.created_at.slice(0, 19)} · ${p.provider}/${p.purpose} · ${p.status} · ${p.amount} ${p.currency} · ${p.email ?? '—'}`);
     console.log(`    id ${p.id}${p.provider_id ? `  провайдер ${p.provider_id}` : '  провайдер не записан'}`);
+    if (p.pay_method || p.receipt_wanted) {
+      console.log(`    чем: ${p.pay_method ?? '—'}, чек просили: ${p.receipt_wanted ?? '—'}`);
+    }
   }
   if (pays.length === 0) console.log('  ни одного');
 

@@ -2,7 +2,8 @@ import { one, query, tx } from './db';
 import { plural } from './format';
 import {
   ALREADY_ISSUED, createReceipt, ICountError,
-  isConfigured as receiptsConfigured, type Card, type ReceiptItem,
+  isConfigured as receiptsConfigured,
+  type Card, type Method, type PayApp, type ReceiptItem,
 } from './icount';
 import { logMoneyIn } from './ledger';
 import { createPaymentLink, fetchTransaction, isConfigured } from './payplus';
@@ -219,10 +220,18 @@ function line(ru: string, he: string): string {
 const LESSON = line('Занятие', 'שיעור');
 
 type ToBill = {
-  id: string; amount: string; currency: string; purpose: string | null;
+  id: string; provider: string; amount: string; currency: string; purpose: string | null;
   raw: Record<string, unknown> | null; user_id: string; email: string;
   name: string | null; billing_name: string | null;
 };
+
+/** Чем закрыт платёж с точки зрения квитанции. */
+function receiptMethod(p: ToBill): { method: Method; app: PayApp | null } {
+  if (p.provider !== 'cash') return { method: 'cc', app: null };
+  const how = p.raw?.pay_method;
+  if (how === 'bit' || how === 'paybox') return { method: 'app', app: how };
+  return { method: 'cash', app: null };
+}
 
 /**
  * Позиции квитанции. Занятия идут одной строкой с количеством, а не
@@ -266,10 +275,13 @@ async function receiptItems(p: ToBill): Promise<ReceiptItem[]> {
   }];
 }
 
-const UNBILLED = `select p.id, p.amount::text, p.currency, p.purpose, p.raw,
+const UNBILLED = `select p.id, p.provider, p.amount::text, p.currency, p.purpose, p.raw,
             u.id as user_id, u.name, u.billing_name, u.email
        from payments p join users u on u.id = p.user_id
-      where p.status = 'paid' and p.invoice_url is null and p.raw -> 'receipt' is null`;
+      where p.status = 'paid' and p.invoice_url is null and p.raw -> 'receipt' is null
+        /* Картой — квитанция всегда. Деньги, отданные Варе в руки, только
+           если она сама попросила чек: иначе выпишем лишнюю бумагу. */
+        and (p.provider <> 'cash' or p.raw ->> 'receipt_wanted' = 'yes')`;
 
 /**
  * Выписывает квитанцию на оплаченный платёж и запоминает ссылку на неё.
@@ -295,7 +307,7 @@ export async function issueReceipt(paymentId: string, card?: Card | null): Promi
       items: await receiptItems(p),
       amount: Number(p.amount),
       currency: p.currency,
-      method: 'cc',
+      ...receiptMethod(p),
       card,
     });
     await query(
@@ -459,7 +471,12 @@ export async function pendingCash(): Promise<CashClaim[]> {
 }
 
 /** Студия подтверждает получение денег: занятия закрываются. */
-export async function confirmCash(paymentId: string, actorId: string): Promise<void> {
+/** Чем родитель на самом деле отдал деньги и нужна ли ему квитанция. */
+export type CashDetails = { method: 'cash' | 'bit' | 'paybox'; receipt: boolean };
+
+export async function confirmCash(
+  paymentId: string, actorId: string, how: CashDetails,
+): Promise<void> {
   await tx(async (c) => {
     const { rows } = await c.query<{
       id: string; user_id: string; status: string; amount: string; currency: string;
@@ -472,7 +489,16 @@ export async function confirmCash(paymentId: string, actorId: string): Promise<v
     const p = rows[0];
     if (!p || p.status !== 'pending') return;
 
-    await c.query(`update payments set status = 'paid' where id = $1`, [p.id]);
+    // Способ и просьбу о чеке помним в самом платеже: квитанцию выпишем
+    // после транзакции, а если iCount откажет — по этой пометке попробуем ещё.
+    await c.query(
+      `update payments set status = 'paid',
+              raw = coalesce(raw, '{}'::jsonb) || jsonb_build_object(
+                      'pay_method', $2::text,
+                      'receipt_wanted', $3::text)
+        where id = $1`,
+      [p.id, how.method, how.receipt ? 'yes' : 'no'],
+    );
     const ids = p.raw?.charge_ids ?? [];
     if (ids.length > 0) {
       await c.query(
@@ -484,9 +510,16 @@ export async function confirmCash(paymentId: string, actorId: string): Promise<v
     await logMoneyIn(c, {
       kind: 'cash_confirmed', actorId, ownerId: p.user_id, paymentId: p.id,
       amount: p.amount, currency: p.currency,
-      note: `подтверждено получение денег за ${ids.length} ${plural(ids.length, 'занятие', 'занятия', 'занятий')}`,
+      note: `подтверждено получение денег за ${ids.length} ${
+        plural(ids.length, 'занятие', 'занятия', 'занятий')}${
+        how.method === 'cash' ? '' : `, ${how.method === 'bit' ? 'Bit' : 'PayBox'}`}`,
+      details: { pay_method: how.method, receipt: how.receipt },
     });
   });
+
+  // Квитанция — уже после того, как деньги зачтены: отказ iCount не должен
+  // отменять подтверждение, за которое Варя уже нажала кнопку.
+  if (how.receipt) await issueReceipt(paymentId);
 }
 
 export async function declineCash(paymentId: string, actorId: string): Promise<void> {

@@ -3,6 +3,7 @@ import {
   allActivePasses, debtors, lessonPrice, passOwners, passTypes, unbilledVisits,
 } from '@/lib/studio';
 import { pendingCash } from '@/lib/billing';
+import { isConfigured as receiptsConfigured } from '@/lib/icount';
 import { dayMonth, money, plural } from '@/lib/format';
 import Link from 'next/link';
 import { confirmCashAction, declineCashAction, issuePassAction } from '@/app/admin/schedule-actions';
@@ -32,6 +33,7 @@ export default async function DebtsPage() {
     passTypes(),
   ]);
   const unbilled = await unbilledVisits();
+  const receipts = receiptsConfigured();
   const currency = price.currency;
   const total = rows.reduce((s, d) => s + Number(d.amount), 0);
 
@@ -75,16 +77,34 @@ export default async function DebtsPage() {
                   {plural(cl.lessons, 'занятие', 'занятия', 'занятий')} ·{' '}
                   {money(cl.amount, cl.currency)}
                 </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-                  <form action={confirmCashAction}>
-                    <input type="hidden" name="paymentId" value={cl.id} />
+                {/* Обе кнопки в одной форме: подтверждению нужны поля рядом,
+                    а вложить форму в форму нельзя. */}
+                <form action={confirmCashAction} style={{ marginTop: 14 }}>
+                  <input type="hidden" name="paymentId" value={cl.id} />
+
+                  <div className="field" style={{ marginBottom: 14, maxWidth: 260 }}>
+                    <label htmlFor={`how-${cl.id}`}>Чем заплатили</label>
+                    <select id={`how-${cl.id}`} name="payMethod" defaultValue="cash">
+                      <option value="cash">наличными</option>
+                      <option value="bit">Bit</option>
+                      <option value="paybox">PayBox</option>
+                    </select>
+                  </div>
+
+                  <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 16, cursor: 'pointer' }}>
+                    <input type="checkbox" name="receipt" style={{ width: 20, height: 20, marginTop: 2 }} />
+                    <span className="hint">
+                      Выписать чек в iCount{receipts ? '' : ' — сейчас не подключён'}
+                    </span>
+                  </label>
+
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <button className="btn" type="submit">Деньги получены</button>
-                  </form>
-                  <form action={declineCashAction}>
-                    <input type="hidden" name="paymentId" value={cl.id} />
-                    <button className="btn-quiet" type="submit">Отклонить</button>
-                  </form>
-                </div>
+                    <button className="btn-quiet" type="submit" formAction={declineCashAction}>
+                      Отклонить
+                    </button>
+                  </div>
+                </form>
               </div>
             ))}
           </>
