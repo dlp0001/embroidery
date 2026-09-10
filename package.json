@@ -35,7 +35,9 @@
     "child:prod": "node --env-file-if-exists=.env.production.local scripts/child-check.mjs",
     "icount:methods": "node --env-file-if-exists=.env.local --env-file-if-exists=.env.production.local scripts/icount-methods.mjs",
     "receipts": "node --env-file-if-exists=.env.local scripts/receipts-check.mjs",
-    "receipts:prod": "node --env-file-if-exists=.env.production.local scripts/receipts-check.mjs"
+    "receipts:prod": "node --env-file-if-exists=.env.production.local scripts/receipts-check.mjs",
+    "child:full": "node --env-file-if-exists=.env.local scripts/child-full.mjs",
+    "child:full:prod": "node --env-file-if-exists=.env.production.local scripts/child-full.mjs"
   },
   "dependencies": {
     "googleapis": "^140.0.0",
