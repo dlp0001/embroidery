@@ -37,7 +37,9 @@
     "receipts": "node --env-file-if-exists=.env.local scripts/receipts-check.mjs",
     "receipts:prod": "node --env-file-if-exists=.env.production.local scripts/receipts-check.mjs",
     "child:full": "node --env-file-if-exists=.env.local scripts/child-full.mjs",
-    "child:full:prod": "node --env-file-if-exists=.env.production.local scripts/child-full.mjs"
+    "child:full:prod": "node --env-file-if-exists=.env.production.local scripts/child-full.mjs",
+    "fill": "node --env-file-if-exists=.env.local scripts/fill-sessions.mjs",
+    "fill:prod": "node --env-file-if-exists=.env.production.local scripts/fill-sessions.mjs --allow-remote"
   },
   "dependencies": {
     "googleapis": "^140.0.0",
