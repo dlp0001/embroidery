@@ -19,6 +19,7 @@ const KIND: Record<MoneyKind, { text: string; good: boolean }> = {
   cash_declared: { text: 'заявлена оплата наличными или переводом', good: false },
   cash_confirmed: { text: 'оплата подтверждена', good: true },
   cash_declined: { text: 'заявка отклонена', good: false },
+  child_merged: { text: 'записи объединены', good: true },
 };
 
 function when(iso: string): string {

@@ -3,7 +3,7 @@ import { families, orphanChildren, peopleCount } from '@/lib/studio';
 import { dayMonth, plural } from '@/lib/format';
 import Toggles from '@/components/Toggles';
 import {
-  addChildAction, createParentAction, linkChildAction, renameChildAction, renameUserAction,
+  addChildAction, createParentAction, linkChildAction, mergeChildAction, renameChildAction, renameUserAction,
   restoreChildAction, retireChildAction, toggleDayAction,
 } from '@/app/admin/people-actions';
 
@@ -209,6 +209,29 @@ export default async function PeoplePage({
                       </form>
                     </div>
                     <DayRow participantId={ch.participant_id} days={ch.days ?? []} />
+
+                    {/* Одного ребёнка заводят дважды: Варя на занятии и родитель
+                        в кабинете. Тогда записи надо склеить, а не прятать. */}
+                    {f.children.filter((o) => o.child_id !== ch.child_id && !o.archived).length > 0 && (
+                      <form
+                        action={mergeChildAction}
+                        style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 12, flexWrap: 'wrap' }}
+                      >
+                        <input type="hidden" name="childId" value={ch.child_id} />
+                        <div className="field" style={{ flex: '1 1 220px', marginBottom: 0, minWidth: 0 }}>
+                          <label htmlFor={`merge-${ch.child_id}`}>Это тот же ребёнок, что</label>
+                          <select id={`merge-${ch.child_id}`} name="intoChildId" defaultValue="">
+                            <option value="">— выберите запись —</option>
+                            {f.children
+                              .filter((o) => o.child_id !== ch.child_id && !o.archived)
+                              .map((o) => (
+                                <option key={o.child_id} value={o.child_id}>{o.name}</option>
+                              ))}
+                          </select>
+                        </div>
+                        <button className="btn-quiet" type="submit">Объединить</button>
+                      </form>
+                    )}
                   </>
                 )}
               </div>

@@ -17,7 +17,8 @@ export type MoneyKind =
   | 'payment_paid'        // платёж подтверждён провайдером
   | 'cash_declared'       // родитель заявил, что заплатит напрямую
   | 'cash_confirmed'      // студия подтвердила, что деньги получены
-  | 'cash_declined';      // заявку отклонили
+  | 'cash_declined'       // заявку отклонили
+  | 'child_merged';       // две записи одного ребёнка склеили в одну
 
 export type MoneyEvent = {
   kind: MoneyKind;

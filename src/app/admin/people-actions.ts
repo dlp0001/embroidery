@@ -5,8 +5,8 @@ import { redirect } from 'next/navigation';
 import { plural } from '@/lib/format';
 import { isAdmin, requireUser } from '@/lib/session';
 import {
-  addChildTo, createParent, linkChild, renameChildById, restoreChild, retireChild,
-  saveParent, setPreferredDay,
+  addChildTo, createParent, linkChild, mergeChildren, renameChildById, restoreChild,
+  retireChild, saveParent, setPreferredDay,
 } from '@/lib/studio';
 
 async function requireAdmin() {
@@ -97,6 +97,24 @@ export async function linkChildAction(form: FormData): Promise<void> {
       ? `Привязали. ${total} ${plural(total, 'занятие', 'занятия', 'занятий')} записано на этого родителя${
           res.counted > 0 ? `, из них ${res.counted} посчитано впервые` : ''}. Абонемент не тронут: если занятие шло по нему, поставьте это в журнале.`
       : 'Привязали. Прошлых занятий не было.'));
+}
+
+/**
+ * Склеивает две записи одного ребёнка. Так выходит, когда Варя заводит
+ * ребёнка на занятии, а родитель потом добавляет его сам.
+ */
+export async function mergeChildAction(form: FormData): Promise<void> {
+  const admin = await requireAdmin();
+  const into = String(form.get('intoChildId') ?? '');
+  if (!into) return;
+  const res = await mergeChildren(String(form.get('childId')), into, admin.id);
+  refresh();
+  revalidatePath('/admin/studio/debts');
+  revalidatePath('/admin/studio/calendar');
+  redirect('/admin/studio/people?' + (res.ok
+    ? 'note=' + encodeURIComponent(
+        `Записи объединены${res.name ? `: «${res.name}» больше нет` : ''}. Перенесено ${res.moved}.`)
+    : 'error=' + encodeURIComponent(res.reason ?? 'Объединить не вышло.')));
 }
 
 export async function restoreChildAction(form: FormData): Promise<void> {

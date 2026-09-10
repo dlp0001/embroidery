@@ -1443,6 +1443,71 @@ export async function linkChild(
   });
 }
 
+/**
+ * Склеивает двух детей в одного: так бывает, когда ребёнка сначала
+ * заводит Варя на занятии, а потом родитель добавляет его сам.
+ *
+ * Всё, что накопилось за лишней записью — записи на занятия, отметки,
+ * начисления, дни и составы групп, — переезжает на ту, что остаётся.
+ * Там, где обе записи оказались на одном занятии, побеждает остающаяся:
+ * дублировать посещение или начисление нельзя. Опекуны объединяются,
+ * лишняя запись удаляется.
+ */
+export type MergeResult = { ok: boolean; reason?: string; moved: number; name?: string };
+
+export async function mergeChildren(
+  fromChildId: string, intoChildId: string, byUser: string,
+): Promise<MergeResult> {
+  if (fromChildId === intoChildId) return { ok: false, reason: 'Это одна и та же запись.', moved: 0 };
+
+  return tx(async (c) => {
+    const { rows: pair } = await c.query<{ child_id: string; participant_id: string; name: string }>(
+      `select ch.id as child_id, p.id as participant_id, ch.name
+         from children ch join participants p on p.child_id = ch.id
+        where ch.id = any($1::uuid[])`,
+      [[fromChildId, intoChildId]]);
+    const from = pair.find((r) => r.child_id === fromChildId);
+    const into = pair.find((r) => r.child_id === intoChildId);
+    if (!from || !into) return { ok: false, reason: 'Одну из записей не нашли.', moved: 0 };
+
+    let moved = 0;
+    const move = async (table: string, key: string) => {
+      const { rowCount } = await c.query(
+        `update ${table} set participant_id = $2
+          where participant_id = $1
+            and not exists (select 1 from ${table} t
+                             where t.participant_id = $2 and t.${key} = ${table}.${key})`,
+        [from.participant_id, into.participant_id]);
+      moved += rowCount ?? 0;
+      // Что не переехало — дубль по тому же занятию или дню: он лишний.
+      await c.query(`delete from ${table} where participant_id = $1`, [from.participant_id]);
+    };
+
+    await move('bookings', 'session_id');
+    await move('attendance', 'session_id');
+    await move('charges', 'session_id');
+    await move('preferred_days', 'weekday');
+    await move('studio_members', 'group_id');
+
+    // Родители обеих записей становятся родителями оставшейся.
+    await c.query(
+      `insert into guardians (child_id, user_id)
+       select $2, g.user_id from guardians g where g.child_id = $1
+       on conflict do nothing`,
+      [fromChildId, intoChildId]);
+
+    await c.query('delete from children where id = $1', [fromChildId]);
+
+    await logMoneyIn(c, {
+      kind: 'child_merged', actorId: byUser, participantId: into.participant_id,
+      note: `«${from.name}» объединён(а) с «${into.name}»: перенесено записей ${moved}`,
+      details: { merged_from: fromChildId, into: intoChildId, moved },
+    });
+
+    return { ok: true, moved, name: from.name };
+  });
+}
+
 /** Возвращает скрытого ребёнка обратно в списки. */
 export async function restoreChild(childId: string): Promise<void> {
   await query('update children set archived_at = null where id = $1', [childId]);
