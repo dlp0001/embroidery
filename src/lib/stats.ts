@@ -97,7 +97,7 @@ export async function monthStats(month: string): Promise<MonthStats> {
     rows: [
       {
         key: 'direct',
-        label: 'Наличными или переводом',
+        label: 'Нал / перевод',
         lessons: { count: L.cash_n, sum: Number(L.cash_sum) },
         passes: cell('direct'),
       },
