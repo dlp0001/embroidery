@@ -1367,18 +1367,23 @@ export async function peopleCount(): Promise<{ adults: number; children: number 
 }
 
 /**
- * Привязывает ребёнка к взрослому. Занятия, которые он уже отходил, к
- * этому моменту посчитаны, но лежат без плательщика: если попросили,
- * они переезжают на этого взрослого вместе со своей ценой и оплатой.
+ * Привязывает ребёнка к взрослому и, если попросили, забирает на него
+ * прошлые занятия: посчитанные переезжают вместе со своей ценой и
+ * оплатой, а непосчитанные — те, что отметили, когда платить было
+ * некому, — считаются сейчас, по нынешней цене.
+ *
+ * Абонемент при этом не трогаем. Списывать занятие задним числом —
+ * решение Вари, а не наше: она откроет журнал и поставит «по абонементу»
+ * сама, если так и было.
  */
 export async function linkChild(
   childId: string, userId: string, takePast: boolean, byUser: string,
-): Promise<{ moved: number }> {
+): Promise<{ moved: number; counted: number }> {
   return tx(async (c) => {
     await c.query(
       'insert into guardians (child_id, user_id) values ($1, $2) on conflict do nothing',
       [childId, userId]);
-    if (!takePast) return { moved: 0 };
+    if (!takePast) return { moved: 0, counted: 0 };
 
     const { rows } = await c.query<{
       id: string; participant_id: string; session_id: string;
@@ -1407,7 +1412,34 @@ export async function linkChild(
           : 'занятие закреплено за родителем',
       });
     }
-    return { moved: rows.length };
+
+    // Посещения, по которым начисления нет вовсе: их отметили, когда
+    // плательщика ещё не было, и деньги за них никто не считал.
+    const { amount, currency } = await lessonPrice();
+    const { rows: missed } = await c.query<{ participant_id: string; session_id: string }>(
+      `select a.participant_id, a.session_id
+         from attendance a
+         join participants p on p.id = a.participant_id
+        where p.child_id = $1 and a.status = 'present'
+          and not exists (select 1 from charges x
+                           where x.participant_id = a.participant_id
+                             and x.session_id = a.session_id)`,
+      [childId]);
+
+    for (const m of missed) {
+      const made = await c.query<{ id: string }>(
+        `insert into charges (participant_id, session_id, owner_id, amount, currency)
+         values ($1, $2, $3, $4, $5) returning id`,
+        [m.participant_id, m.session_id, userId, amount, currency]);
+      await logMoneyIn(c, {
+        kind: 'charge_created', actorId: byUser, ownerId: userId,
+        participantId: m.participant_id, sessionId: m.session_id,
+        chargeId: made.rows[0].id, amount, currency,
+        note: 'занятие посчитано при привязке к родителю, по нынешней цене',
+      });
+    }
+
+    return { moved: rows.length, counted: missed.length };
   });
 }
 

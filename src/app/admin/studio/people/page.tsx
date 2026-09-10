@@ -118,7 +118,8 @@ export default async function PeoplePage({
                     <input type="checkbox" name="takePast" defaultChecked
                            style={{ width: 20, height: 20, marginTop: 2 }} />
                     <span className="hint">
-                      Записать на него и прошлые занятия вместе с их оплатой
+                      Записать на него и прошлые занятия вместе с их оплатой.
+                      Непосчитанные посчитаются по нынешней цене, абонемент не тронется
                     </span>
                   </label>
                 )}

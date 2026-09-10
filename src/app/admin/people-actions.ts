@@ -91,10 +91,12 @@ export async function linkChildAction(form: FormData): Promise<void> {
   const res = await linkChild(childId, userId, form.get('takePast') === 'on', admin.id);
   refresh();
   revalidatePath('/admin/studio/debts');
+  const total = res.moved + res.counted;
   redirect('/admin/studio/people?note=' + encodeURIComponent(
-    res.moved > 0
-      ? `Привязали. ${res.moved} ${plural(res.moved, 'занятие', 'занятия', 'занятий')} записано на этого родителя.`
-      : 'Привязали. Прошлые занятия остались без плательщика.'));
+    total > 0
+      ? `Привязали. ${total} ${plural(total, 'занятие', 'занятия', 'занятий')} записано на этого родителя${
+          res.counted > 0 ? `, из них ${res.counted} посчитано впервые` : ''}. Абонемент не тронут: если занятие шло по нему, поставьте это в журнале.`
+      : 'Привязали. Прошлых занятий не было.'));
 }
 
 export async function restoreChildAction(form: FormData): Promise<void> {

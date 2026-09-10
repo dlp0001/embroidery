@@ -43,9 +43,10 @@ function settledWay(r: RosterRow): PayWay | null {
 function defaults(r: RosterRow): Row {
   return {
     present: r.status === 'present',
-    // Абонемент подставляем только тем, по кому занятие ещё не считали:
-    // сохранённое «не оплачено» подменять нельзя.
-    pay: settledWay(r) ?? (!r.locked && r.has_pass ? 'pass' : 'none'),
+    // Абонемент предлагаем только тем, кого сейчас отмечают впервые.
+    // Занятие с уже проставленной отметкой — прошлое: подставлять ему
+    // абонемент нельзя, иначе экран обещает списание, которого не было.
+    pay: settledWay(r) ?? (!r.status && !r.locked && r.has_pass ? 'pass' : 'none'),
   };
 }
 
