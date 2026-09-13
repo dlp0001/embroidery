@@ -24,7 +24,18 @@ export type MonthStats = {
   onPass: number;
   /** Продано занятий в абонементах: за них деньги уже взяты. */
   passLessons: number;
+  /** Что студия за месяц отработала, независимо от того, когда платили. */
+  done: Done;
 };
+
+/**
+ * Реализация: занятия, которые прошли в этом месяце, и сколько они стоят.
+ * Разовое стоит столько, сколько за него начислено. Занятие по абонементу
+ * — свою долю от цены абонемента: восьмёрка за 680 даёт 85 за занятие,
+ * а не сотню.
+ */
+export type DoneRow = { count: number; sum: number };
+export type Done = { single: DoneRow; pass: DoneRow; total: DoneRow; average: number };
 
 type LessonAgg = {
   cash_n: number; cash_sum: string;
@@ -60,6 +71,20 @@ export async function monthStats(month: string): Promise<MonthStats> {
     [first],
   );
 
+  // Реализация считается по занятиям месяца, а не по платежам.
+  const delivered = await query<{
+    pass_id: string | null; amount: string;
+    lessons_total: number | null; pass_paid: string | null;
+  }>(
+    `select ch.pass_id, ch.amount::text, ps.lessons_total, pay.amount::text as pass_paid
+       from charges ch
+       join studio_sessions s on s.id = ch.session_id
+       left join passes ps on ps.id = ch.pass_id
+       left join payments pay on pay.id = ps.payment_id
+      where s.held_on >= $1::date and s.held_on < ($1::date + interval '1 month')`,
+    [first],
+  );
+
   const passes = await query<PassRow>(
     `select ps.id, ps.lessons_total, pay.provider, pay.amount::text
        from passes ps
@@ -89,9 +114,35 @@ export async function monthStats(month: string): Promise<MonthStats> {
     due_n: 0, due_sum: '0', pass_n: 0,
   };
 
+  const single: DoneRow = { count: 0, sum: 0 };
+  const onPass: DoneRow = { count: 0, sum: 0 };
+  for (const d of delivered) {
+    if (!d.pass_id) {
+      single.count++;
+      single.sum += Number(d.amount);
+      continue;
+    }
+    const lessons = d.lessons_total ?? 0;
+    const paid = d.pass_paid !== null
+      ? Number(d.pass_paid)
+      : (types.find((t) => t.lessons === lessons)?.price ?? price.amount * lessons);
+    onPass.count++;
+    onPass.sum += lessons > 0 ? paid / lessons : 0;
+  }
+  const totalDone: DoneRow = {
+    count: single.count + onPass.count,
+    sum: single.sum + onPass.sum,
+  };
+
   return {
     month,
     currency: price.currency,
+    done: {
+      single,
+      pass: onPass,
+      total: totalDone,
+      average: totalDone.count > 0 ? totalDone.sum / totalDone.count : 0,
+    },
     onPass: L.pass_n,
     passLessons: passes.reduce((s, p) => s + p.lessons_total, 0),
     rows: [

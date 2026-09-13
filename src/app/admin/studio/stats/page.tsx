@@ -130,6 +130,47 @@ export default async function StatsPage({
           не получено, остальное на руках.
         </p>
 
+        <div className="lbl" style={{ marginTop: 30 }}>Реализация</div>
+        <p className="hint" style={{ marginBottom: 14 }}>
+          Занятия, которые прошли в этом месяце, и сколько они стоят. Занятие
+          по абонементу считается своей долей от его цены, а не ценой разового.
+        </p>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table className="rep">
+            <thead>
+              <tr>
+                <th>Что прошло</th>
+                <th>Занятий</th>
+                <th>Выручка</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Разовые</td>
+                <td>{stats.done.single.count || <span className="dim">—</span>}</td>
+                <td>{money(stats.done.single.sum, cur)}</td>
+              </tr>
+              <tr>
+                <td>По абонементам</td>
+                <td>{stats.done.pass.count || <span className="dim">—</span>}</td>
+                <td>{money(stats.done.pass.sum, cur)}</td>
+              </tr>
+              <tr className="total">
+                <td>Итого</td>
+                <td>{stats.done.total.count}</td>
+                <td>{money(stats.done.total.sum, cur)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p className="hint" style={{ marginTop: 16 }}>
+          {stats.done.total.count > 0
+            ? <>Среднее занятие в этом месяце стоило {money(stats.done.average, cur)}.</>
+            : 'Занятий в этом месяце ещё не было.'}
+        </p>
+
         <div className="card-lin" style={{ marginTop: 18 }}>
           <div className="what" style={{ marginBottom: 6 }}>Абонементы в этом месяце</div>
           <div className="sub">
