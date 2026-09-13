@@ -1273,8 +1273,12 @@ export async function retireChild(childId: string): Promise<RetireResult> {
 
 /**
  * Ребёнок, которого привели на занятие прямо сейчас. Родителя у него ещё
- * нет: заводим саму запись и сразу ставим «был». Денег это не считает —
- * начислять некому, пока ребёнка не привязали к взрослому.
+ * нет: заводим запись, ставим «был» и сразу считаем занятие.
+ *
+ * Начисление создаём здесь же, а не ждём «Сохранить»: на экране ребёнок
+ * уже отмечен, и выглядит это как готовое дело. Раз отметка настоящая,
+ * деньги за неё должны считаться так же, как у всех. Плательщика пока
+ * нет — начисление ждёт привязки к взрослому.
  */
 export async function addWalkIn(
   sessionId: string, name: string, actorId: string,
@@ -1299,6 +1303,23 @@ export async function addWalkIn(
        values ($1, $2, 'present', $3)
        on conflict (session_id, participant_id) do nothing`,
       [sessionId, part.rows[0].id, actorId]);
+
+    const { amount, currency } = await lessonPrice();
+    const charge = await c.query<{ id: string }>(
+      `insert into charges (participant_id, session_id, amount, currency)
+       values ($1, $2, $3, $4)
+       on conflict (participant_id, session_id) do nothing
+       returning id`,
+      [part.rows[0].id, sessionId, amount, currency]);
+
+    if (charge.rows[0]) {
+      await logMoneyIn(c, {
+        kind: 'charge_created', actorId,
+        participantId: part.rows[0].id, sessionId, chargeId: charge.rows[0].id,
+        amount, currency,
+        note: 'занятие посчитано, плательщик пока не известен',
+      });
+    }
   });
   return { ok: true };
 }

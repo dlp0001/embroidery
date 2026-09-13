@@ -60,8 +60,9 @@ export default async function DebtsPage() {
       <div className="body">
         {unbilled > 0 && (
           <div className="note" style={{ marginBottom: 18 }}>
-            {unbilled}&nbsp;{plural(unbilled, 'посещение', 'посещения', 'посещений')} не
-            посчитано: у детей нет родителя, и платить за них некому.{' '}
+            {unbilled}&nbsp;{plural(unbilled, 'занятие', 'занятия', 'занятий')} без
+            плательщика: у детей нет родителя, и счёт выставить некому. В долги
+            они не попадут, пока ребёнка не привяжут.{' '}
             <Link href="/admin/studio/people">Привязать в «Людях»</Link>.
           </div>
         )}
