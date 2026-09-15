@@ -13,6 +13,7 @@ export type CurrentUser = {
   id: string;
   email: string;
   name: string | null;
+  telegram: string | null;
   roles: Role[];
 };
 
@@ -55,8 +56,10 @@ export const currentUser = cache(async (): Promise<CurrentUser | null> => {
   const token = store.get(COOKIE)?.value;
   if (!token) return null;
 
-  const row = await one<{ id: string; email: string; name: string | null; roles: Role[] | null }>(
-    `select u.id, u.email, u.name,
+  const row = await one<{
+    id: string; email: string; name: string | null; telegram: string | null; roles: Role[] | null;
+  }>(
+    `select u.id, u.email, u.name, u.telegram,
             array_remove(array_agg(r.role), null) as roles
        from sessions s
        join users u on u.id = s.user_id
@@ -66,7 +69,10 @@ export const currentUser = cache(async (): Promise<CurrentUser | null> => {
     [hash(token)],
   );
   if (!row) return null;
-  return { id: row.id, email: row.email, name: row.name, roles: row.roles ?? [] };
+  return {
+    id: row.id, email: row.email, name: row.name,
+    telegram: row.telegram, roles: row.roles ?? [],
+  };
 });
 
 /**

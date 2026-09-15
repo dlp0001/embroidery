@@ -140,10 +140,16 @@ export default async function PeoplePage({
                 <label htmlFor="p-email">Почта</label>
                 <input id="p-email" name="email" type="email" required placeholder="tanya@example.com" />
               </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label htmlFor="p-telegram">Ник в телеграме</label>
+                <input id="p-telegram" name="telegram" maxLength={80} placeholder="@tanya_l"
+                       autoComplete="off" autoCapitalize="none" spellCheck={false} />
+              </div>
               <button className="btn-wide" type="submit">Завести</button>
             </form>
             <p className="hint" style={{ marginTop: 14 }}>
-              По этому адресу человек будет входить в кабинет. Пароль не нужен, код приходит письмом.
+              По этому адресу человек будет входить в кабинет. Пароль не нужен,
+              код приходит письмом. Ник необязателен, его можно дописать потом.
             </p>
             <a className="hint" href="/admin/studio/people" style={{ display: 'block', marginTop: 10 }}>Отмена</a>
           </div>
@@ -165,6 +171,16 @@ export default async function PeoplePage({
                 <input id={`bill-${f.user_id}`} name="billingName" maxLength={120}
                        defaultValue={f.billing_name ?? ''} placeholder="Tanya Liberman"
                        style={{ ...inline, font: 'inherit', color: 'inherit' }} />
+              </div>
+              <div className="sub" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                <label htmlFor={`tg-${f.user_id}`}>Телеграм:</label>
+                <input id={`tg-${f.user_id}`} name="telegram" maxLength={80}
+                       defaultValue={f.telegram ? `@${f.telegram}` : ''} placeholder="@tanya_l"
+                       autoComplete="off" autoCapitalize="none" spellCheck={false}
+                       style={{ ...inline, font: 'inherit', color: 'inherit' }} />
+                {f.telegram && (
+                  <a href={`https://t.me/${f.telegram}`} target="_blank" rel="noreferrer">написать</a>
+                )}
               </div>
             </form>
 
@@ -254,6 +270,13 @@ export default async function PeoplePage({
           Имя для квитанции печатается в чеке и уходит в бухгалтерию. Пишется
           латиницей и одинаково у всех, потому что по нему сходятся документы.
           Пусто — в квитанцию пойдёт обычное имя.
+        </p>
+
+        <p className="hint" style={{ marginTop: 18 }}>
+          Ник в телеграме родитель заполняет сам в своём кабинете, но он
+          необязательный, поэтому чаще его приходится дописывать здесь. Можно
+          вставить хоть ссылку t.me — сохранится один ник. Имя, квитанция и ник
+          сохраняются одной кнопкой «Сохранить».
         </p>
 
         <p className="hint" style={{ marginTop: 18 }}>

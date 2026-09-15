@@ -37,6 +37,26 @@ export function todayISO(): string {
   }).format(new Date());
 }
 
+/**
+ * Ник в телеграме пишут как придётся: с «собакой», без неё, ссылкой
+ * t.me или целым https. Приводим к одному виду — голому нику, «собаку»
+ * дорисовываем при показе. Пусто — ника нет, это законно: поле необязательное.
+ * ok = false — написано что-то, но на ник не похоже, и молча стирать это нельзя.
+ */
+export function telegramNick(raw: string): { ok: boolean; nick: string | null } {
+  const bare = raw
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .replace(/^(?:www\.)?(?:t\.me|telegram\.me|telegram\.dog)\//i, '')
+    .replace(/^@/, '')
+    .replace(/\/+$/, '');
+  if (!bare) return { ok: true, nick: null };
+  // Правила телеграма: латиница, цифры и подчёркивание, первый знак — буква,
+  // всего от пяти до тридцати двух.
+  if (!/^[a-zA-Z][a-zA-Z0-9_]{4,31}$/.test(bare)) return { ok: false, nick: null };
+  return { ok: true, nick: bare };
+}
+
 /** Русские склонения: plural(2, 'занятие', 'занятия', 'занятий'). */
 export function plural(n: number, one: string, few: string, many: string): string {
   const mod10 = n % 10;

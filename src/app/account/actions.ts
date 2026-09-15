@@ -1,10 +1,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { one } from '@/lib/db';
+import { telegramNick } from '@/lib/format';
 import { requireUser } from '@/lib/session';
 import {
-  addChild, renameChild, renameUser, setAttends, setBooking, setPreferredDay,
+  addChild, renameChild, saveProfile, setAttends, setBooking, setPreferredDay,
 } from '@/lib/studio';
 
 /** Участник принадлежит семье вошедшего? */
@@ -60,12 +62,22 @@ export async function setMyAttendance(formData: FormData): Promise<void> {
   refresh();
 }
 
-/** Своё имя родитель правит сам: раньше его мог поменять только админ. */
-export async function updateMyName(formData: FormData): Promise<void> {
+/**
+ * Свою карточку родитель правит сам: раньше её мог поменять только админ.
+ * Ник в телеграме необязателен, но если уж написан — должен быть ником,
+ * иначе по нему всё равно никто не напишет.
+ */
+export async function updateMyProfile(formData: FormData): Promise<void> {
   const user = await requireUser();
   const name = String(formData.get('name') ?? '').trim().slice(0, 120);
-  await renameUser(user.id, name);
+  const tg = telegramNick(String(formData.get('telegram') ?? '').slice(0, 80));
+  if (!tg.ok) {
+    redirect('/account/profile?error=' + encodeURIComponent(
+      'Ник в телеграме — латиница, цифры и подчёркивание, от пяти знаков. Например @anna_liberman'));
+  }
+  await saveProfile(user.id, name, tg.nick);
   refresh();
+  redirect('/account/profile');
 }
 
 export async function updateChild(formData: FormData): Promise<void> {

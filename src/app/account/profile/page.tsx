@@ -3,7 +3,7 @@ import { archivedChildren, familyWithDays } from '@/lib/studio';
 import Toggles from '@/components/Toggles';
 import YesNo from '@/components/YesNo';
 import {
-  createChild, setMyAttendance, togglePreferredDay, updateChild, updateMyName,
+  createChild, setMyAttendance, togglePreferredDay, updateChild, updateMyProfile,
 } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -19,8 +19,13 @@ const WEEK = [
   { n: 5, short: 'пт' }, { n: 6, short: 'сб' }, { n: 7, short: 'вс' },
 ];
 
-export default async function ProfilePage() {
+export default async function ProfilePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const user = await requireUser();
+  const { error } = await searchParams;
   const [family, hidden] = await Promise.all([
     familyWithDays(user.id),
     archivedChildren(user.id),
@@ -41,21 +46,42 @@ export default async function ProfilePage() {
       </div>
 
       <div className="body">
+        {error && <p className="err">{error}</p>}
+
         <div className="card">
           <div className="what" style={{ marginBottom: 14 }}>Родитель</div>
-          <form action={updateMyName} style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-            <div className="field" style={{ flex: 1, marginBottom: 0 }}>
-              <label htmlFor="my-name">Имя и фамилия</label>
-              <input
-                id="my-name"
-                name="name"
-                defaultValue={user.name ?? ''}
-                placeholder="Как вас зовут"
-                maxLength={120}
-              />
+          <form action={updateMyProfile}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div className="field" style={{ flex: '1 1 180px', marginBottom: 0, minWidth: 0 }}>
+                <label htmlFor="my-name">Имя и фамилия</label>
+                <input
+                  id="my-name"
+                  name="name"
+                  defaultValue={user.name ?? ''}
+                  placeholder="Как вас зовут"
+                  maxLength={120}
+                />
+              </div>
+              <div className="field" style={{ flex: '1 1 180px', marginBottom: 0, minWidth: 0 }}>
+                <label htmlFor="my-telegram">Ник в телеграме</label>
+                <input
+                  id="my-telegram"
+                  name="telegram"
+                  defaultValue={user.telegram ? `@${user.telegram}` : ''}
+                  placeholder="@anna_liberman"
+                  maxLength={80}
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                />
+              </div>
+              <button className="btn-quiet" type="submit">Сохранить</button>
             </div>
-            <button className="btn-quiet" type="submit">Сохранить</button>
           </form>
+          <p className="hint" style={{ marginTop: 12 }}>
+            Ник не обязателен. Он нужен только затем, чтобы Варя могла быстро
+            написать, если занятие переносится.
+          </p>
           <div className="sub" style={{ marginTop: 10 }}>{user.email}</div>
 
           <div className="lbl" style={{ margin: '18px 0 0' }}>Хожу на занятия сам</div>

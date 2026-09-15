@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { plural } from '@/lib/format';
+import { plural, telegramNick } from '@/lib/format';
 import { isAdmin, requireUser } from '@/lib/session';
 import {
   addChildTo, createParent, linkChild, mergeChildren, renameChildById, restoreChild,
@@ -29,10 +29,16 @@ export async function createParentAction(form: FormData): Promise<void> {
   await requireAdmin();
   const email = text(form, 'email', 200).toLowerCase();
   const name = text(form, 'name');
+  // С ошибкой возвращаемся в открытую форму, иначе набранное пропадёт.
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-    redirect('/admin/studio/people?error=' + encodeURIComponent('Проверьте адрес почты'));
+    redirect('/admin/studio/people?add=1&error=' + encodeURIComponent('Проверьте адрес почты'));
   }
-  await createParent(email, name);
+  const tg = telegramNick(text(form, 'telegram', 80));
+  if (!tg.ok) {
+    redirect('/admin/studio/people?add=1&error='
+      + encodeURIComponent('Ник в телеграме — латиница, цифры и подчёркивание, от пяти знаков'));
+  }
+  await createParent(email, name, tg.nick);
   refresh();
   redirect('/admin/studio/people');
 }
@@ -46,8 +52,14 @@ export async function renameUserAction(form: FormData): Promise<void> {
     redirect('/admin/studio/people?error='
       + encodeURIComponent('Имя для квитанции пишется латиницей'));
   }
-  await saveParent(String(form.get('userId')), text(form, 'name'), billing);
+  const tg = telegramNick(text(form, 'telegram', 80));
+  if (!tg.ok) {
+    redirect('/admin/studio/people?error='
+      + encodeURIComponent('Ник в телеграме — латиница, цифры и подчёркивание, от пяти знаков'));
+  }
+  await saveParent(String(form.get('userId')), text(form, 'name'), billing, tg.nick);
   refresh();
+  redirect('/admin/studio/people');
 }
 
 export async function addChildAction(form: FormData): Promise<void> {

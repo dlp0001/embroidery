@@ -1146,6 +1146,7 @@ export type Family = {
   participant_id: string | null;
   name: string | null;
   billing_name: string | null;
+  telegram: string | null;
   email: string;
   roles: string[];
   attends: boolean;
@@ -1156,7 +1157,7 @@ export type Family = {
 /** Все взрослые с детьми и составом групп. */
 export async function families(): Promise<Family[]> {
   const rows = await query<Family>(
-    `select u.id as user_id, u.name, u.billing_name, u.email, u.attends,
+    `select u.id as user_id, u.name, u.billing_name, u.telegram, u.email, u.attends,
             (select p.id from participants p where p.user_id = u.id) as participant_id,
             coalesce((select array_agg(r.role order by r.role) from user_roles r
                        where r.user_id = u.id), '{}') as roles,
@@ -1187,12 +1188,21 @@ export async function families(): Promise<Family[]> {
   return rows.map((r) => ({ ...r, children: r.children ?? [] }));
 }
 
-export async function createParent(email: string, name: string): Promise<string> {
+/**
+ * Заводит родителя вручную. Адрес уже может быть в базе: человек покупал
+ * курс или его завели раньше. Тогда дописываем то, чего не хватало,
+ * и не стираем то, что уже стоит — пустое поле формы не должно
+ * затирать заполненное.
+ */
+export async function createParent(
+  email: string, name: string, telegram: string | null,
+): Promise<string> {
   const row = await one<{ id: string }>(
-    `insert into users (email, name) values ($1, $2)
-     on conflict (email) do update set name = coalesce(excluded.name, users.name)
+    `insert into users (email, name, telegram) values ($1, $2, $3)
+     on conflict (email) do update set name = coalesce(excluded.name, users.name),
+                                       telegram = coalesce(excluded.telegram, users.telegram)
      returning id`,
-    [email.trim().toLowerCase(), name.trim() || null],
+    [email.trim().toLowerCase(), name.trim() || null, telegram],
   );
   await query(`insert into user_roles (user_id, role) values ($1, 'parent') on conflict do nothing`, [row!.id]);
   await query('insert into participants (user_id) values ($1) on conflict do nothing', [row!.id]);
@@ -1213,17 +1223,26 @@ export async function setAttends(userId: string, attends: boolean): Promise<void
   });
 }
 
-export async function renameUser(userId: string, name: string): Promise<void> {
-  await query('update users set name = $2 where id = $1', [userId, name.trim() || null]);
-}
-
-/** Правка админа: заодно с именем правится и то, как человек назван в квитанции. */
-export async function saveParent(
-  userId: string, name: string, billingName: string,
+/** Своя карточка: имя и ник в телеграме родитель правит сам. Ник приходит уже разобранным. */
+export async function saveProfile(
+  userId: string, name: string, telegram: string | null,
 ): Promise<void> {
   await query(
-    'update users set name = $2, billing_name = $3 where id = $1',
-    [userId, name.trim() || null, billingName.trim() || null],
+    'update users set name = $2, telegram = $3 where id = $1',
+    [userId, name.trim() || null, telegram],
+  );
+}
+
+/**
+ * Правка админа: заодно с именем правятся и то, как человек назван
+ * в квитанции, и ник в телеграме. Ник приходит уже разобранным.
+ */
+export async function saveParent(
+  userId: string, name: string, billingName: string, telegram: string | null,
+): Promise<void> {
+  await query(
+    'update users set name = $2, billing_name = $3, telegram = $4 where id = $1',
+    [userId, name.trim() || null, billingName.trim() || null, telegram],
   );
 }
 
