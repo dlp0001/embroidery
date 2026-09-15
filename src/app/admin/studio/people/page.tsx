@@ -169,13 +169,13 @@ export default async function PeoplePage({
               <div className="sub" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
                 <label htmlFor={`bill-${f.user_id}`}>Имя для квитанции:</label>
                 <input id={`bill-${f.user_id}`} name="billingName" maxLength={120}
-                       defaultValue={f.billing_name ?? ''} placeholder="Tanya Liberman"
+                       defaultValue={f.billing_name ?? ''} placeholder="не задано"
                        style={{ ...inline, font: 'inherit', color: 'inherit' }} />
               </div>
               <div className="sub" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
                 <label htmlFor={`tg-${f.user_id}`}>Телеграм:</label>
                 <input id={`tg-${f.user_id}`} name="telegram" maxLength={80}
-                       defaultValue={f.telegram ? `@${f.telegram}` : ''} placeholder="@tanya_l"
+                       defaultValue={f.telegram ? `@${f.telegram}` : ''} placeholder="не задан"
                        autoComplete="off" autoCapitalize="none" spellCheck={false}
                        style={{ ...inline, font: 'inherit', color: 'inherit' }} />
                 {f.telegram && (
