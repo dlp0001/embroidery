@@ -5,8 +5,8 @@ import { redirect } from 'next/navigation';
 import { plural, telegramNick } from '@/lib/format';
 import { isAdmin, requireUser } from '@/lib/session';
 import {
-  addChildTo, createParent, linkChild, mergeChildren, renameChildById, restoreChild,
-  retireChild, saveParent, setPreferredDay,
+  addChildTo, createParent, hideChild, linkChild, mergeChildren, renameChildById,
+  restoreChild, saveParent, setPreferredDay,
 } from '@/lib/studio';
 
 async function requireAdmin() {
@@ -78,16 +78,14 @@ export async function renameChildAction(form: FormData): Promise<void> {
   refresh();
 }
 
-export async function retireChildAction(form: FormData): Promise<void> {
+export async function hideChildAction(form: FormData): Promise<void> {
   await requireAdmin();
-  const res = await retireChild(String(form.get('childId')));
+  const res = await hideChild(String(form.get('childId')));
   refresh();
-  // Скрытие — не ошибка, но человек должен понимать, что произошло.
-  if (!res.removed && res.name) {
-    redirect('/admin/studio/people?note=' + encodeURIComponent(
-      `${res.name} скрыт: у него есть посещения или начисления, стереть их нельзя.`));
-  }
-  redirect('/admin/studio/people');
+  redirect('/admin/studio/people' + (res.name
+    ? '?note=' + encodeURIComponent(
+        `${res.name} скрыт: в журналах и в записи на занятия его больше нет. Всё прошлое осталось.`)
+    : ''));
 }
 
 /**

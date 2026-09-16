@@ -3,8 +3,8 @@ import { families, orphanChildren, peopleCount } from '@/lib/studio';
 import { dayMonth, plural } from '@/lib/format';
 import Toggles from '@/components/Toggles';
 import {
-  addChildAction, createParentAction, linkChildAction, mergeChildAction, renameChildAction, renameUserAction,
-  restoreChildAction, retireChildAction, toggleDayAction,
+  addChildAction, createParentAction, hideChildAction, linkChildAction, mergeChildAction,
+  renameChildAction, renameUserAction, restoreChildAction, toggleDayAction,
 } from '@/app/admin/people-actions';
 
 export const dynamic = 'force-dynamic';
@@ -199,31 +199,36 @@ export default async function PeoplePage({
 
             {f.children.map((ch) => (
               <div key={ch.child_id} style={{ padding: '12px 0', borderBottom: '1px solid var(--line-soft)' }}>
+                {/* Скрытый ребёнок остаётся на своём месте, только тускнеет:
+                    так видно, что он в семье есть, но на занятия не ходит. */}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <form action={renameChildAction} style={{ display: 'flex', gap: 8, alignItems: 'center', flex: '1 1 260px', minWidth: 0 }}>
+                    <input type="hidden" name="childId" value={ch.child_id} />
+                    <input name="name" defaultValue={ch.name} aria-label="Имя ребёнка"
+                           style={{
+                             ...inline, fontFamily: "'Cormorant Garamond', serif", fontSize: 20,
+                             color: ch.archived ? 'rgba(26, 26, 46, 0.35)' : undefined,
+                           }} />
+                    <button className="btn-quiet" type="submit">Переименовать</button>
+                  </form>
+                  <form action={ch.archived ? restoreChildAction : hideChildAction}>
+                    <input type="hidden" name="childId" value={ch.child_id} />
+                    <button
+                      className="btn-quiet"
+                      type="submit"
+                      aria-label={`${ch.archived ? 'Вернуть' : 'Скрыть'} ${ch.name}`}
+                    >
+                      {ch.archived ? 'Вернуть' : 'Скрыть'}
+                    </button>
+                  </form>
+                </div>
+
                 {ch.archived ? (
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="what" style={{ opacity: 0.5 }}>{ch.name}</div>
-                      <div className="sub">скрыт, в журналах не появляется</div>
-                    </div>
-                    <form action={restoreChildAction}>
-                      <input type="hidden" name="childId" value={ch.child_id} />
-                      <button className="btn-quiet" type="submit">Вернуть</button>
-                    </form>
+                  <div className="sub" style={{ marginTop: 6 }}>
+                    скрыт: на занятия не записывается и в журналах не появляется
                   </div>
                 ) : (
                   <>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <form action={renameChildAction} style={{ display: 'flex', gap: 8, alignItems: 'center', flex: '1 1 260px', minWidth: 0 }}>
-                        <input type="hidden" name="childId" value={ch.child_id} />
-                        <input name="name" defaultValue={ch.name} aria-label="Имя ребёнка"
-                               style={{ ...inline, fontFamily: "'Cormorant Garamond', serif", fontSize: 20 }} />
-                        <button className="btn-quiet" type="submit">Переименовать</button>
-                      </form>
-                      <form action={retireChildAction}>
-                        <input type="hidden" name="childId" value={ch.child_id} />
-                        <button className="btn-quiet" type="submit" aria-label={`Убрать ${ch.name}`}>Убрать</button>
-                      </form>
-                    </div>
                     <DayRow participantId={ch.participant_id} days={ch.days ?? []} />
 
                     {/* Одного ребёнка заводят дважды: Варя на занятии и родитель
@@ -283,9 +288,9 @@ export default async function PeoplePage({
           Дни сохраняются сразу, отдельная кнопка им не нужна.
           Дни — это те, в которые человек обычно приходит. По ним он попадает в журнал
           нужного занятия и в раздел «ждём». На конкретное занятие родитель записывается
-          сам, в своём кабинете. «Убрать» стирает ребёнка, если он ещё не был
-          ни на одном занятии, и прячет, если посещения уже есть: журналы и
-          деньги прошлых занятий переписывать нельзя.
+          сам, в своём кабинете. «Скрыть» убирает ребёнка из журналов и из
+          записи на занятия, ничего не стирая: прошлые занятия и деньги
+          остаются. «Вернуть» приводит его обратно.
         </p>
       </div>
     </>

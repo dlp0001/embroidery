@@ -1264,33 +1264,18 @@ export async function renameChildById(childId: string, name: string): Promise<vo
 
 /** Убирает ребёнка совсем. Отметки и деньги держат его: тогда отказ. */
 /**
- * Убирает ребёнка из списков. Если он ни разу не был на занятии и денег
- * за него не считали, запись стирается совсем. Если след уже есть, она
- * прячется: журналы и деньги прошлых занятий должны остаться правдой.
+ * Прячет ребёнка: он перестаёт появляться в журналах, в расписании и в
+ * списках для записи, но всё, что с ним было, остаётся на месте. Ничего
+ * не удаляем: за ребёнком могут стоять посещения и деньги, а «скрыть» и
+ * «стереть» — разные обещания.
  */
-export type RetireResult = { removed: boolean; name: string | null };
-
-export async function retireChild(childId: string): Promise<RetireResult> {
-  const row = await one<{ name: string; used: string }>(
-    `select c.name,
-            (select count(*) from attendance a
-               join participants p on p.id = a.participant_id where p.child_id = c.id)
-          + (select count(*) from charges ch
-               join participants p on p.id = ch.participant_id where p.child_id = c.id)
-          + (select count(*) from bookings b
-               join participants p on p.id = b.participant_id where p.child_id = c.id) as used
-       from children c where c.id = $1`,
+export async function hideChild(childId: string): Promise<{ name: string | null }> {
+  const row = await one<{ name: string }>(
+    `update children set archived_at = now()
+      where id = $1 and archived_at is null returning name`,
     [childId],
   );
-  if (!row) return { removed: false, name: null };
-
-  if (Number(row.used) === 0) {
-    await query('delete from children where id = $1', [childId]);
-    return { removed: true, name: row.name };
-  }
-  await query('update children set archived_at = now() where id = $1 and archived_at is null',
-    [childId]);
-  return { removed: false, name: row.name };
+  return { name: row?.name ?? null };
 }
 
 /**

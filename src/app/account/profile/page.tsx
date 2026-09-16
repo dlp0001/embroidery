@@ -155,8 +155,8 @@ export default async function ProfilePage({
           <div className="card">
             <div className="what" style={{ marginBottom: 4 }}>Скрытые</div>
             <p className="hint" style={{ marginBottom: 14 }}>
-              Они не появляются в расписании и журналах, но прошлые занятия
-              и оплаты за них сохранены. Вернуть может Варя.
+              Они не записываются на занятия и не появляются в журналах, но
+              прошлые занятия и оплаты за них сохранены. Вернуть может Варя.
             </p>
             {hidden.map((ch) => (
               <div className="sub" key={ch.child_id} style={{ padding: '6px 0' }}>{ch.name}</div>
