@@ -1,10 +1,11 @@
 import { isAdmin, requireTeacher } from '@/lib/session';
 import {
-  allActivePasses, debtors, lessonPrice, passOwners, passTypes, unbilledVisits,
+  PASS_WARN_DAYS, allActivePasses, debtors, lessonPrice, passOwners, passTypes,
+  unbilledVisits,
 } from '@/lib/studio';
 import { pendingCash } from '@/lib/billing';
 import { isConfigured as receiptsConfigured } from '@/lib/icount';
-import { dayMonth, money, plural } from '@/lib/format';
+import { dayMonth, daysUntil, money, plural, todayISO } from '@/lib/format';
 import Link from 'next/link';
 import { confirmCashAction, declineCashAction, issuePassAction } from '@/app/admin/schedule-actions';
 
@@ -34,6 +35,11 @@ export default async function DebtsPage() {
   ]);
   const unbilled = await unbilledVisits();
   const receipts = receiptsConfigured();
+  // Скоро сгорят: срок на исходе, а занятия ещё остались.
+  const today = todayISO();
+  const burning = passes.filter(
+    (p) => p.valid_to && p.left > 0 && daysUntil(p.valid_to, today) <= PASS_WARN_DAYS,
+  );
   const currency = price.currency;
   const total = rows.reduce((s, d) => s + Number(d.amount), 0);
 
@@ -125,6 +131,14 @@ export default async function DebtsPage() {
             </div>
           </div>
         ))}
+
+        {burning.length > 0 && (
+          <div className="note" style={{ marginBottom: 18 }}>
+            {burning.length === 1 ? 'У одной семьи' : `У ${burning.length} семей`} скоро
+            кончится абонемент, а занятия в нём остались:{' '}
+            {burning.map((p) => `${p.owner_name ?? p.owner_email} — ${p.left} до ${dayMonth(p.valid_to!)}`).join('; ')}.
+          </div>
+        )}
 
         <div className="lbl">Действующие абонементы</div>
         {passes.length === 0 && <p className="hint">Ни одного не продано.</p>}

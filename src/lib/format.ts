@@ -27,6 +27,15 @@ export function money(amount: string | number, currency = 'ILS'): string {
   return `${Number.isInteger(n) ? n : n.toFixed(2)}\u00a0${sign}`;
 }
 
+/** Сколько дней осталось до даты. Отрицательное — дата уже прошла. */
+export function daysUntil(iso: string, from: string): number {
+  const [ay, am, ad] = iso.split('-').map(Number);
+  const [by, bm, bd] = from.split('-').map(Number);
+  const a = Date.UTC(ay, am - 1, ad);
+  const b = Date.UTC(by, bm - 1, bd);
+  return Math.round((a - b) / 86400000);
+}
+
 /** Сегодняшняя дата по времени студии, а не по времени сервера. */
 export function todayISO(): string {
   return new Intl.DateTimeFormat('en-CA', {

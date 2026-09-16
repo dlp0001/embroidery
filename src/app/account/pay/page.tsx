@@ -1,7 +1,9 @@
 import { isAdmin, requireUser } from '@/lib/session';
-import { lessonPrice, passBalances, passTypes, unpaidCharges } from '@/lib/studio';
+import {
+  PASS_WARN_DAYS, lessonPrice, passBalances, passTypes, unpaidCharges,
+} from '@/lib/studio';
 import { isConfigured } from '@/lib/payplus';
-import { dayMonth, money, plural } from '@/lib/format';
+import { dayMonth, daysUntil, money, plural, todayISO } from '@/lib/format';
 import { STUDIO_TZ } from '@/lib/time';
 import { lastTestPayment, myPendingCash, paymentHistory, TEST_AMOUNT, verifyPending } from '@/lib/billing';
 import DebtPicker from './DebtPicker';
@@ -32,6 +34,9 @@ export default async function PayPage({
     passTypes(),
   ]);
   const pass = passes.find((p) => p.left > 0) ?? null;
+  // Остаток сгорает вместе со сроком: говорим об этом, пока можно успеть.
+  const passEnds = pass?.valid_to ? daysUntil(pass.valid_to, todayISO()) : null;
+  const passSoon = passEnds !== null && passEnds <= PASS_WARN_DAYS;
 
   return (
     <>
@@ -59,6 +64,15 @@ export default async function PayPage({
             <div className="sub">
               Общий на всех{pass.valid_to ? ` · действует до ${dayMonth(pass.valid_to)}` : ''}
             </div>
+            {passSoon && (
+              <div className="money-due" style={{ marginTop: 10 }}>
+                {passEnds! > 0
+                  ? `Осталось ${passEnds} ${plural(passEnds!, 'день', 'дня', 'дней')} и ${
+                      pass.left} ${plural(pass.left, 'занятие', 'занятия', 'занятий')}. Неиспользованные сгорят.`
+                  : `Сегодня последний день: ${pass.left} ${
+                      plural(pass.left, 'занятие', 'занятия', 'занятий')} ещё не использовано.`}
+              </div>
+            )}
           </div>
         )}
 

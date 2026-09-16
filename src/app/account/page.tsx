@@ -2,8 +2,8 @@ import Link from 'next/link';
 import BookingHint from '@/components/BookingHint';
 import SlotList from '@/components/SlotList';
 import { requireUser } from '@/lib/session';
-import { passBalances, slotsForUser, unpaidCharges } from '@/lib/studio';
-import { dayMonth, money, plural, todayISO, weekdayDayMonth } from '@/lib/format';
+import { PASS_WARN_DAYS, passBalances, slotsForUser, unpaidCharges } from '@/lib/studio';
+import { dayMonth, daysUntil, money, plural, todayISO, weekdayDayMonth } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +23,9 @@ export default async function WeekPage() {
   ]);
 
   const pass = passes.find((p) => p.left > 0) ?? null;
+  // Занятия в абонементе сгорают вместе со сроком: предупреждаем заранее.
+  const passEnds = pass?.valid_to ? daysUntil(pass.valid_to, today) : null;
+  const passSoon = passEnds !== null && passEnds <= PASS_WARN_DAYS;
   const debt = unpaid.reduce((sum, c) => sum + Number(c.amount), 0);
 
   const days = [...new Set(slots.map((s) => s.held_on))];
@@ -49,6 +52,16 @@ export default async function WeekPage() {
               ))}
             </div>
             <div className="sub">Общий на всех. Списывается с того, кто пришёл.</div>
+            {passSoon && pass.valid_to && (
+              <div className="money-due" style={{ marginTop: 10 }}>
+                {passEnds! > 0
+                  ? `Действует до ${dayMonth(pass.valid_to)}: ${passEnds} ${
+                      plural(passEnds!, 'день', 'дня', 'дней')} и ${pass.left} ${
+                      plural(pass.left, 'занятие', 'занятия', 'занятий')}. Потом сгорит.`
+                  : `Сегодня последний день: ${pass.left} ${
+                      plural(pass.left, 'занятие', 'занятия', 'занятий')} ещё не использовано.`}
+              </div>
+            )}
           </div>
         )}
 

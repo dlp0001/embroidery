@@ -1126,7 +1126,10 @@ export async function allActivePasses(): Promise<PassRow[]> {
             (select pay.provider from payments pay where pay.id = p.payment_id) as paid
        from passes p
        join users u on u.id = p.owner_id
-      where p.valid_to is null or p.valid_to >= current_date
+      where (p.valid_to is null or p.valid_to >= current_date)
+        /* Израсходованный абонемент действующим не считается: тратить
+           в нём нечего, а в списке он мешает видеть настоящие. */
+        and p.lessons_total > (select count(*) from charges c where c.pass_id = p.id)
       order by p.valid_to nulls last, coalesce(u.name, u.email)`,
   );
 }
@@ -1391,6 +1394,12 @@ export async function unbilledVisits(): Promise<number> {
   );
   return row?.n ?? 0;
 }
+
+/**
+ * За сколько дней до конца абонемента начинаем предупреждать. Раньше
+ * незачем, позже уже не успеть отходить остаток.
+ */
+export const PASS_WARN_DAYS = 7;
 
 /** Сколько в студии людей. Варю и админов не считаем: они не ученики. */
 export async function peopleCount(): Promise<{ adults: number; children: number }> {
