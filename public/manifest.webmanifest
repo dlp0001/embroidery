@@ -2,7 +2,7 @@
   "name": "Студия · Re.Create.Art",
   "short_name": "Студия",
   "description": "Расписание, запись и оплата занятий студии свободного творчества",
-  "start_url": "/account",
+  "start_url": "/app",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
