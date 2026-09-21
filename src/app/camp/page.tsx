@@ -65,7 +65,7 @@ export default async function CampPage() {
           <div className="hero-title-italic">лагерь</div>
           <p className="hero-desc">
             {camp
-              ? `Целый день в студии вместо трёх часов: ${period(camp)}. Те же материалы, те же инструменты и время, которого обычно не хватает, чтобы довести идею до вещи.`
+              ? `${period(camp)}, каждый день с ${hhmm(camp.starts_at)} до ${endsAt(camp)}. Те же материалы и инструменты — и время, которого на обычном занятии не хватает, чтобы довести идею до вещи.`
               : 'Варя ведёт творческие занятия в студии и в детских лагерях. Даты ближайшей смены появятся здесь.'}
           </p>
           <a href={camp ? '/login' : 'mailto:info@re-create.art'} className="hero-cta">
@@ -124,10 +124,11 @@ export default async function CampPage() {
               </p>
             </div>
             <div className="rule">
-              <div className="rule-t">Обычных занятий в эти дни нет</div>
+              <div className="rule-t">Обычные занятия идут как шли</div>
               <p className="rule-d">
-                В дни смены студия занята лагерем целиком: обычное расписание
-                на это время не действует и в кабинете не показывается.
+                Смена ничего не отменяет: расписание студии на эти дни
+                остаётся прежним. Можно прийти и на лагерь днём, и на своё
+                занятие потом.
               </p>
             </div>
             <div className="rule">

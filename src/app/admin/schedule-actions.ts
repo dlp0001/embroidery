@@ -5,7 +5,7 @@ import { confirmCash, declineCash } from '@/lib/billing';
 import { isAdmin, requireUser } from '@/lib/session';
 import {
   addSession, createGroup, issuePass, resyncGroupSessions, saleOffers,
-  setGroupActive, setSessionStatus, syncLessonsAround, updateGroup,
+  setGroupActive, setSessionStatus, updateGroup,
   type GroupInput, type GroupKind, type PassOffer,
 } from '@/lib/studio';
 
@@ -99,22 +99,18 @@ function readGroup(form: FormData): GroupInput {
 
 export async function createGroupAction(form: FormData): Promise<void> {
   await requireAdmin();
-  const input = readGroup(form);
-  const id = await createGroup(input);
+  const id = await createGroup(readGroup(form));
   // Сразу расставляем занятия, иначе новая группа висит без расписания.
   await resyncGroupSessions(id);
-  if (input.kind !== 'lesson') await syncLessonsAround(id);
   refresh();
 }
 
 export async function updateGroupAction(form: FormData): Promise<void> {
   await requireAdmin();
   const id = String(form.get('id'));
-  const input = readGroup(form);
-  await updateGroup(id, input);
+  await updateGroup(id, readGroup(form));
   // День или время могли измениться — переносим будущие пустые занятия.
   await resyncGroupSessions(id);
-  if (input.kind !== 'lesson') await syncLessonsAround(id);
   refresh();
 }
 
@@ -124,8 +120,6 @@ export async function toggleGroupAction(form: FormData): Promise<void> {
   const active = String(form.get('active')) === '1';
   await setGroupActive(id, active);
   await resyncGroupSessions(id);
-  // Смена ушла в архив — обычные занятия в её дни возвращаются.
-  await syncLessonsAround(id);
   refresh();
 }
 

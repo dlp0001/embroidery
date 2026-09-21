@@ -1196,43 +1196,6 @@ export async function resyncGroupSessions(groupId: string, weeksAhead = 6): Prom
   });
 }
 
-/**
- * В дни лагеря обычных занятий не бывает: студия занята целиком.
- * Поэтому такие дни отменяем — но не удаляем: если день всё-таки
- * рабочий, Варя вернёт его в календаре одной кнопкой. Дни, где уже
- * есть отметки или деньги, не трогаем вовсе.
- *
- * Помним, ради кого отменили: когда смена сдвинулась или ушла в архив,
- * занятия возвращаются сами. Те, что Варя отменила руками, так и
- * остаются отменёнными — их никто за неё не воскрешает.
- */
-export async function syncLessonsAround(groupId: string): Promise<void> {
-  await tx(async (c) => {
-    await c.query(
-      `update studio_sessions s set status = 'planned', cancelled_for = null
-        where s.cancelled_for = $1
-          and s.held_on >= current_date
-          and not exists (select 1 from studio_sessions cs
-                           where cs.group_id = $1 and cs.held_on = s.held_on
-                             and cs.status <> 'cancelled')`,
-      [groupId],
-    );
-    await c.query(
-      `update studio_sessions s set status = 'cancelled', cancelled_for = $1
-         from studio_groups g
-        where g.id = s.group_id and g.kind = 'lesson'
-          and s.held_on >= current_date
-          and s.status <> 'cancelled'
-          and exists (select 1 from studio_sessions cs
-                       where cs.group_id = $1 and cs.held_on = s.held_on
-                         and cs.status <> 'cancelled')
-          and not exists (select 1 from attendance a where a.session_id = s.id)
-          and not exists (select 1 from charges ch where ch.session_id = s.id)`,
-      [groupId],
-    );
-  });
-}
-
 // ── Абонементы ────────────────────────────────────────────
 
 export type PassOwner = { id: string; name: string | null; email: string; active_left: number };
