@@ -36,7 +36,15 @@ export default async function CalendarPage({
   const { first, last, days, lead } = monthBounds(month);
 
   const rows = await slotsForUser(user.id, first, last);
-  const withSessions = new Set(rows.map((r) => r.held_on));
+  // Точек под числом столько, сколько занятий в этот день: в дни лагеря
+  // их два — сама смена и обычное занятие после неё.
+  const byDay = new Map<string, Set<string>>();
+  for (const r of rows) {
+    const seen = byDay.get(r.held_on) ?? new Set<string>();
+    seen.add(r.session_id);
+    byDay.set(r.held_on, seen);
+  }
+  const withSessions = new Set(byDay.keys());
 
   const selected = params.d && withSessions.has(params.d)
     ? params.d
@@ -69,7 +77,8 @@ export default async function CalendarPage({
           {Array.from({ length: lead }, (_, i) => <div key={`lead-${i}`} />)}
           {Array.from({ length: days }, (_, i) => {
             const iso = `${month}-${pad(i + 1)}`;
-            const has = withSessions.has(iso);
+            const count = byDay.get(iso)?.size ?? 0;
+            const has = count > 0;
             const isSel = iso === selected;
             const cell = (
               <div style={{
@@ -79,7 +88,12 @@ export default async function CalendarPage({
                 color: isSel ? '#fff' : has ? 'var(--charcoal)' : 'rgba(26,26,46,0.35)',
               }}>
                 {i + 1}
-                {has && <div style={{ width: 4, height: 4, borderRadius: '50%', background: isSel ? '#fff' : 'var(--rose)' }} />}
+                <div style={{ display: 'flex', gap: 2 }}>
+                  {Array.from({ length: Math.min(count, 3) }, (_, k) => (
+                    <div key={k} style={{ width: 4, height: 4, borderRadius: '50%',
+                                          background: isSel ? '#fff' : 'var(--rose)' }} />
+                  ))}
+                </div>
               </div>
             );
             return has
