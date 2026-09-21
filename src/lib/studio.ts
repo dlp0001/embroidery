@@ -806,9 +806,9 @@ export type SlotRow = {
   preferred: boolean;
 };
 
-export async function slotsForUser(userId: string, from: string, to: string): Promise<SlotRow[]> {
-  return query<SlotRow>(
-    `select s.id as session_id, s.held_on::text, g.starts_at::text,
+/** Общая часть запроса: кто из семьи на какое занятие может записаться. */
+function slotsQuery(extra: string): string {
+  return `select s.id as session_id, s.held_on::text, g.starts_at::text,
             g.id as group_id, g.title as group_title,
             g.audience, g.kind, g.weekday, g.capacity, g.duration_min,
             coalesce(g.price::text,
@@ -833,10 +833,27 @@ export async function slotsForUser(userId: string, from: string, to: string): Pr
         and c.archived_at is null
         /* На мастер-класс записывается и взрослый, который обычно не ходит. */
         and (p.user_id is null or u.attends or g.kind <> 'lesson')
-        and s.held_on between $2::date and $3::date
         and s.status <> 'cancelled'
-      order by s.held_on, g.starts_at, (p.user_id is not null) desc, who`,
+        ${extra}
+      order by s.held_on, g.starts_at, (p.user_id is not null) desc, who`;
+}
+
+export async function slotsForUser(userId: string, from: string, to: string): Promise<SlotRow[]> {
+  return query<SlotRow>(
+    slotsQuery('and s.held_on between $2::date and $3::date'),
     [userId, from, to],
+  );
+}
+
+/**
+ * Дни лагерей и мастер-классов впереди — все сразу, а не только на
+ * ближайшую неделю. Смена начинается через месяц, и записываться на неё
+ * удобнее одним списком, чем ходя по календарю день за днём.
+ */
+export async function eventSlotsForUser(userId: string): Promise<SlotRow[]> {
+  return query<SlotRow>(
+    slotsQuery(`and g.kind <> 'lesson' and s.held_on >= current_date`),
+    [userId],
   );
 }
 
@@ -1184,23 +1201,36 @@ export async function resyncGroupSessions(groupId: string, weeksAhead = 6): Prom
  * Поэтому такие дни отменяем — но не удаляем: если день всё-таки
  * рабочий, Варя вернёт его в календаре одной кнопкой. Дни, где уже
  * есть отметки или деньги, не трогаем вовсе.
+ *
+ * Помним, ради кого отменили: когда смена сдвинулась или ушла в архив,
+ * занятия возвращаются сами. Те, что Варя отменила руками, так и
+ * остаются отменёнными — их никто за неё не воскрешает.
  */
-export async function cancelLessonsDuring(groupId: string): Promise<number> {
-  const rows = await query<{ id: string }>(
-    `update studio_sessions s set status = 'cancelled'
-       from studio_groups g
-      where g.id = s.group_id and g.kind = 'lesson'
-        and s.held_on >= current_date
-        and s.status <> 'cancelled'
-        and exists (select 1 from studio_sessions cs
-                     where cs.group_id = $1 and cs.held_on = s.held_on
-                       and cs.status <> 'cancelled')
-        and not exists (select 1 from attendance a where a.session_id = s.id)
-        and not exists (select 1 from charges ch where ch.session_id = s.id)
-      returning s.id`,
-    [groupId],
-  );
-  return rows.length;
+export async function syncLessonsAround(groupId: string): Promise<void> {
+  await tx(async (c) => {
+    await c.query(
+      `update studio_sessions s set status = 'planned', cancelled_for = null
+        where s.cancelled_for = $1
+          and s.held_on >= current_date
+          and not exists (select 1 from studio_sessions cs
+                           where cs.group_id = $1 and cs.held_on = s.held_on
+                             and cs.status <> 'cancelled')`,
+      [groupId],
+    );
+    await c.query(
+      `update studio_sessions s set status = 'cancelled', cancelled_for = $1
+         from studio_groups g
+        where g.id = s.group_id and g.kind = 'lesson'
+          and s.held_on >= current_date
+          and s.status <> 'cancelled'
+          and exists (select 1 from studio_sessions cs
+                       where cs.group_id = $1 and cs.held_on = s.held_on
+                         and cs.status <> 'cancelled')
+          and not exists (select 1 from attendance a where a.session_id = s.id)
+          and not exists (select 1 from charges ch where ch.session_id = s.id)`,
+      [groupId],
+    );
+  });
 }
 
 // ── Абонементы ────────────────────────────────────────────

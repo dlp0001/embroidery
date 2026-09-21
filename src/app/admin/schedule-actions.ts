@@ -4,8 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { confirmCash, declineCash } from '@/lib/billing';
 import { isAdmin, requireUser } from '@/lib/session';
 import {
-  addSession, cancelLessonsDuring, createGroup, issuePass, resyncGroupSessions, saleOffers,
-  setGroupActive, setSessionStatus, updateGroup,
+  addSession, createGroup, issuePass, resyncGroupSessions, saleOffers,
+  setGroupActive, setSessionStatus, syncLessonsAround, updateGroup,
   type GroupInput, type GroupKind, type PassOffer,
 } from '@/lib/studio';
 
@@ -103,7 +103,7 @@ export async function createGroupAction(form: FormData): Promise<void> {
   const id = await createGroup(input);
   // Сразу расставляем занятия, иначе новая группа висит без расписания.
   await resyncGroupSessions(id);
-  if (input.kind !== 'lesson') await cancelLessonsDuring(id);
+  if (input.kind !== 'lesson') await syncLessonsAround(id);
   refresh();
 }
 
@@ -114,7 +114,7 @@ export async function updateGroupAction(form: FormData): Promise<void> {
   await updateGroup(id, input);
   // День или время могли измениться — переносим будущие пустые занятия.
   await resyncGroupSessions(id);
-  if (input.kind !== 'lesson') await cancelLessonsDuring(id);
+  if (input.kind !== 'lesson') await syncLessonsAround(id);
   refresh();
 }
 
@@ -124,6 +124,8 @@ export async function toggleGroupAction(form: FormData): Promise<void> {
   const active = String(form.get('active')) === '1';
   await setGroupActive(id, active);
   await resyncGroupSessions(id);
+  // Смена ушла в архив — обычные занятия в её дни возвращаются.
+  await syncLessonsAround(id);
   refresh();
 }
 

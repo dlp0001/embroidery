@@ -1,8 +1,11 @@
 import Link from 'next/link';
 import BookingHint from '@/components/BookingHint';
+import EventSignup from '@/components/EventSignup';
 import SlotList from '@/components/SlotList';
 import { requireUser } from '@/lib/session';
-import { PASS_WARN_DAYS, passBalances, slotsForUser, unpaidCharges } from '@/lib/studio';
+import {
+  PASS_WARN_DAYS, eventSlotsForUser, passBalances, slotsForUser, unpaidCharges,
+} from '@/lib/studio';
 import { dayMonth, daysUntil, money, plural, todayISO, weekdayDayMonth } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -16,17 +19,21 @@ function plusDays(iso: string, n: number): string {
 export default async function WeekPage() {
   const user = await requireUser();
   const today = todayISO();
-  const [passes, unpaid, slots] = await Promise.all([
+  const [passes, unpaid, slots, events] = await Promise.all([
     passBalances(user.id),
     unpaidCharges(user.id),
     slotsForUser(user.id, today, plusDays(today, 7)),
+    eventSlotsForUser(user.id),
   ]);
 
   // Пакет лагеря лежит рядом с обычным абонементом: показываем оба.
   const mine = passes.filter((p) => p.left > 0);
   const debt = unpaid.reduce((sum, c) => sum + Number(c.amount), 0);
 
-  const days = [...new Set(slots.map((s) => s.held_on))];
+  // Дни лагеря показываем отдельно и целиком, а из недели убираем:
+  // два раза одно и то же на одном экране только путает.
+  const week = slots.filter((s) => s.kind === 'lesson');
+  const days = [...new Set(week.map((s) => s.held_on))];
 
   return (
     <>
@@ -89,8 +96,12 @@ export default async function WeekPage() {
           </div>
         )}
 
+        <EventSignup rows={events} />
+
         {days.length === 0 ? (
-          <p className="hint" style={{ marginTop: 20 }}>На ближайшую неделю занятий нет.</p>
+          <p className="hint" style={{ marginTop: 20 }}>
+            На ближайшую неделю обычных занятий нет.
+          </p>
         ) : (
           <BookingHint />
         )}
@@ -99,7 +110,7 @@ export default async function WeekPage() {
           days.map((day) => (
             <section key={day}>
               <div className="lbl">{weekdayDayMonth(day)}</div>
-              <SlotList rows={slots.filter((s) => s.held_on === day)} />
+              <SlotList rows={week.filter((s) => s.held_on === day)} />
             </section>
           ))
         )}
