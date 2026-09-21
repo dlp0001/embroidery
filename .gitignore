@@ -10,3 +10,4 @@ node_modules/
 next-env.d.ts
 tsconfig.tsbuildinfo
 .next-verify/
+.next-check/

@@ -56,11 +56,14 @@ export default function Journal({
   price,
   saved,
   kids = false,
+  passWord = 'по абонементу',
 }: {
   sessionId: string;
   roster: RosterRow[];
   price: string;
   saved: boolean;
+  /** Как называется списание: у лагеря это пакет, а не абонемент. */
+  passWord?: string;
   /** Детское занятие: сюда можно завести ребёнка прямо с порога. */
   kids?: boolean;
 }) {
@@ -99,7 +102,7 @@ export default function Journal({
     // Оплату картой из журнала не снять: деньги пришли через банк.
     if (r.paid && !r.cash) return { text: 'оплачено картой', cls: 'money' };
     if (row.pay === 'cash') return { text: 'оплачено наличными или переводом', cls: 'money' };
-    if (row.pay === 'pass') return { text: 'по абонементу', cls: 'money' };
+    if (row.pay === 'pass') return { text: passWord, cls: 'money' };
     return { text: `не оплачено · ${price}`, cls: 'money-due' };
   }
 

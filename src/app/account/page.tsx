@@ -22,10 +22,8 @@ export default async function WeekPage() {
     slotsForUser(user.id, today, plusDays(today, 7)),
   ]);
 
-  const pass = passes.find((p) => p.left > 0) ?? null;
-  // Занятия в абонементе сгорают вместе со сроком: предупреждаем заранее.
-  const passEnds = pass?.valid_to ? daysUntil(pass.valid_to, today) : null;
-  const passSoon = passEnds !== null && passEnds <= PASS_WARN_DAYS;
+  // Пакет лагеря лежит рядом с обычным абонементом: показываем оба.
+  const mine = passes.filter((p) => p.left > 0);
   const debt = unpaid.reduce((sum, c) => sum + Number(c.amount), 0);
 
   const days = [...new Set(slots.map((s) => s.held_on))];
@@ -38,32 +36,41 @@ export default async function WeekPage() {
       </div>
 
       <div className="body">
-        {pass && (
-          <div className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-              <div className="what">Абонемент</div>
-              <div style={{ fontSize: 13, color: 'var(--warm-gray)' }}>
-                осталось {pass.left} из {pass.lessons_total}
+        {mine.map((pass) => {
+          const ends = pass.valid_to ? daysUntil(pass.valid_to, today) : null;
+          const soon = ends !== null && ends <= PASS_WARN_DAYS;
+          const what = pass.group_id
+            ? plural(pass.left, 'день', 'дня', 'дней')
+            : plural(pass.left, 'занятие', 'занятия', 'занятий');
+          return (
+            <div className="card" key={pass.id}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+                <div className="what">{pass.group_title ?? 'Абонемент'}</div>
+                <div style={{ fontSize: 13, color: 'var(--warm-gray)' }}>
+                  осталось {pass.left} из {pass.lessons_total}
+                </div>
               </div>
-            </div>
-            <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-              {Array.from({ length: pass.lessons_total }, (_, i) => (
-                <div key={i} style={{ height: 6, flexGrow: 1, background: i < pass.used ? 'var(--rose-light)' : 'var(--rose)' }} />
-              ))}
-            </div>
-            <div className="sub">Общий на всех. Списывается с того, кто пришёл.</div>
-            {passSoon && pass.valid_to && (
-              <div className="money-due" style={{ marginTop: 10 }}>
-                {passEnds! > 0
-                  ? `Действует до ${dayMonth(pass.valid_to)}: ${passEnds} ${
-                      plural(passEnds!, 'день', 'дня', 'дней')} и ${pass.left} ${
-                      plural(pass.left, 'занятие', 'занятия', 'занятий')}. Потом сгорит.`
-                  : `Сегодня последний день: ${pass.left} ${
-                      plural(pass.left, 'занятие', 'занятия', 'занятий')} ещё не использовано.`}
+              <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
+                {Array.from({ length: pass.lessons_total }, (_, i) => (
+                  <div key={i} style={{ height: 6, flexGrow: 1, background: i < pass.used ? 'var(--rose-light)' : 'var(--rose)' }} />
+                ))}
               </div>
-            )}
-          </div>
-        )}
+              <div className="sub">
+                {pass.group_id
+                  ? 'Только на эти дни. Списывается с того, кто пришёл.'
+                  : 'Общий на всех. Списывается с того, кто пришёл.'}
+              </div>
+              {soon && pass.valid_to && (
+                <div className="money-due" style={{ marginTop: 10 }}>
+                  {ends! > 0
+                    ? `Действует до ${dayMonth(pass.valid_to)}: ${ends} ${
+                        plural(ends!, 'день', 'дня', 'дней')} и ${pass.left} ${what}. Потом сгорит.`
+                    : `Сегодня последний день: ${pass.left} ${what} ещё не использовано.`}
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         {unpaid.length > 0 && (
           <div className="card-lin">

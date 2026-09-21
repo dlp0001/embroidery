@@ -46,9 +46,11 @@ export async function testPaymentAction(): Promise<void> {
 }
 
 export async function buyPassAction(form: FormData): Promise<void> {
-  const lessons = Number(form.get('lessons'));
+  // Один ключ «id группы:дней»: пакет лагеря не перепутать с абонементом.
+  const [groupId, lessonsKey] = String(form.get('offer') ?? '').split(':');
+  const lessons = Number(lessonsKey);
   if (!Number.isInteger(lessons) || lessons < 1 || lessons > 100) {
     redirect('/account/pay?error=' + encodeURIComponent('Странное число занятий.'));
   }
-  await go({ kind: 'pass', lessons });
+  await go({ kind: 'pass', lessons, groupId: groupId || null });
 }

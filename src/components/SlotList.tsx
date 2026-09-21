@@ -1,4 +1,4 @@
-import { hhmm, plural } from '@/lib/format';
+import { hhmm, money, plural } from '@/lib/format';
 import type { SlotRow } from '@/lib/studio';
 import { toggleBooking } from '@/app/account/actions';
 
@@ -22,9 +22,18 @@ export default function SlotList({ rows }: { rows: SlotRow[] }) {
                 {hhmm(head.starts_at)} · {head.group_title}
               </div>
               <div className="tag tag-ok">
-                {head.audience === 'adults' ? 'взрослое' : 'детское'}
+                {head.kind === 'camp' ? 'лагерь'
+                  : head.kind === 'event' ? 'мастер-класс'
+                  : head.audience === 'adults' ? 'взрослое' : 'детское'}
               </div>
             </div>
+
+            {head.kind !== 'lesson' && (
+              <div className="sub" style={{ marginBottom: 8 }}>
+                День стоит {money(Number(head.price), 'ILS')}. Выгоднее взять пакет
+                в «Оплате».
+              </div>
+            )}
 
             {people.map((p) => (
               <form action={toggleBooking} key={p.participant_id}>

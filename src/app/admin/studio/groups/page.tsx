@@ -1,12 +1,28 @@
 import GroupForm from '@/components/GroupForm';
 import { isAdmin, requireTeacher } from '@/lib/session';
-import { allGroups, teachers } from '@/lib/studio';
-import { hhmm, plural } from '@/lib/format';
+import { allGroups, KIND_NAME, type GroupRow } from '@/lib/studio';
+import { teachers } from '@/lib/studio';
+import { dayMonth, hhmm, money, plural } from '@/lib/format';
 import { createGroupAction, toggleGroupAction, updateGroupAction } from '@/app/admin/schedule-actions';
 
 export const dynamic = 'force-dynamic';
 
 const WD = ['', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье'];
+const SHORT = ['', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+
+/** Когда занятие бывает: у обычной группы день недели, у лагеря — период. */
+function when(g: GroupRow): string {
+  if (g.kind === 'lesson') {
+    return `${WD[g.weekday ?? 0] ?? ''} ${hhmm(g.starts_at)} · ${g.duration_min} мин`;
+  }
+  const days = g.weekdays.length > 0 && g.weekdays.length < 7
+    ? ` · ${g.weekdays.map((d) => SHORT[d]).join(', ')}`
+    : '';
+  const period = g.starts_on && g.ends_on
+    ? `${dayMonth(g.starts_on)} — ${dayMonth(g.ends_on)}`
+    : 'даты не заданы';
+  return `${period}${days} · с ${hhmm(g.starts_at)} · ${g.duration_min} мин`;
+}
 
 export default async function GroupsPage({
   searchParams,
@@ -47,15 +63,26 @@ export default async function GroupsPage({
             <div className="card" key={g.id} style={{ opacity: g.active ? 1 : 0.55 }}>
               <div className="row" style={{ alignItems: 'flex-start' }}>
                 <div>
-                  <div className="when">{WD[g.weekday]} {hhmm(g.starts_at)} · {g.duration_min} мин</div>
+                  <div className="when">{when(g)}</div>
                   <div className="what">{g.title}</div>
                   <div className="sub">
+                    {g.kind !== 'lesson' && `${KIND_NAME[g.kind]} · `}
                     {g.audience === 'adults' ? 'взрослое' : 'детское'}
                     {g.age_hint ? ` · ${g.age_hint}` : ''} · {g.people}&nbsp;
                     {plural(g.people, 'человек', 'человека', 'человек')}
                     {g.capacity ? ` из ${g.capacity}` : ''}
                     {!g.active && ' · в архиве'}
                   </div>
+                  {g.kind !== 'lesson' && (
+                    <div className="sub" style={{ marginTop: 4 }}>
+                      {g.days}&nbsp;{plural(g.days, 'день', 'дня', 'дней')}
+                      {g.price ? ` по ${money(Number(g.price), 'ILS')}` : ''}
+                      {g.pass_offers && g.pass_offers.length > 0 &&
+                        ` · пакеты: ${g.pass_offers
+                          .map((o) => `${o.lessons} за ${money(o.price, 'ILS')}`)
+                          .join(', ')}`}
+                    </div>
+                  )}
                 </div>
                 {admin && !editing && (
                   <a className="btn-quiet" href={`/admin/studio/groups?edit=${g.id}`}>Править</a>
@@ -91,6 +118,7 @@ export default async function GroupsPage({
         {admin && (
           <p className="hint" style={{ marginTop: 18 }}>
             Занятия по расписанию группы создаются сами на шесть недель вперёд.
+            Дни лагеря и мастер-класса — ровно по заданному периоду.
             Разовое занятие вне расписания добавляется в календаре.
           </p>
         )}

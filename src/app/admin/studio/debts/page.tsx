@@ -1,6 +1,6 @@
 import { isAdmin, requireTeacher } from '@/lib/session';
 import {
-  PASS_WARN_DAYS, allActivePasses, debtors, lessonPrice, passOwners, passTypes,
+  PASS_WARN_DAYS, allActivePasses, debtors, lessonPrice, passOwners, saleOffers,
   unbilledVisits,
 } from '@/lib/studio';
 import { pendingCash } from '@/lib/billing';
@@ -31,7 +31,7 @@ export default async function DebtsPage() {
     admin ? passOwners() : [],
     lessonPrice(),
     admin ? pendingCash() : [],
-    passTypes(),
+    saleOffers(),
   ]);
   const unbilled = await unbilledVisits();
   const receipts = receiptsConfigured();
@@ -148,6 +148,7 @@ export default async function DebtsPage() {
               <div>
                 <div className="what">{p.owner_name ?? p.owner_email}</div>
                 <div className="sub">
+                  {p.group_title ? `${p.group_title}: ` : ''}
                   осталось {p.left} из {p.lessons_total}
                   {p.valid_to ? ` · до ${dayMonth(p.valid_to)}` : ''}
                   {p.paid ? ` · оплачен ${PAID[p.paid] ?? p.paid}` : ' · не оплачен'}
@@ -159,7 +160,7 @@ export default async function DebtsPage() {
 
         {admin && (
           <div className="card" style={{ borderStyle: 'dashed', marginTop: 16 }}>
-            <div className="what" style={{ marginBottom: 16 }}>Продать абонемент</div>
+            <div className="what" style={{ marginBottom: 16 }}>Продать абонемент или пакет</div>
             <form action={issuePassAction} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               <div>
                 <label style={label} htmlFor="ownerId">Кому</label>
@@ -173,13 +174,21 @@ export default async function DebtsPage() {
               </div>
 
               <div>
-                <label style={label} htmlFor="lessons">Абонемент</label>
-                <select style={field} id="lessons" name="lessons" required>
+                <label style={label} htmlFor="offer">Что продаём</label>
+                <select style={field} id="offer" name="offer" required>
                   {packs.map((t) => (
-                    <option key={t.lessons} value={t.lessons}>
-                      {t.lessons} {plural(t.lessons, 'занятие', 'занятия', 'занятий')}
+                    <option key={`${t.groupId ?? ''}:${t.lessons}`}
+                            value={`${t.groupId ?? ''}:${t.lessons}`}>
+                      {t.groupTitle ? `${t.groupTitle}: ` : ''}
+                      {t.lessons}&nbsp;
+                      {t.groupId
+                        ? plural(t.lessons, 'день', 'дня', 'дней')
+                        : plural(t.lessons, 'занятие', 'занятия', 'занятий')}
                       {' · '}{money(t.price, currency)}
-                      {' · '}{t.months} {plural(t.months, 'месяц', 'месяца', 'месяцев')}
+                      {' · '}
+                      {t.validTo
+                        ? `до ${dayMonth(t.validTo)}`
+                        : `${t.months} ${plural(t.months, 'месяц', 'месяца', 'месяцев')}`}
                     </option>
                   ))}
                 </select>
@@ -197,7 +206,8 @@ export default async function DebtsPage() {
               <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
                 <input type="checkbox" name="coverDebt" style={{ width: 20, height: 20, marginTop: 2 }} />
                 <span className="hint">
-                  Закрыть им уже накопленные неоплаченные занятия, начиная с самых старых
+                  Закрыть им уже накопленные неоплаченные занятия, начиная с самых старых.
+                  Пакет лагеря закрывает только дни этого лагеря
                 </span>
               </label>
 

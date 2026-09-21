@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { isAdmin, requireTeacher } from '@/lib/session';
-import { lessonPrice, sessionHead, sessionRoster } from '@/lib/studio';
+import { KIND_NAME, sessionHead, sessionRoster } from '@/lib/studio';
 import { dayMonth, hhmm, money } from '@/lib/format';
 import Journal from '@/components/Journal';
 
@@ -14,7 +14,9 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   if (!head) notFound();
   if (!isAdmin(user) && head.teacher_id !== user.id) notFound();
 
-  const [roster, price] = await Promise.all([sessionRoster(id), lessonPrice()]);
+  const roster = await sessionRoster(id);
+  // День лагеря стоит своё, и списывается он с пакета, а не с абонемента.
+  const camp = head.kind !== 'lesson';
 
   return (
     <>
@@ -22,9 +24,15 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         <div style={{ fontSize: 12, color: 'var(--warm-gray)', marginBottom: 10 }}>
           <Link href="/admin/studio" style={{ color: 'var(--warm-gray)' }}>Студия</Link> · {head.group_title}
         </div>
-        <div className="kicker">{dayMonth(head.held_on)} · {hhmm(head.starts_at)}</div>
+        <div className="kicker">
+          {dayMonth(head.held_on)} · {hhmm(head.starts_at)}
+          {camp && ` · ${KIND_NAME[head.kind]}`}
+        </div>
         <h1 className="h1">{head.group_title}</h1>
-        <p className="sub">Отметьте тех, кто пришёл. Сверху те, кого ждём.</p>
+        <p className="sub">
+          Отметьте тех, кто пришёл. Сверху те, кого ждём.
+          {camp && ' На лагерь и мастер-класс ждут только записавшихся.'}
+        </p>
       </div>
 
       <div className="body">
@@ -35,7 +43,8 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
             <Journal
               sessionId={id}
               roster={roster}
-              price={money(price.amount, price.currency)}
+              price={money(Number(head.price ?? 0), 'ILS')}
+              passWord={camp ? 'по пакету' : 'по абонементу'}
               saved={head.status === 'done'}
               kids={head.audience === 'kids'}
             />

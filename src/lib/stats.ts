@@ -49,7 +49,19 @@ type PassRow = {
   lessons_total: number;
   provider: string | null;
   amount: string | null;
+  /** Цена пакета из его же группы: у лагеря она своя. */
+  offer_price: string | null;
 };
+
+/**
+ * Цена пакета, записанная в группе. Нужна, когда пакет выдан без оплаты:
+ * брать для лагеря студийную цену занятия было бы просто неправдой.
+ */
+const OFFER_PRICE = `
+  (select (o->>'price')::numeric
+     from studio_groups og, jsonb_array_elements(og.pass_offers) o
+    where og.id = ps.group_id and (o->>'lessons')::int = ps.lessons_total
+    limit 1)`;
 
 export async function monthStats(month: string): Promise<MonthStats> {
   const first = `${month}-01`;
@@ -76,7 +88,8 @@ export async function monthStats(month: string): Promise<MonthStats> {
     pass_id: string | null; amount: string;
     lessons_total: number | null; pass_paid: string | null;
   }>(
-    `select ch.pass_id, ch.amount::text, ps.lessons_total, pay.amount::text as pass_paid
+    `select ch.pass_id, ch.amount::text, ps.lessons_total,
+            coalesce(pay.amount, ${OFFER_PRICE})::text as pass_paid
        from charges ch
        join studio_sessions s on s.id = ch.session_id
        left join passes ps on ps.id = ch.pass_id
@@ -86,7 +99,8 @@ export async function monthStats(month: string): Promise<MonthStats> {
   );
 
   const passes = await query<PassRow>(
-    `select ps.id, ps.lessons_total, pay.provider, pay.amount::text
+    `select ps.id, ps.lessons_total, pay.provider, pay.amount::text,
+            ${OFFER_PRICE}::text as offer_price
        from passes ps
        left join payments pay on pay.id = ps.payment_id
       where ps.created_at >= $1::date
@@ -97,6 +111,7 @@ export async function monthStats(month: string): Promise<MonthStats> {
   /** Сколько абонемент стоил. У неоплаченного цены нет — берём из справочника. */
   const worth = (p: PassRow): number => {
     if (p.amount !== null) return Number(p.amount);
+    if (p.offer_price !== null) return Number(p.offer_price);
     const t = types.find((x) => x.lessons === p.lessons_total);
     return t ? t.price : price.amount * p.lessons_total;
   };

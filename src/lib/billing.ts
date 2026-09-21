@@ -7,11 +7,12 @@ import {
 } from './icount';
 import { logMoneyIn } from './ledger';
 import { createPaymentLink, fetchTransaction, isConfigured } from './payplus';
-import { lessonPrice, passTypes } from './studio';
+import { lessonPrice, saleOffers } from './studio';
 
 export type Intent =
   | { kind: 'debt'; chargeIds?: string[] }
-  | { kind: 'pass'; lessons: number }
+  /** Абонемент студии, а с groupId — пакет дней лагеря или мастер-класса. */
+  | { kind: 'pass'; lessons: number; groupId?: string | null }
   | { kind: 'test' };
 
 /** Сумма проверочного платежа: маленькая, чтобы не жалко было вернуть. */
@@ -71,11 +72,19 @@ export async function startPayment(
     raw = { charge_ids: debts.map((c) => c.id) };
   } else {
     // Абонемент стоит своих денег, а не «занятий умножить на цену».
-    const type = (await passTypes()).find((t) => t.lessons === intent.lessons);
-    if (!type) return { error: 'Такого абонемента нет.' };
-    amount = type.price;
-    description = `Абонемент на ${type.lessons} занятий`;
-    raw = { lessons: type.lessons, months: type.months };
+    const key = intent.groupId ?? '';
+    const offer = (await saleOffers()).find(
+      (o) => (o.groupId ?? '') === key && o.lessons === intent.lessons,
+    );
+    if (!offer) return { error: 'Такого абонемента нет.' };
+    amount = offer.price;
+    description = offer.groupTitle
+      ? `${offer.groupTitle}: ${offer.lessons} ${plural(offer.lessons, 'день', 'дня', 'дней')}`
+      : `Абонемент на ${offer.lessons} занятий`;
+    raw = {
+      lessons: offer.lessons, months: offer.months,
+      group_id: offer.groupId, group_title: offer.groupTitle, valid_to: offer.validTo,
+    };
   }
 
   const payment = await one<{ id: string }>(
@@ -193,18 +202,24 @@ export async function applyPayment(
     if (p.purpose === 'studio_pass') {
       const lessons = Number(p.raw?.lessons ?? 0);
       const months = Number(p.raw?.months ?? 1);
+      const groupId = (p.raw?.group_id as string | null | undefined) ?? null;
+      const validTo = (p.raw?.valid_to as string | null | undefined) ?? null;
+      const title = (p.raw?.group_title as string | null | undefined) ?? null;
       if (lessons < 1) return;
       const { rows: made } = await c.query<{ id: string }>(
-        `insert into passes (owner_id, lessons_total, valid_from, valid_to, payment_id)
-         values ($1, $2, current_date, current_date + ($3 || ' months')::interval, $4)
+        `insert into passes (owner_id, lessons_total, valid_from, valid_to, payment_id, group_id)
+         values ($1, $2, current_date,
+                 coalesce($5::date, current_date + ($3 || ' months')::interval), $4, $6)
          returning id`,
-        [p.user_id, lessons, String(months), p.id],
+        [p.user_id, lessons, String(months), p.id, validTo, groupId],
       );
       await logMoneyIn(c, {
         kind: 'pass_issued', actorId: null, ownerId: p.user_id,
         passId: made[0].id, paymentId: p.id, amount: p.amount, currency: p.currency,
-        note: `абонемент на ${lessons} ${plural(lessons, 'занятие', 'занятия', 'занятий')}, оплачен картой`,
-        details: { lessons, months },
+        note: title
+          ? `${title}: пакет на ${lessons} ${plural(lessons, 'день', 'дня', 'дней')}, оплачен картой`
+          : `абонемент на ${lessons} ${plural(lessons, 'занятие', 'занятия', 'занятий')}, оплачен картой`,
+        details: { lessons, months, group_id: groupId },
       });
     }
   });
@@ -243,11 +258,14 @@ async function receiptItems(p: ToBill): Promise<ReceiptItem[]> {
 
   if (p.purpose === 'studio_pass') {
     const n = Number(p.raw?.lessons ?? 0);
+    const title = (p.raw?.group_title as string | null | undefined) ?? null;
     return [{
-      description: line(
-        `Абонемент на ${n} ${plural(n, 'занятие', 'занятия', 'занятий')}`,
-        n === 1 ? 'מנוי לשיעור אחד' : `מנוי ל-${n} שיעורים`,
-      ),
+      description: title
+        ? line(`${title}: ${n} ${plural(n, 'день', 'дня', 'дней')}`, `${title}: ${n} ימים`)
+        : line(
+            `Абонемент на ${n} ${plural(n, 'занятие', 'занятия', 'занятий')}`,
+            n === 1 ? 'מנוי לשיעור אחד' : `מנוי ל-${n} שיעורים`,
+          ),
       quantity: 1,
       price: total,
     }];
@@ -564,6 +582,8 @@ export type PaymentRow = {
   currency: string;
   lessons: number;
   invoice_url: string | null;
+  /** Пакет лагеря: в истории он зовётся своим именем, а не абонементом. */
+  group_title: string | null;
 };
 
 /** Все платежи родителя: картой, напрямую и абонементы. */
@@ -571,6 +591,9 @@ export async function paymentHistory(userId: string): Promise<PaymentRow[]> {
   return query<PaymentRow>(
     `select p.id, p.created_at::text as at, p.provider, p.status, p.purpose,
             p.amount::text, p.currency, p.invoice_url,
+            (select g.title from passes ps
+               join studio_groups g on g.id = ps.group_id
+              where ps.payment_id = p.id) as group_title,
             coalesce(
               jsonb_array_length(p.raw -> 'charge_ids'),
               (p.raw ->> 'lessons')::int,
