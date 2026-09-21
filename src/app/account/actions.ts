@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { redirect } from 'next/navigation';
+import type { SaveResult } from '@/components/AutoSave';
 import { one } from '@/lib/db';
 import { telegramNick } from '@/lib/format';
 import { requireUser } from '@/lib/session';
@@ -68,25 +68,32 @@ export async function setMyAttendance(formData: FormData): Promise<void> {
  * Свою карточку родитель правит сам: раньше её мог поменять только админ.
  * Ник в телеграме необязателен, но если уж написан — должен быть ником,
  * иначе по нему всё равно никто не напишет.
+ *
+ * Отвечает результатом, а не переходом на страницу: форма сохраняется сама,
+ * и ошибку надо показать прямо под полем, никуда человека не уводя.
  */
-export async function updateMyProfile(formData: FormData): Promise<void> {
+export async function updateMyProfile(formData: FormData): Promise<SaveResult> {
   const user = await requireUser();
   const name = String(formData.get('name') ?? '').trim().slice(0, 120);
   const tg = telegramNick(String(formData.get('telegram') ?? '').slice(0, 80));
   if (!tg.ok) {
-    redirect('/account/profile?error=' + encodeURIComponent(
-      'Ник в телеграме — латиница, цифры и подчёркивание, от пяти знаков. Например @anna_liberman'));
+    return {
+      ok: false,
+      error: 'Ник в телеграме — латиница, цифры и подчёркивание, от пяти знаков. Например @my_nick',
+    };
   }
   await saveProfile(user.id, name, tg.nick);
   refresh();
-  redirect('/account/profile');
+  return { ok: true };
 }
 
-export async function updateChild(formData: FormData): Promise<void> {
+export async function updateChild(formData: FormData): Promise<SaveResult> {
   const user = await requireUser();
   const childId = String(formData.get('childId'));
   const name = String(formData.get('name') ?? '').trim().slice(0, 120);
-  if (!name) return;
+  // Пустое имя не ошибка, а несохранённая правка: человек стёр и думает.
+  if (!name) return { ok: false, error: 'Имя не может быть пустым.' };
   await renameChild(user.id, childId, name);
   refresh();
+  return { ok: true };
 }

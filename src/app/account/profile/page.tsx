@@ -1,5 +1,6 @@
 import { requireUser } from '@/lib/session';
 import { archivedChildren, familyWithDays } from '@/lib/studio';
+import AutoSave from '@/components/AutoSave';
 import Toggles from '@/components/Toggles';
 import YesNo from '@/components/YesNo';
 import {
@@ -19,13 +20,8 @@ const WEEK = [
   { n: 5, short: 'пт' }, { n: 6, short: 'сб' }, { n: 7, short: 'вс' },
 ];
 
-export default async function ProfilePage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
-}) {
+export default async function ProfilePage() {
   const user = await requireUser();
-  const { error } = await searchParams;
   const [family, hidden] = await Promise.all([
     familyWithDays(user.id),
     archivedChildren(user.id),
@@ -46,11 +42,12 @@ export default async function ProfilePage({
       </div>
 
       <div className="body">
-        {error && <p className="err">{error}</p>}
-
         <div className="card">
           <div className="what" style={{ marginBottom: 14 }}>Родитель</div>
-          <form action={updateMyProfile}>
+          <AutoSave
+            action={updateMyProfile}
+            hint="Ник не обязателен. Он нужен только затем, чтобы Варя могла быстро написать, если занятие переносится."
+          >
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
               <div className="field" style={{ flex: '1 1 180px', marginBottom: 0, minWidth: 0 }}>
                 <label htmlFor="my-name">Имя и фамилия</label>
@@ -68,20 +65,15 @@ export default async function ProfilePage({
                   id="my-telegram"
                   name="telegram"
                   defaultValue={user.telegram ? `@${user.telegram}` : ''}
-                  placeholder="@anna_liberman"
+                  placeholder="@мой_ник"
                   maxLength={80}
                   autoComplete="off"
                   autoCapitalize="none"
                   spellCheck={false}
                 />
               </div>
-              <button className="btn-quiet" type="submit">Сохранить</button>
             </div>
-          </form>
-          <p className="hint" style={{ marginTop: 12 }}>
-            Ник не обязателен. Он нужен только затем, чтобы Варя могла быстро
-            написать, если занятие переносится.
-          </p>
+          </AutoSave>
           <div className="sub" style={{ marginTop: 10 }}>{user.email}</div>
 
           <div className="lbl" style={{ margin: '18px 0 0' }}>Хожу на занятия сам</div>
@@ -108,7 +100,11 @@ export default async function ProfilePage({
 
         {kids.map((m) => (
           <div className="card" key={m.participant_id}>
-            <form action={updateChild} style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <AutoSave
+              action={updateChild}
+              hint="Имя сохраняется само"
+              style={{ display: 'flex', gap: 10, alignItems: 'center' }}
+            >
               <input type="hidden" name="childId" value={m.child_id ?? ''} />
               <input
                 name="name"
@@ -117,8 +113,7 @@ export default async function ProfilePage({
                 maxLength={120}
                 style={nameField}
               />
-              <button className="btn-quiet" type="submit">Переименовать</button>
-            </form>
+            </AutoSave>
 
             <div className="lbl" style={{ margin: '14px 0 0' }}>
               Детские занятия · возможные дни посещений
