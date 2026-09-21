@@ -43,6 +43,7 @@ export default async function PayPage({
   ).keys()].map((gid) => ({
     id: gid,
     title: offers.find((o) => o.groupId === gid)!.groupTitle!,
+    kind: offers.find((o) => o.groupId === gid)!.kind,
     validTo: offers.find((o) => o.groupId === gid)!.validTo,
     offers: offers.filter((o) => o.groupId === gid),
   }));
@@ -133,12 +134,20 @@ export default async function PayPage({
           </div>
         )}
 
+        {/* Пакет лагеря — отдельная покупка, не «ещё один абонемент».
+            Поэтому он живёт в своей рамке, а не в общем списке. */}
         {events.map((e) => (
-          <section key={e.id}>
-            <div className="lbl">{e.title}</div>
-            <p className="hint" style={{ marginBottom: 16 }}>
-              Пакет дней только на это: обычные занятия им не оплачиваются, и
-              наоборот. Неиспользованные дни сгорают вместе с лагерем
+          <div className="card-lin" key={e.id} style={{ marginTop: 22, padding: '18px 18px 20px' }}>
+            <div className="row" style={{ alignItems: 'baseline', marginBottom: 4 }}>
+              <div className="when" style={{ marginBottom: 0 }}>
+                Пакет дней{e.validTo ? ` · до ${dayMonth(e.validTo)}` : ''}
+              </div>
+              <div className="tag tag-ok">{e.kind === 'camp' ? 'лагерь' : 'мастер-класс'}</div>
+            </div>
+            <div className="what">{e.title}</div>
+            <p className="hint" style={{ margin: '8px 0 14px' }}>
+              Тратится только здесь: обычные занятия им не оплачиваются, и
+              наоборот. Неиспользованные дни сгорают вместе со сменой
               {e.validTo ? `: ${dayMonth(e.validTo)} — последний день` : ''}.
             </p>
             {online ? (
@@ -147,17 +156,23 @@ export default async function PayPage({
                   <form action={buyPassAction} key={t.lessons}>
                     <input type="hidden" name="offer" value={`${e.id}:${t.lessons}`} />
                     <button className="btn-quiet" type="submit"
-                            style={{ width: '100%', justifyContent: 'space-between' }}>
-                      <span>{t.lessons}&nbsp;{plural(t.lessons, 'день', 'дня', 'дней')}</span>
+                            style={{ width: '100%', justifyContent: 'space-between',
+                                     background: 'var(--cream)' }}>
+                      <span>
+                        {t.lessons}&nbsp;{plural(t.lessons, 'день', 'дня', 'дней')}
+                        <span className="hint">
+                          {' · '}{money(Math.round(t.price / t.lessons), price.currency)} за день
+                        </span>
+                      </span>
                       <span>{money(t.price, price.currency)}</span>
                     </button>
                   </form>
                 ))}
               </div>
             ) : (
-              <div className="note">Пакет можно купить у Вари.</div>
+              <div className="sub">Пакет можно купить у Вари на занятии.</div>
             )}
-          </section>
+          </div>
         ))}
 
         <div className="lbl">Неоплаченные разовые занятия</div>
