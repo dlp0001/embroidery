@@ -1162,10 +1162,14 @@ export async function setSessionStatus(id: string, status: 'planned' | 'cancelle
  */
 export async function resyncGroupSessions(groupId: string, weeksAhead = 6): Promise<void> {
   await tx(async (c) => {
+    // Сегодняшний день тоже пересобираем: правка расписания утром
+    // должна убирать сегодняшнее занятие, а не оставлять его висеть
+    // до завтра. Прошлое не трогаем, как и всё, где уже есть отметки,
+    // деньги или записи.
     await c.query(
       `delete from studio_sessions s
         where s.group_id = $1
-          and s.held_on > current_date
+          and s.held_on >= current_date
           and not exists (select 1 from attendance a where a.session_id = s.id)
           and not exists (select 1 from charges ch where ch.session_id = s.id)
           and not exists (select 1 from bookings b where b.session_id = s.id
