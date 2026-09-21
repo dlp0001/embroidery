@@ -1,11 +1,12 @@
 /** @type {import('next').NextConfig} */
 
 // Страницы, которые пока живут статикой в public/legacy.
-// Rewrite по умолчанию срабатывает ПОСЛЕ роутов приложения,
-// поэтому любой из этих адресов можно перенести в app/ и он победит.
+// Адрес, переехавший в app/, нужно убрать отсюда: на Vercel этот
+// rewrite срабатывает раньше, чем серверная страница приложения, и
+// статика молча побеждает. Так случилось с /camp.
 const legacy = [
   'embroidery', 'register', 'video', 'materials', 'materials2',
-  'portfolio', 'israeli-hints', 'camp', 'studio',
+  'portfolio', 'israeli-hints', 'studio',
   'agreement', 'privacy-ru', 'consent-data', 'consent-marketing',
   'terms', 'refunds', 'privacy',
 ];
