@@ -96,11 +96,15 @@ export default function EventSignup({ rows }: { rows: SlotRow[] }) {
               ).length;
               return (
               <div key={participantId} style={{ marginBottom: 16 }}>
+                {/* Высота строки задана жёстко, а счётчик есть всегда —
+                    пустой он или нет. Иначе появившееся «2 дня» тянет
+                    строку на пару пикселей и сетка под ней съезжает. */}
                 <div style={{ display: 'flex', justifyContent: 'space-between',
-                              alignItems: 'baseline', gap: 10, minHeight: 18 }}>
-                  <div className="lbl" style={{ margin: '0 0 6px' }}>{who}</div>
-                  <div className="hint" style={{ whiteSpace: 'nowrap', fontSize: 11 }}>
-                    {picked > 0 && `${picked} ${plural(picked, 'день', 'дня', 'дней')}`}
+                              alignItems: 'baseline', gap: 10,
+                              height: 20, marginBottom: 6, overflow: 'hidden' }}>
+                  <div className="lbl" style={{ margin: 0 }}>{who}</div>
+                  <div className="hint" style={{ whiteSpace: 'nowrap', fontSize: 11, margin: 0 }}>
+                    {picked > 0 ? `${picked} ${plural(picked, 'день', 'дня', 'дней')}` : '\u00a0'}
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
