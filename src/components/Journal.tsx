@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react';
 import { addWalkInAction, saveJournal } from '@/app/admin/actions';
+import { plural } from '@/lib/format';
 import type { PayWay, RosterRow } from '@/lib/studio';
 
 type Row = { present: boolean; pay: PayWay };
@@ -93,6 +94,11 @@ export default function Journal({
     .sort((a, b) => Number(b.booked) - Number(a.booked));
   const rest = roster.filter((r) => !expected(r));
   const split = likely.length > 0 && rest.length > 0;
+  // В день лагеря в «Остальных» оказывается вся студия: ждут-то немногих,
+  // а прийти может любой. Такой список закрывает собой журнал, поэтому
+  // держим его свёрнутым — но только пока в нём никого не отметили.
+  const touched = rest.some((r) => r.status !== null || r.cash || r.on_pass);
+  const [restOpen, setRestOpen] = useState(touched);
 
   function moneyFor(r: RosterRow): { text: string; cls: string } | null {
     const row = rowFor(r);
@@ -213,8 +219,26 @@ export default function Journal({
 
       {rest.length > 0 && (
         <>
-          {split && <div className="lbl">Остальные</div>}
-          {rest.map(line)}
+          {split && (
+            <button
+              type="button"
+              className="lbl"
+              onClick={() => setRestOpen((v) => !v)}
+              aria-expanded={restOpen}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                       background: 'none', border: 0, padding: 0, cursor: 'pointer',
+                       fontFamily: 'inherit', textAlign: 'left' }}
+            >
+              <span aria-hidden style={{ fontSize: 8 }}>{restOpen ? '▼' : '▶'}</span>
+              Остальные · {rest.length} {plural(rest.length, 'человек', 'человека', 'человек')}
+            </button>
+          )}
+          {/* Свёрнутый список прячем показом, а не удалением: строки
+              остаются в форме, и сохранение не стирает отметки тех,
+              кого сейчас не видно. */}
+          <div style={{ display: split && !restOpen ? 'none' : undefined }}>
+            {rest.map(line)}
+          </div>
         </>
       )}
 
