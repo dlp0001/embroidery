@@ -54,7 +54,7 @@ if (!local && send && !only && !allowRemote) {
   process.exit(1);
 }
 
-const SITE = process.env.SITE_URL ?? 'https://re-create.art';
+const SITE = process.env.SITE_URL ?? 'https://www.re-create.art';
 const FROM = process.env.MAIL_FROM ?? 'Варя · Re.Create.Art <info@re-create.art>';
 const REPLY_TO = process.env.MAIL_REPLY_TO ?? 'info@re-create.art';
 
@@ -152,9 +152,17 @@ if (!send) {
   const sample = to[0];
   const file = join(tmpdir(), `${campaign}.html`);
   await writeFile(file, letter.html({ name: sample.name, unsubscribeUrl: unsubUrl(sample.email) }));
-  console.log('\nПервые адреса:');
-  for (const r of to.slice(0, 5)) console.log(`   ${r.email}${r.name ? `  (${r.name})` : ''}`);
-  if (to.length > 5) console.log(`   … и ещё ${to.length - 5}`);
+  // Не просто список адресов, а то, чем начнётся письмо у каждого: имена
+  // в базе бывают пустые, задом наперёд и не тем алфавитом, и увидеть это
+  // надо до отправки, а не в чужом почтовом ящике.
+  const SHOW = 30;
+  const wide = Math.max(...to.slice(0, SHOW).map((r) => r.email.length));
+  console.log('\nКому уйдёт:');
+  for (const r of to.slice(0, SHOW)) {
+    const greeting = letter.hello ? letter.hello(r.name) : (r.name ?? '');
+    console.log(`   ${r.email.padEnd(wide)}   ${greeting}`);
+  }
+  if (to.length > SHOW) console.log(`   … и ещё ${to.length - SHOW}`);
   console.log(`\nПисьмо целиком: ${file}`);
   console.log('Ничего не отправлено. Отправить — флаг --send.');
   await c.end();

@@ -18,7 +18,7 @@ const preheader =
   'Десять дней с 9 до 14. Еда входит в цену. Восемь человек в день.';
 
 /** Обращение: имени может не быть, тогда письмо начинается без него. */
-function hello(name) {
+export function hello(name) {
   const who = (name ?? '').trim().split(/\s+/)[0];
   return who ? `Здравствуйте, ${who}.` : 'Здравствуйте.';
 }
