@@ -534,22 +534,48 @@ export type UpcomingRow = {
   booked: boolean;
 };
 
+/**
+ * Записывает или снимает запись. Место занимается только если оно есть:
+ * на экране полный день не нажимается, но два родителя могут потянуться
+ * к последнему месту одновременно, и решает это база, а не экран.
+ */
 export async function setBooking(
   sessionId: string,
   participantId: string,
   booked: boolean,
-): Promise<void> {
+): Promise<{ ok: boolean; reason?: string }> {
   if (booked) {
-    await query(
-      `insert into bookings (session_id, participant_id, status) values ($1, $2, 'booked')
-       on conflict (session_id, participant_id) do update set status = 'booked'`,
-      [sessionId, participantId],
-    );
-  } else {
+    const done = await tx(async (c) => {
+      const { rows } = await c.query<{ capacity: number | null; taken: number }>(
+        `select g.capacity,
+                (select count(*)::int from bookings b
+                  where b.session_id = s.id and b.status = 'booked'
+                    and b.participant_id <> $2) as taken
+           from studio_sessions s
+           join studio_groups g on g.id = s.group_id
+          where s.id = $1
+          for update of s`,
+        [sessionId, participantId],
+      );
+      const row = rows[0];
+      if (!row) return false;
+      if (row.capacity !== null && row.taken >= row.capacity) return false;
+      await c.query(
+        `insert into bookings (session_id, participant_id, status) values ($1, $2, 'booked')
+         on conflict (session_id, participant_id) do update set status = 'booked'`,
+        [sessionId, participantId],
+      );
+      return true;
+    });
+    if (!done) return { ok: false, reason: 'В этот день мест уже нет.' };
+    return { ok: true };
+  }
+  {
     await query(
       `update bookings set status = 'cancelled' where session_id = $1 and participant_id = $2`,
       [sessionId, participantId],
     );
+    return { ok: true };
   }
 }
 

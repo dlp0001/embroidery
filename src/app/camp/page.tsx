@@ -197,7 +197,7 @@ function Event({ e, tinted }: { e: PublicEvent; tinted: boolean }) {
                 hhmm(e.starts_at)} до ${endsAt(e)}.`}{' '}
           {who}
           {e.age_hint ? `, ${e.age_hint}` : ''}.
-          {e.capacity ? ` Мест ${e.capacity}.` : ''}
+          {e.capacity ? ` В день берут не больше ${e.capacity} человек.` : ''}
         </p>
 
         <div className="sked">

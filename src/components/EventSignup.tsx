@@ -38,9 +38,20 @@ function label(day: string): string {
 }
 
 const cell: React.CSSProperties = {
-  padding: '9px 0', width: '100%', textAlign: 'center',
-  letterSpacing: 0, fontSize: 13,
+  padding: '7px 0 6px', width: '100%', textAlign: 'center',
+  letterSpacing: 0, fontSize: 13, lineHeight: 1.25,
 };
+
+/**
+ * Сколько мест осталось в этот день. Себе «нет мест» не пишем: когда
+ * человек уже записан, последнее место — его, и надпись только пугает.
+ */
+function seats(capacity: number | null, taken: number, booked: boolean): string {
+  if (capacity === null) return '';
+  const free = Math.max(capacity - taken, 0);
+  if (free === 0) return booked ? '' : 'нет мест';
+  return `мест: ${free}`;
+}
 
 /**
  * Запись на лагерь и мастер-класс. В отличие от обычных занятий, смена
@@ -59,7 +70,6 @@ export default function EventSignup({ rows }: { rows: SlotRow[] }) {
         const head = slots[0];
         const days = [...new Set(slots.map((s) => s.held_on))].sort();
         const people = [...new Map(slots.map((s) => [s.participant_id, s.who])).entries()];
-        const mine = slots.filter((s) => s.booked).length;
         const grid = calendarDays(days);
 
         return (
@@ -71,17 +81,28 @@ export default function EventSignup({ rows }: { rows: SlotRow[] }) {
               <div className="tag tag-ok">{head.kind === 'camp' ? 'лагерь' : 'мастер-класс'}</div>
             </div>
             <div className="what">{head.group_title}</div>
+            {/* Текст под названием не меняется от отметок: иначе он то в одну
+                строку, то в две, и дни под ним прыгают. Сколько отмечено —
+                написано у каждого в своей строке, справа. */}
             <div className="sub" style={{ marginBottom: 14 }}>
-              День стоит {money(Number(head.price), 'ILS')}. Выгоднее взять пакет
-              в «Оплате».{' '}
-              {mine > 0
-                ? `Записаны на ${mine} ${plural(mine, 'день', 'дня', 'дней')}.`
-                : 'Отметьте дни, в которые придёте.'}
+              День стоит {money(Number(head.price), 'ILS')}
+              {head.capacity ? `, мест в день ${head.capacity}` : ''}. Отметьте
+              дни, в которые придёте: пакет дней покупается в «Оплате».
             </div>
 
-            {people.map(([participantId, who]) => (
+            {people.map(([participantId, who]) => {
+              const picked = slots.filter(
+                (s) => s.participant_id === participantId && s.booked,
+              ).length;
+              return (
               <div key={participantId} style={{ marginBottom: 16 }}>
-                <div className="lbl" style={{ margin: '0 0 6px' }}>{who}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between',
+                              alignItems: 'baseline', gap: 10, minHeight: 18 }}>
+                  <div className="lbl" style={{ margin: '0 0 6px' }}>{who}</div>
+                  <div className="hint" style={{ whiteSpace: 'nowrap', fontSize: 11 }}>
+                    {picked > 0 && `${picked} ${plural(picked, 'день', 'дня', 'дней')}`}
+                  </div>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 }}>
                   {WD.map((w) => (
                     <div key={w} className="hint"
@@ -105,6 +126,11 @@ export default function EventSignup({ rows }: { rows: SlotRow[] }) {
                         </div>
                       );
                     }
+                    const left = seats(slot.capacity, slot.taken, slot.booked);
+                    // Занять последнее место можно только тому, кто ещё не
+                    // записан: себя отменить всегда можно.
+                    const full = slot.capacity !== null
+                      && slot.taken >= slot.capacity && !slot.booked;
                     return (
                       <form action={toggleBooking} key={day}>
                         <input type="hidden" name="sessionId" value={slot.session_id} />
@@ -114,18 +140,29 @@ export default function EventSignup({ rows }: { rows: SlotRow[] }) {
                           type="submit"
                           className={slot.booked ? 'chip-on' : 'chip'}
                           aria-pressed={slot.booked}
-                          aria-label={`${who}, ${dayMonth(day)}: ${
-                            slot.booked ? 'отменить запись' : 'записать'}`}
-                          style={cell}
+                          disabled={full}
+                          aria-label={`${who}, ${dayMonth(day)}${left ? `, ${left}` : ''}: ${
+                            full ? 'мест нет' : slot.booked ? 'отменить запись' : 'записать'}`}
+                          style={{ ...cell, opacity: full ? 0.45 : 1,
+                                   cursor: full ? 'default' : 'pointer' }}
                         >
                           {label(day)}
+                          {/* Строка всегда на месте, даже пустая: иначе
+                              клетки в сетке разной высоты. */}
+                          {slot.capacity !== null && (
+                            <span style={{ display: 'block', fontSize: 9, letterSpacing: 0,
+                                           color: 'var(--warm-gray)' }}>
+                              {left || '\u00a0'}
+                            </span>
+                          )}
                         </button>
                       </form>
                     );
                   })}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         );
       })}
