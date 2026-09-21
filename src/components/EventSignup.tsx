@@ -2,6 +2,12 @@ import { dayMonth, hhmm, money, plural } from '@/lib/format';
 import type { SlotRow } from '@/lib/studio';
 import { toggleBooking } from '@/app/account/actions';
 
+/** «22.09»: в смене дней много, и кнопка должна быть короткой. */
+function shortDay(iso: string): string {
+  const [, m, d] = iso.split('-');
+  return `${d}.${m}`;
+}
+
 /**
  * Запись на лагерь и мастер-класс. В отличие от обычных занятий, смена
  * идёт подряд несколько дней, и выбирать их удобнее не по одному дню в
@@ -59,7 +65,7 @@ export default function EventSignup({ rows }: { rows: SlotRow[] }) {
                           aria-label={`${who}, ${dayMonth(day)}: ${
                             slot.booked ? 'отменить запись' : 'записать'}`}
                         >
-                          {dayMonth(day)}
+                          {shortDay(day)}
                         </button>
                       </form>
                     );
