@@ -24,6 +24,8 @@ function refresh(): void {
   revalidatePath('/account');
   revalidatePath('/account/calendar');
   revalidatePath('/account/profile');
+  // На лагерь записывают и с публичной страницы: она тоже живая.
+  revalidatePath('/camp');
 }
 
 export async function toggleBooking(formData: FormData): Promise<void> {

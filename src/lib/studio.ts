@@ -989,6 +989,26 @@ export async function publicEvents(): Promise<PublicEvent[]> {
   );
 }
 
+export type EventDay = {
+  session_id: string;
+  held_on: string;
+  taken: number;
+  capacity: number | null;
+};
+
+/** Дни смены для публичной страницы: с занятыми местами, без имён. */
+export async function eventDays(groupId: string): Promise<EventDay[]> {
+  return query<EventDay>(
+    `select s.id as session_id, s.held_on::text, g.capacity,
+            (select count(*)::int from bookings b
+              where b.session_id = s.id and b.status = 'booked') as taken
+       from studio_sessions s join studio_groups g on g.id = s.group_id
+      where s.group_id = $1 and s.status <> 'cancelled'
+      order by s.held_on`,
+    [groupId],
+  );
+}
+
 // ── Управление расписанием ────────────────────────────────
 
 export type GroupRow = {

@@ -44,6 +44,22 @@ export const CAMP_CSS = `
   .lp .sked-tag { display: inline-block; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--rose-dark); border: 1px solid var(--rose-light); padding: 3px 10px; margin-left: 10px; vertical-align: middle; }
   .lp .after { font-size: 14px; color: var(--warm-gray); margin-top: 28px; }
 
+  /* Программа по дням */
+  .lp .prog { margin-top: 40px; border-top: 1px solid var(--line); }
+  .lp .prog-row { display: grid; grid-template-columns: 150px 1fr auto; gap: 24px; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--line); }
+  .lp .prog-day { font-family: 'Cormorant Garamond', serif; font-size: 23px; font-variant-numeric: lining-nums; }
+  .lp .prog-dow { display: block; font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--warm-gray); margin-bottom: 2px; }
+  .lp .prog-what { font-size: 14px; color: var(--warm-gray); line-height: 1.75; }
+  .lp .prog-soon { color: rgba(26,26,46,0.32); }
+  .lp .prog-act { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+  .lp .prog-seats { font-size: 11px; color: var(--warm-gray); white-space: nowrap; }
+  .lp .kid { font-size: 11px; letter-spacing: 0.04em; padding: 9px 14px; cursor: pointer; border: 1px solid rgba(26,26,46,0.15); background: #fff; color: var(--charcoal); }
+  .lp .kid:hover { border-color: var(--rose-light); }
+  .lp .kid-on { border-color: var(--rose); background: rgba(233,30,140,0.07); font-weight: 500; }
+  .lp .kid[disabled] { opacity: 0.45; cursor: default; }
+  .lp .prog-cta { font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; padding: 10px 22px; background: var(--charcoal); color: #fff; text-decoration: none; white-space: nowrap; }
+  .lp .prog-cta:hover { background: var(--rose); }
+
   .lp .prices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 44px; }
   .lp .price { background: #fff; border: 1px solid var(--line); padding: 32px 28px; display: flex; flex-direction: column; }
   .lp .price-kind { font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--warm-gray); margin-bottom: 20px; }
@@ -92,6 +108,8 @@ export const CAMP_CSS = `
     .lp .wrap, .lp .split-text { padding: 60px 28px; }
     .lp .sked-row { grid-template-columns: 1fr; gap: 4px; padding: 22px 0; }
     .lp .sked-days { font-size: 21px; }
+    .lp .prog-row { grid-template-columns: 1fr; gap: 10px; padding: 18px 0; }
+    .lp .prog-act { justify-content: flex-start; }
     .lp .prices { grid-template-columns: 1fr; }
     .lp .rules { grid-template-columns: 1fr; gap: 4px 0; }
     .lp .split { grid-template-columns: 1fr; }

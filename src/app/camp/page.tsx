@@ -1,5 +1,10 @@
 import type { Metadata } from 'next';
-import { publicEvents, type PublicEvent } from '@/lib/studio';
+import { currentUser } from '@/lib/session';
+import {
+  eventDays, eventSlotsForUser, publicEvents,
+  type EventDay, type PublicEvent, type SlotRow,
+} from '@/lib/studio';
+import { toggleBooking } from '@/app/account/actions';
 import { dayMonth, hhmm, money, plural } from '@/lib/format';
 import { CAMP_CSS } from './styles';
 
@@ -40,9 +45,24 @@ function oneDay(e: PublicEvent): boolean {
   return e.starts_on === e.ends_on;
 }
 
+/**
+ * Что будет в этот день. Пока пусто: Варя допишет темы ближе к смене,
+ * и тогда они переедут отсюда в базу, к самому дню.
+ */
+const PROGRAMME: Record<string, string> = {};
+
 export default async function CampPage() {
   const events = await publicEvents();
   const camp = events.find((e) => e.kind === 'camp') ?? events[0] ?? null;
+
+  // Записывать можно прямо отсюда: если человек уже вошёл, показываем
+  // его детей, если нет — дорогу в кабинет.
+  const me = await currentUser();
+  const [days, slots] = await Promise.all([
+    camp ? eventDays(camp.id) : Promise.resolve([] as EventDay[]),
+    me ? eventSlotsForUser(me.id) : Promise.resolve([] as SlotRow[]),
+  ]);
+  const mine = camp ? slots.filter((s) => s.group_id === camp.id) : [];
 
   return (
     <div className="lp">
@@ -94,8 +114,34 @@ export default async function CampPage() {
         ))
       )}
 
-      {events.length > 0 && (
+      {camp && days.length > 0 && (
         <section className="wrap">
+          <div className="eyebrow">Программа</div>
+          <h2 className="h2">Что будет<br /><em>по дням</em></h2>
+          <p className="lead">
+            Темы дней Варя допишет ближе к смене. Записаться можно уже
+            сейчас: отметьте дни, в которые ребёнок придёт, — отметку можно
+            снять в любой момент.
+          </p>
+
+          <div className="prog">
+            {days.map((d) => (
+              <Day key={d.session_id} day={d} slots={mine.filter((s) => s.held_on === d.held_on)}
+                   signedIn={me !== null} />
+            ))}
+          </div>
+
+          <p className="after">
+            {me
+              ? 'Отмеченные дни видно и в кабинете, на закладке «Неделя».'
+              : 'Чтобы записаться, войдите в кабинет: пароль не нужен, придёт код на почту.'}
+          </p>
+        </section>
+      )}
+
+      {events.length > 0 && (
+        <section className="wrap wrap-tint">
+          <div className="inner">
           <div className="eyebrow">Как это устроено</div>
           <h2 className="h2">Правила простые<br />и их немного</h2>
 
@@ -155,11 +201,12 @@ export default async function CampPage() {
               </p>
             </div>
           </div>
+          </div>
         </section>
       )}
 
-      <section className="wrap wrap-tint">
-        <div className="inner">
+      <section className="wrap">
+        <div>
           <div className="eyebrow">Кабинет</div>
           <h2 className="h2">Запись, дни и оплата —<br /><em>в личном кабинете</em></h2>
           <p className="lead">
@@ -181,6 +228,72 @@ export default async function CampPage() {
           <a href="/privacy-ru">Конфиденциальность</a>
         </div>
       </footer>
+    </div>
+  );
+}
+
+const DOW = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
+
+function dowName(day: string): string {
+  const [y, m, d] = day.split('-').map(Number);
+  return DOW[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+}
+
+/**
+ * День смены: что в нём будет и кнопки записи. Вошедшему показываем его
+ * детей, остальным — дорогу в кабинет: записывать можно только своих.
+ */
+function Day({
+  day,
+  slots,
+  signedIn,
+}: {
+  day: EventDay;
+  slots: SlotRow[];
+  signedIn: boolean;
+}) {
+  const free = day.capacity === null ? null : Math.max(day.capacity - day.taken, 0);
+  const text = PROGRAMME[day.held_on];
+
+  return (
+    <div className="prog-row">
+      <div>
+        <span className="prog-dow">{dowName(day.held_on)}</span>
+        <span className="prog-day">{dayMonth(day.held_on)}</span>
+      </div>
+
+      <div className="prog-what">
+        {text ?? <span className="prog-soon">Тему этого дня допишем</span>}
+      </div>
+
+      <div className="prog-act">
+        {free !== null && (
+          <span className="prog-seats">{free > 0 ? `мест: ${free}` : 'мест нет'}</span>
+        )}
+
+        {!signedIn && <a className="prog-cta" href="/login">Кабинет</a>}
+
+        {signedIn && slots.length === 0 && (
+          <a className="prog-cta" href="/account/profile">Кабинет</a>
+        )}
+
+        {slots.map((s) => {
+          const full = free === 0 && !s.booked;
+          return (
+            <form action={toggleBooking} key={s.participant_id}>
+              <input type="hidden" name="sessionId" value={s.session_id} />
+              <input type="hidden" name="participantId" value={s.participant_id} />
+              <input type="hidden" name="booked" value={s.booked ? '0' : '1'} />
+              <button type="submit" className={s.booked ? 'kid kid-on' : 'kid'}
+                      disabled={full} aria-pressed={s.booked}
+                      aria-label={`${s.who}, ${dayMonth(day.held_on)}: ${
+                        full ? 'мест нет' : s.booked ? 'отменить запись' : 'записать'}`}>
+                {s.who}
+              </button>
+            </form>
+          );
+        })}
+      </div>
     </div>
   );
 }
