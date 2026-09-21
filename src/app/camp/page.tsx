@@ -140,6 +140,14 @@ export default async function CampPage() {
               </p>
             </div>
             <div className="rule">
+              <div className="rule-t">Еда входит в цену</div>
+              <p className="rule-d">
+                Кормим весь день: паста, овощи, фрукты, снэки и всё подряд.
+                Платить отдельно и собирать с собой контейнеры не нужно.
+                А в какие-то дни будем готовить сами — это тоже занятие.
+              </p>
+            </div>
+            <div className="rule">
               <div className="rule-t">Оплата</div>
               <p className="rule-d">
                 Картой, Apple Pay или Google Pay, битом, пейбоксом или наличными.
