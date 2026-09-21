@@ -2,10 +2,18 @@ import { dayMonth, hhmm, money, plural } from '@/lib/format';
 import type { SlotRow } from '@/lib/studio';
 import { toggleBooking } from '@/app/account/actions';
 
+const WD = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+
 /** «22.09»: в смене дней много, и кнопка должна быть короткой. */
 function shortDay(iso: string): string {
   const [, m, d] = iso.split('-');
   return `${d}.${m}`;
+}
+
+/** День недели над числом: в смене подряд десять дней, и они путаются. */
+function weekday(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return WD[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
 }
 
 /**
@@ -62,9 +70,14 @@ export default function EventSignup({ rows }: { rows: SlotRow[] }) {
                           type="submit"
                           className={slot.booked ? 'chip-on' : 'chip'}
                           aria-pressed={slot.booked}
-                          aria-label={`${who}, ${dayMonth(day)}: ${
+                          aria-label={`${who}, ${weekday(day)} ${dayMonth(day)}: ${
                             slot.booked ? 'отменить запись' : 'записать'}`}
+                          style={{ lineHeight: 1.3, textAlign: 'center' }}
                         >
+                          <span style={{ display: 'block', fontSize: 10, letterSpacing: '0.16em',
+                                         textTransform: 'uppercase', opacity: 0.7 }}>
+                            {weekday(day)}
+                          </span>
                           {shortDay(day)}
                         </button>
                       </form>
