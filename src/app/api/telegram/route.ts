@@ -1,5 +1,6 @@
 import {
-  answerCallback, applyTap, bindChat, chatUser, editMessage, readTap, secretOk, send, weekView,
+  answerCallback, applyTap, bindChat, chatUser, editMessage, eventViews, readTap, secretOk,
+  send, viewAfterTap, weekView,
 } from '@/lib/telegram';
 
 export const runtime = 'nodejs';
@@ -66,10 +67,16 @@ async function onMessage(chatId: number, text: string, origin: string): Promise<
     return;
   }
 
-  // Команд пока нет: любое сообщение — просьба показать неделю. Разбирать
-  // слова начнём тогда, когда боту будет что ещё ответить.
-  const view = await weekView(user.id, origin);
-  await send(chatId, view.text, view.keyboard);
+  // Команд пока нет: любое сообщение — просьба показать, что впереди.
+  // Разбирать слова начнём тогда, когда боту будет что ещё ответить.
+  const week = await weekView(user.id, origin);
+  await send(chatId, week.text, week.keyboard);
+
+  // Смена — отдельным сообщением, и только пока она есть: кончится лагерь,
+  // кончатся и эти сообщения, ничего выключать не придётся.
+  for (const view of await eventViews(user.id, origin)) {
+    await send(chatId, view.text, view.keyboard);
+  }
 }
 
 /**
@@ -95,8 +102,9 @@ async function onTap(
   await answerCallback(id, said);
 
   // Перерисовываем всё сообщение: изменилась не одна кнопка, а и число
-  // свободных мест, которое видят все строки этого занятия.
-  const view = await weekView(user.id, origin);
+  // свободных мест, которое видят все строки этого дня. Какое именно
+  // сообщение — решает занятие: у смены оно своё.
+  const view = await viewAfterTap(user.id, tap.sessionId, origin);
   await editMessage(chatId, messageId, view.text, view.keyboard);
 }
 

@@ -48,6 +48,9 @@ const info = await api('getWebhookInfo');
 console.log('\nСейчас у телеграма:');
 console.log(`  адрес            ${info.url || 'не задан'}`);
 console.log(`  секрет           ${info.has_custom_certificate ? 'свой сертификат' : secret ? 'задан' : 'НЕТ'}`);
+// Список телеграм хранит у себя. Нет тут callback_query — кнопки под
+// сообщениями будут нажиматься впустую, и никакой ошибки при этом нет.
+console.log(`  апдейты          ${(info.allowed_updates ?? ['все']).join(', ')}`);
 console.log(`  в очереди        ${info.pending_update_count ?? 0}`);
 if (info.last_error_message) {
   console.log(`  последняя ошибка ${info.last_error_message}`);

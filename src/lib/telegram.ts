@@ -1,7 +1,12 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { one, query, tx } from './db';
-import { hhmm, plusDays, todayISO, weekdayDayMonth } from './format';
-import { sessionIsPast, setBooking, slotsForUser, type SlotRow } from './studio';
+import {
+  dayMonth, hhmm, money, packageFrom, plural, plusDays, todayISO, weekdayDayMonth,
+} from './format';
+import {
+  eventSlotsForUser, sessionIsPast, setBooking, slotsForUser,
+  type GroupKind, type SlotRow,
+} from './studio';
 
 const API = 'https://api.telegram.org';
 
@@ -227,7 +232,7 @@ export async function ownsParticipant(userId: string, participantId: string): Pr
   return Boolean(ok);
 }
 
-// ── Экран недели ──────────────────────────────────────────
+// ── Экраны ──────────────────────────────────────────
 
 /** Чем занятие отличается от обычного детского. Ничем — значит без пометки. */
 function tag(row: SlotRow): string | null {
@@ -256,34 +261,57 @@ function shortDay(iso: string): string {
   return `${wd} ${d}`;
 }
 
-export type WeekView = { text: string; keyboard: Keyboard };
+export type View = { text: string; keyboard: Keyboard };
+
+/** Смена знает свою группу: по ней после нажатия находим, что перерисовать. */
+export type GroupView = View & { groupId: string };
 
 /**
- * Ближайшая неделя семьи: сообщение и кнопки под ним. Одна функция на
- * оба случая — и на первую отправку, и на перерисовку после нажатия,
- * иначе они разъедутся.
+ * Кнопки по две в ряд: у семьи с тремя детьми их на неделю выходит
+ * дюжина, и столбиком они превращают сообщение в простыню. День подписан
+ * на каждой, поэтому ряд может начинаться с середины занятия.
+ */
+function rows2(buttons: Button[]): Keyboard {
+  const keyboard: Keyboard = [];
+  for (let i = 0; i < buttons.length; i += 2) keyboard.push(buttons.slice(i, i + 2));
+  return keyboard;
+}
+
+/**
+ * Дни и люди под ними. Общая разметка недели и смены: разойдись тут
+ * подпись мест или пометка «придёт», и родитель в одном сообщении
+ * увидел бы одно, а в соседнем другое.
  *
  * На кнопке, в отличие от кабинета, стоит не действие, а состояние:
  * галочка значит «записан». Кнопка тут единственное, что можно нажать,
  * и читается она вместе со строчкой над собой, а не вместо неё.
  */
-export async function weekView(userId: string, origin: string): Promise<WeekView> {
-  const today = todayISO();
-  const rows = (await slotsForUser(userId, today, plusDays(today, 7)))
-    .filter((r) => r.kind === 'lesson');
-  if (rows.length === 0) {
-    return {
-      text: `На ближайшую неделю занятий нет.\n\nРасписание целиком: ${origin}/account/calendar`,
-      keyboard: [],
-    };
+/** Кнопка на каждого, кого ещё можно записать или уже можно отменить. */
+function slotButtons(rows: SlotRow[], today: string): Button[] {
+  const buttons: Button[] = [];
+  for (const r of rows) {
+    // День прошёл — обещать приход поздно. Мест нет — записаться некуда,
+    // но свою запись снять можно всегда.
+    if (r.held_on < today) continue;
+    const free = r.capacity === null ? null : Math.max(r.capacity - r.taken, 0);
+    if (!r.booked && free === 0) continue;
+    buttons.push({
+      text: `${r.booked ? '✓ ' : ''}${shortDay(r.held_on)} · ${r.who}`,
+      callback_data: tapData(r),
+    });
   }
+  return buttons;
+}
 
+function renderSlots(
+  rows: SlotRow[], today: string, withTag: boolean,
+): { lines: string[]; buttons: Button[] } {
   // Порядок строк задаёт база, но два занятия в одно время на одном дне
   // могли бы перемешаться именами. Группируем, как это делает SlotList.
   const bySession = new Map<string, SlotRow[]>();
   for (const r of rows) bySession.set(r.session_id, [...(bySession.get(r.session_id) ?? []), r]);
 
-  const lines: string[] = ['Ближайшая неделя'];
+  const lines: string[] = [];
   const buttons: Button[] = [];
   let day = '';
 
@@ -296,7 +324,9 @@ export async function weekView(userId: string, origin: string): Promise<WeekView
     const free = head.capacity === null ? null : Math.max(head.capacity - head.taken, 0);
     const parts = [hhmm(head.starts_at)];
     if (head.moved) parts.push('перенесено');
-    const what = tag(head);
+    // Внутри сообщения про смену пометка «лагерь» стоит на каждой строке
+    // и перестаёт что-либо значить: она уже в заголовке.
+    const what = withTag ? tag(head) : null;
     if (what) parts.push(what);
     const left = seats(head, people.some((p) => p.booked));
     if (left) parts.push(left);
@@ -304,8 +334,8 @@ export async function weekView(userId: string, origin: string): Promise<WeekView
 
     for (const p of people) {
       lines.push(`   ${p.who}${p.booked ? ' — придёт' : ''}`);
-      // Занятие прошло — обещать приход поздно. Мест нет — записаться
-      // некуда, но свою запись снять можно всегда.
+      // День прошёл — обещать приход поздно. Мест нет — записаться некуда,
+      // но свою запись снять можно всегда.
       if (head.held_on < today) continue;
       if (!p.booked && free === 0) continue;
       buttons.push({
@@ -314,16 +344,137 @@ export async function weekView(userId: string, origin: string): Promise<WeekView
       });
     }
   }
+  return { lines, buttons };
+}
 
-  lines.push('', 'Галочка — записан. Нажмите, чтобы записать или отменить.');
-  lines.push(`Лагерь, оплата и остальное: ${origin}/account`);
+/**
+ * Ближайшая неделя семьи: сообщение и кнопки под ним. Одна функция на
+ * оба случая — и на первую отправку, и на перерисовку после нажатия,
+ * иначе они разъедутся.
+ */
+export async function weekView(userId: string, origin: string): Promise<View> {
+  const today = todayISO();
+  const rows = (await slotsForUser(userId, today, plusDays(today, 7)))
+    .filter((r) => r.kind === 'lesson');
+  if (rows.length === 0) {
+    return {
+      text: `На ближайшую неделю занятий нет.\n\nРасписание целиком: ${origin}/account/calendar`,
+      keyboard: [],
+    };
+  }
+  const { lines, buttons } = renderSlots(rows, today, true);
+  return {
+    text: [
+      'Ближайшая неделя',
+      ...lines,
+      '',
+      'Галочка — записан. Нажмите, чтобы записать или отменить.',
+      `Оплата, история и остальное: ${origin}/account`,
+    ].join('\n'),
+    keyboard: rows2(buttons),
+  };
+}
 
-  // По две в ряд: у семьи с тремя детьми кнопок на неделю выходит дюжина,
-  // и столбиком они превращают сообщение в простыню. День подписан на
-  // каждой, поэтому ряд может начинаться с середины занятия.
-  const keyboard: Keyboard = [];
-  for (let i = 0; i < buttons.length; i += 2) keyboard.push(buttons.slice(i, i + 2));
-  return { text: lines.join('\n'), keyboard };
+/**
+ * Лагерь и мастер-классы — отдельными сообщениями, по одному на смену.
+ *
+ * Смена идёт подряд много дней и решается один раз, а неделя живёт своим
+ * чередом: в общем сообщении эти два списка мешали бы друг другу, и
+ * десять дней лагеря заслонили бы четыре занятия. Когда смена кончится,
+ * сообщение перестанет приходить само: дней в будущем не останется.
+ */
+export async function eventViews(userId: string, origin: string): Promise<GroupView[]> {
+  const today = todayISO();
+  const byGroup = new Map<string, SlotRow[]>();
+  for (const r of await eventSlotsForUser(userId)) {
+    byGroup.set(r.group_id, [...(byGroup.get(r.group_id) ?? []), r]);
+  }
+
+  const out: GroupView[] = [];
+  for (const slots of byGroup.values()) {
+    const head = slots[0];
+    const days = [...new Map(slots.map((s) => [s.held_on, s])).values()]
+      .sort((a, b) => a.held_on.localeCompare(b.held_on));
+    // Начало пишем один раз в шапке: у смены все дни начинаются в одно
+    // время. День, который перенесли, подписываем отдельно в списке.
+    const usual = head.starts_at;
+    const what = head.kind === 'camp' ? 'лагерь' : 'мастер-класс';
+    // «Лагерь на Суккот · лагерь» — пометка, которая уже в названии.
+    const title = head.group_title.toLowerCase().includes(what)
+      ? head.group_title
+      : `${head.group_title} · ${what}`;
+
+    const from = packageFrom(Number(head.price), head.pass_offers);
+    const top = [
+      title,
+      `${dayMonth(days[0].held_on)} — ${dayMonth(days[days.length - 1].held_on)} · ${hhmm(usual)}`,
+      '',
+      `День стоит ${money(Number(head.price), 'ILS')}${
+        head.capacity ? `, мест в день ${head.capacity}` : ''}.`,
+      from === null
+        ? 'Платится за те дни, в которые ребёнок пришёл.'
+        : `Если планируете ${from} ${plural(from, 'день', 'дня', 'дней')} и больше, выгоднее`
+          + ' взять пакет: он покупается в «Оплате».',
+    ];
+
+    // Дни списком, а не карточками: какой день и кто на него идёт, видно
+    // по кнопкам, и повторять это ещё и текстом значит получить полотно
+    // на полсотни строк. Текстом остаётся то, чего на кнопке не написать,
+    // — сколько мест свободно.
+    const left = days
+      .filter((d) => d.held_on >= today)
+      .map((d) => {
+        const free = d.capacity === null ? null : Math.max(d.capacity - d.taken, 0);
+        const when = d.starts_at === usual ? '' : ` (${hhmm(d.starts_at)})`;
+        if (free === null) return `${shortDay(d.held_on)}${when}`;
+        return `${shortDay(d.held_on)}${when} — ${free === 0 ? 'нет мест' : free}`;
+      });
+    if (left.length > 0) top.push('', `Свободно: ${left.join(', ')}`);
+
+    // Сколько дней уже отмечено у каждого: от этого зависит, брать пакет
+    // или платить поштучно, и считать это по галочкам в уме не надо.
+    const picked = [...new Map(slots.map((s) => [s.participant_id, s.who])).entries()]
+      .map(([id, who]) => {
+        const n = slots.filter((s) => s.participant_id === id && s.booked).length;
+        return n > 0 ? `${who} — ${n} ${plural(n, 'день', 'дня', 'дней')}` : null;
+      })
+      .filter((x): x is string => x !== null);
+    top.push('', picked.length > 0 ? `Отмечено: ${picked.join(', ')}` : 'Пока ничего не отмечено.');
+
+    out.push({
+      groupId: head.group_id,
+      text: [...top, '', 'Галочка — записан. Нажмите, чтобы отметить дни.',
+             `Пакет и оплата: ${origin}/account/pay`].join('\n'),
+      // У смены кнопки идут блоками по человеку, а не вперемешку по дням:
+      // родитель отмечает все дни одному ребёнку подряд, и в списке из
+      // тридцати кнопок это единственный способ не сбиться.
+      keyboard: rows2(slotButtons(
+        [...slots].sort((a, b) => a.who.localeCompare(b.who) || a.held_on.localeCompare(b.held_on)),
+        today,
+      )),
+    });
+  }
+  return out;
+}
+
+/**
+ * Что перерисовать после нажатия. Кнопка лагеря живёт в сообщении про
+ * лагерь, кнопка занятия — в неделе; перепутать их значит стереть
+ * родителю не то сообщение.
+ */
+export async function viewAfterTap(
+  userId: string, sessionId: string, origin: string,
+): Promise<View> {
+  const row = await one<{ kind: GroupKind; group_id: string }>(
+    `select g.kind, g.id as group_id
+       from studio_sessions s join studio_groups g on g.id = s.group_id
+      where s.id = $1`,
+    [sessionId]);
+  if (row && row.kind !== 'lesson') {
+    const found = (await eventViews(userId, origin)).find((v) => v.groupId === row.group_id);
+    if (found) return found;
+  }
+  return weekView(userId, origin);
 }
 
 /**
@@ -335,7 +486,7 @@ export async function weekView(userId: string, origin: string): Promise<WeekView
  */
 export async function applyTap(userId: string, tap: Tap): Promise<string> {
   if (!(await ownsParticipant(userId, tap.participantId))) return 'Это не ваш участник.';
-  if (tap.book && (await sessionIsPast(tap.sessionId))) return 'Занятие уже прошло.';
+  if (tap.book && (await sessionIsPast(tap.sessionId))) return 'День уже прошёл.';
   const res = await setBooking(tap.sessionId, tap.participantId, tap.book);
   if (!res.ok) return res.reason ?? 'Не получилось.';
   return tap.book ? 'Записали' : 'Отменили';
