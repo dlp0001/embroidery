@@ -28,7 +28,6 @@ export default async function TodayPage() {
 
   const rosters = await Promise.all(today.map((s) => sessionRoster(s.session_id)));
   const debtTotal = debts.reduce((s, d) => s + Number(d.amount), 0);
-  const priceLabel = money(price.amount, price.currency);
 
   return (
     <>
@@ -64,10 +63,14 @@ export default async function TodayPage() {
               <p className="hint" style={{ marginTop: 10 }}>В группе пока никого нет.</p>
             ) : (
               <div style={{ marginTop: 10 }}>
+                {/* Цена своя у каждого дня: день лагеря стоит не столько,
+                    сколько обычное занятие, и в журнале это та цена, по
+                    которой считается долг. */}
                 <Journal
                   sessionId={s.session_id}
                   roster={rosters[i]}
-                  price={priceLabel}
+                  price={money(Number(s.price ?? price.amount), price.currency)}
+                  passWord={s.kind === 'camp' ? 'по пакету' : 'по абонементу'}
                   saved={s.marked > 0}
                   kids={s.audience === 'kids'}
                 />

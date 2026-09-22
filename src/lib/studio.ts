@@ -589,6 +589,9 @@ export type TeacherSession = {
   starts_at: string;
   status: string;
   audience: string;
+  kind: GroupKind;
+  /** Цена этого дня: у лагеря своя, у обычного занятия общая студийная. */
+  price: string | null;
   people: number;
   marked: number;
 };
@@ -597,7 +600,9 @@ export type TeacherSession = {
 export async function teacherSessions(teacherId: string | null): Promise<TeacherSession[]> {
   return query<TeacherSession>(
     `select s.id as session_id, g.id as group_id, g.title as group_title,
-            s.held_on::text, g.starts_at::text, s.status, g.audience,
+            s.held_on::text, g.starts_at::text, s.status, g.audience, g.kind,
+            coalesce(g.price::text,
+                     (select value from settings where key = 'studio_lesson_price')) as price,
             (select count(*)::int
                from participants p
               where ((g.audience = 'adults' and p.user_id is not null)
@@ -631,7 +636,9 @@ export async function nextSessions(teacherId: string | null): Promise<TeacherSes
           and s.status <> 'cancelled'
      )
      select s.id as session_id, g.id as group_id, g.title as group_title,
-            s.held_on::text, g.starts_at::text, s.status, g.audience,
+            s.held_on::text, g.starts_at::text, s.status, g.audience, g.kind,
+            coalesce(g.price::text,
+                     (select value from settings where key = 'studio_lesson_price')) as price,
             (select count(*)::int from participants p
               where ((g.audience = 'adults' and p.user_id is not null)
                   or (g.audience = 'kids' and p.child_id is not null))
