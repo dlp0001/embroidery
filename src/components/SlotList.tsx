@@ -8,6 +8,13 @@ import { toggleBooking } from '@/app/account/actions';
  */
 const signUp: React.CSSProperties = { width: 116, textAlign: 'center' };
 
+/** Чем это занятие отличается от обычного детского. Ничем — значит, без пометки. */
+function tag(head: SlotRow): string | null {
+  if (head.kind === 'camp') return 'лагерь';
+  if (head.kind === 'event') return 'мастер-класс';
+  return head.audience === 'adults' ? 'взрослое' : null;
+}
+
 /** Сколько мест осталось. Своей записи «мест нет» не пишем: место уже занято вами. */
 function seats(free: number | null, booked: boolean): string | null {
   if (free === null) return null;
@@ -44,11 +51,10 @@ export default function SlotList({ rows }: { rows: SlotRow[] }) {
                 {head.moved && <span style={{ color: 'var(--rose)' }}> · перенесено</span>}
                 {' · '}{head.group_title}{left ? ` · ${left}` : ''}
               </div>
-              <div className="tag tag-ok">
-                {head.kind === 'camp' ? 'лагерь'
-                  : head.kind === 'event' ? 'мастер-класс'
-                  : head.audience === 'adults' ? 'взрослое' : 'детское'}
-              </div>
+              {/* Детское занятие не подписываем: их подавляющее большинство,
+                  и пометка на каждой карточке перестаёт что-либо значить.
+                  Подписываем то, что выбивается из обычного порядка. */}
+              {tag(head) && <div className="tag tag-ok">{tag(head)}</div>}
             </div>
 
             {head.kind !== 'lesson' && (
