@@ -104,7 +104,7 @@ async function onTap(
   // Перерисовываем всё сообщение: изменилась не одна кнопка, а и число
   // свободных мест, которое видят все строки этого дня. Какое именно
   // сообщение — решает занятие: у смены оно своё.
-  const view = await viewAfterTap(user.id, tap.sessionId, origin);
+  const view = await viewAfterTap(user.id, tap, origin);
   await editMessage(chatId, messageId, view.text, view.keyboard);
 }
 

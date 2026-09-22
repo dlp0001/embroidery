@@ -570,7 +570,8 @@ export async function setBooking(
       if (row.capacity !== null && row.taken >= row.capacity) return false;
       await c.query(
         `insert into bookings (session_id, participant_id, status) values ($1, $2, 'booked')
-         on conflict (session_id, participant_id) do update set status = 'booked'`,
+         on conflict (session_id, participant_id)
+         do update set status = 'booked', updated_at = now()`,
         [sessionId, participantId],
       );
       return true;
@@ -579,8 +580,14 @@ export async function setBooking(
     return { ok: true };
   }
   {
+    // Отказ заводит строку, даже если записи не было. «Не придёт» — это
+    // ответ, а не пустота: бот спрашивает накануне, и надо уметь отличить
+    // сказавшего «нет» от промолчавшего. Отменённая строка нигде не
+    // считается: и места, и журнал смотрят только на 'booked'.
     await query(
-      `update bookings set status = 'cancelled' where session_id = $1 and participant_id = $2`,
+      `insert into bookings (session_id, participant_id, status) values ($1, $2, 'cancelled')
+       on conflict (session_id, participant_id)
+       do update set status = 'cancelled', updated_at = now()`,
       [sessionId, participantId],
     );
     return { ok: true };

@@ -202,20 +202,34 @@ function unpack(s: string): string | null {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
-export type Tap = { sessionId: string; participantId: string; book: boolean };
+/**
+ * Откуда нажали: из списка (неделя, смена) или из вечернего вопроса.
+ * Это решает, какое сообщение перерисовать в ответ, — подменить вопрос
+ * недельной простынёй значит стереть родителю то, что он читал.
+ */
+export type TapFrom = 'list' | 'ask';
+
+export type Tap = {
+  sessionId: string; participantId: string; book: boolean; from: TapFrom;
+};
 
 /** Разбор нажатия. Всё, что пришло не от нашей кнопки, — мусор. */
 export function readTap(data: string): Tap | null {
-  const m = /^b([01]):([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{22})$/.exec(data);
+  const m = /^([ba])([01]):([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{22})$/.exec(data);
   if (!m) return null;
-  const sessionId = unpack(m[2]);
-  const participantId = unpack(m[3]);
+  const sessionId = unpack(m[3]);
+  const participantId = unpack(m[4]);
   if (!sessionId || !participantId) return null;
-  return { sessionId, participantId, book: m[1] === '1' };
+  return {
+    sessionId, participantId,
+    book: m[2] === '1',
+    from: m[1] === 'a' ? 'ask' : 'list',
+  };
 }
 
-function tapData(row: SlotRow): string {
-  return `b${row.booked ? '0' : '1'}:${pack(row.session_id)}.${pack(row.participant_id)}`;
+function tapData(row: SlotRow, book: boolean, from: TapFrom): string {
+  return `${from === 'ask' ? 'a' : 'b'}${book ? '1' : '0'}`
+    + `:${pack(row.session_id)}.${pack(row.participant_id)}`;
 }
 
 /**
@@ -297,7 +311,7 @@ function slotButtons(rows: SlotRow[], today: string): Button[] {
     if (!r.booked && free === 0) continue;
     buttons.push({
       text: `${r.booked ? '✓ ' : ''}${shortDay(r.held_on)} · ${r.who}`,
-      callback_data: tapData(r),
+      callback_data: tapData(r, !r.booked, 'list'),
     });
   }
   return buttons;
@@ -340,7 +354,7 @@ function renderSlots(
       if (!p.booked && free === 0) continue;
       buttons.push({
         text: `${p.booked ? '✓ ' : ''}${shortDay(head.held_on)} · ${p.who}`,
-        callback_data: tapData(p),
+        callback_data: tapData(p, !p.booked, 'list'),
       });
     }
   }
@@ -457,14 +471,129 @@ export async function eventViews(userId: string, origin: string): Promise<GroupV
   return out;
 }
 
+// ── Вечерний вопрос ───────────────────────────────────────
+
+export type AskTarget = { chat_id: string; user_id: string; session_id: string };
+
+/**
+ * Кому завтра задавать вопрос. Спрашиваем только тех, чей ответ что-то
+ * меняет: занятие завтра есть, записи на него нет, а основание ждать —
+ * есть. Записавшимся не пишем ничего: вопрос без смысла обесценивает
+ * все остальные, и через месяц их перестанут читать.
+ *
+ * Основание ждать — одно из двух: ребёнка приводили на это же занятие в
+ * последние две недели или этот день отмечен у него в профиле. Первого
+ * достаточно тем, кто ходит и профиль не заполнял; второго — новичкам,
+ * которых в журнале ещё нет.
+ */
+export async function askTargets(): Promise<AskTarget[]> {
+  return query<AskTarget>(
+    `select distinct u.tg_chat_id::text as chat_id, u.id as user_id, s.id as session_id
+       from studio_sessions s
+       join studio_groups g on g.id = s.group_id and g.active and g.kind = 'lesson'
+       join participants p
+         on (g.audience = 'adults' and p.user_id is not null)
+         or (g.audience = 'kids' and p.child_id is not null)
+       left join children ch on ch.id = p.child_id
+       left join users pu on pu.id = p.user_id
+       /* Пишем каждому взрослому, кто отвечает за этого участника: сам
+          он это или его опекуны, которых может быть двое. */
+       join users u
+         on (p.user_id is not null and u.id = p.user_id)
+         or (p.child_id is not null
+             and exists (select 1 from guardians gg
+                          where gg.child_id = p.child_id and gg.user_id = u.id))
+      where s.held_on = current_date + 1
+        and s.status <> 'cancelled'
+        and ch.archived_at is null
+        and (p.user_id is null or pu.attends)
+        and u.tg_chat_id is not null
+        and not exists (select 1 from bookings b
+                         where b.session_id = s.id and b.participant_id = p.id
+                           and b.status = 'booked')
+        and (exists (select 1 from attendance a
+                       join studio_sessions s2 on s2.id = a.session_id
+                      where a.participant_id = p.id and a.status = 'present'
+                        and s2.group_id = g.id and s2.held_on > current_date - 14)
+          or exists (select 1 from preferred_days pd
+                      where pd.participant_id = p.id and pd.weekday = g.weekday))`,
+  );
+}
+
+/**
+ * Сам вопрос: одно занятие, семья под ним, по две кнопки на каждого.
+ * Коротко — в отличие от недели, это сообщение приходит само и вечером,
+ * и простыня на семь дней тут не к месту.
+ *
+ * null — от занятия ничего не осталось: отменили или семья к нему уже
+ * не подходит. Такое сообщение слать не за чем.
+ */
+export async function askView(userId: string, sessionId: string): Promise<View | null> {
+  const when = await one<{ held_on: string }>(
+    'select held_on::text from studio_sessions where id = $1', [sessionId]);
+  if (!when) return null;
+
+  const rows = (await slotsForUser(userId, when.held_on, when.held_on))
+    .filter((r) => r.session_id === sessionId);
+  if (rows.length === 0) return null;
+
+  // Отказ тоже хранится строкой, поэтому «не придёт» отличимо от
+  // «промолчал»: у первого есть отменённая запись, у второго нет ничего.
+  const said = new Map<string, string>();
+  for (const r of await query<{ participant_id: string; status: string }>(
+    'select participant_id, status from bookings where session_id = $1', [sessionId])) {
+    said.set(r.participant_id, r.status);
+  }
+
+  const head = rows[0];
+  const free = head.capacity === null ? null : Math.max(head.capacity - head.taken, 0);
+  const lines = [
+    'Кто придёт завтра?',
+    `${weekdayDayMonth(head.held_on)} · ${hhmm(head.starts_at)}`
+      + (free === null ? '' : ` · ${free === 0 ? 'мест нет' : `свободно ${free} из ${head.capacity}`}`),
+    '',
+  ];
+
+  const buttons: Button[] = [];
+  for (const r of rows) {
+    const state = r.booked ? 'придёт'
+      : said.get(r.participant_id) === 'cancelled' ? 'не придёт'
+      : 'не отмечено';
+    lines.push(`${r.who} — ${state}`);
+    // Обе кнопки стоят всегда: ответ можно поменять до самого занятия.
+    // Занять последнее место может только тот, кто ещё не записан.
+    if (!r.booked && free === 0) {
+      buttons.push({ text: `${r.who} · мест нет`, callback_data: tapData(r, false, 'ask') });
+    } else {
+      buttons.push({
+        text: `${r.booked ? '✓ ' : ''}${r.who} · придёт`,
+        callback_data: tapData(r, true, 'ask'),
+      });
+    }
+    buttons.push({
+      text: `${said.get(r.participant_id) === 'cancelled' && !r.booked ? '✓ ' : ''}${r.who} · не придёт`,
+      callback_data: tapData(r, false, 'ask'),
+    });
+  }
+
+  return { text: lines.join('\n'), keyboard: rows2(buttons) };
+}
+
 /**
  * Что перерисовать после нажатия. Кнопка лагеря живёт в сообщении про
  * лагерь, кнопка занятия — в неделе; перепутать их значит стереть
  * родителю не то сообщение.
  */
 export async function viewAfterTap(
-  userId: string, sessionId: string, origin: string,
+  userId: string, tap: Tap, origin: string,
 ): Promise<View> {
+  // Вопрос перерисовывается в себя: родитель читал короткое «кто придёт
+  // завтра», и подменять его недельной простынёй нельзя.
+  if (tap.from === 'ask') {
+    const asked = await askView(userId, tap.sessionId);
+    if (asked) return asked;
+  }
+  const sessionId = tap.sessionId;
   const row = await one<{ kind: GroupKind; group_id: string }>(
     `select g.kind, g.id as group_id
        from studio_sessions s join studio_groups g on g.id = s.group_id
