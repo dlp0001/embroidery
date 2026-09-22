@@ -1161,6 +1161,8 @@ export type CalendarSession = {
   group_title: string;
   /** Детское занятие или взрослое: ребёнка записывают только на детское. */
   audience: 'kids' | 'adults';
+  /** Лагерь, мастер-класс или обычное занятие: в календаре у них своя точка. */
+  kind: GroupKind;
   held_on: string;
   starts_at: string;
   status: string;
@@ -1181,7 +1183,7 @@ export async function sessionsInRange(from: string, to: string): Promise<Calenda
     `select s.id as session_id, g.id as group_id, g.title as group_title,
             s.held_on::text, coalesce(s.starts_at, g.starts_at)::text as starts_at,
             (s.starts_at is not null) as moved,
-            s.status, g.audience,
+            s.status, g.audience, g.kind,
             (select count(*)::int from attendance a where a.session_id = s.id) as marked,
             (select count(*)::int from attendance a
               where a.session_id = s.id and a.status = 'present') as came,

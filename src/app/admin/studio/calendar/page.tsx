@@ -18,8 +18,19 @@ const pad = (n: number) => String(n).padStart(2, '0');
 function bounds(month: string) {
   const [y, m] = month.split('-').map(Number);
   const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const lead = (new Date(Date.UTC(y, m - 1, 1)).getUTCDay() + 6) % 7;
+  // Неделя с воскресенья: так живёт Израиль и так же выложен календарь
+  // в кабинете у родителей.
+  const lead = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
   return { first: `${month}-01`, last: `${month}-${pad(days)}`, days, lead };
+}
+
+/**
+ * Цвет точки под числом. У лагеря и мастер-класса он свой: в месяце сразу
+ * видно, где идёт смена, а где обычные занятия.
+ */
+function dot(isEvent: boolean, selected: boolean): string {
+  if (selected) return isEvent ? 'rgba(255,255,255,0.55)' : '#fff';
+  return isEvent ? 'var(--charcoal)' : 'var(--rose)';
 }
 
 function shift(month: string, by: number) {
@@ -77,8 +88,11 @@ export default async function AdminCalendarPage({
   ]);
   const selected = /^\d{4}-\d{2}-\d{2}$/.test(params.d ?? '') ? params.d! : today;
   const daySessions = sessions.filter((s) => s.held_on === selected);
-  const byDay = new Map<string, number>();
-  for (const s of sessions) if (s.status !== 'cancelled') byDay.set(s.held_on, (byDay.get(s.held_on) ?? 0) + 1);
+  const byDay = new Map<string, boolean[]>();
+  for (const s of sessions) {
+    if (s.status === 'cancelled') continue;
+    byDay.set(s.held_on, [...(byDay.get(s.held_on) ?? []), s.kind !== 'lesson']);
+  }
 
   const href = (d: string) => `/admin/studio/calendar?m=${month}&d=${d}`;
 
@@ -97,7 +111,7 @@ export default async function AdminCalendarPage({
 
       <div className="body">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 2, marginBottom: 8 }}>
-          {['пн','вт','ср','чт','пт','сб','вс'].map((d) => (
+          {['вс','пн','вт','ср','чт','пт','сб'].map((d) => (
             <div key={d} style={{ textAlign: 'center', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>{d}</div>
           ))}
         </div>
@@ -106,7 +120,8 @@ export default async function AdminCalendarPage({
           {Array.from({ length: lead }, (_, i) => <div key={`lead-${i}`} />)}
           {Array.from({ length: days }, (_, i) => {
             const iso = `${month}-${pad(i + 1)}`;
-            const count = byDay.get(iso) ?? 0;
+            const kinds = (byDay.get(iso) ?? []).slice(0, 3);
+            const count = kinds.length;
             const sel = iso === selected;
             return (
               <Link key={iso} href={href(iso)}>
@@ -119,8 +134,9 @@ export default async function AdminCalendarPage({
                 }}>
                   {i + 1}
                   <div style={{ display: 'flex', gap: 2 }}>
-                    {Array.from({ length: Math.min(count, 3) }, (_, k) => (
-                      <div key={k} style={{ width: 4, height: 4, borderRadius: '50%', background: sel ? '#fff' : 'var(--rose)' }} />
+                    {kinds.map((isEvent, k) => (
+                      <div key={k} style={{ width: 4, height: 4, borderRadius: '50%',
+                                            background: dot(isEvent, sel) }} />
                     ))}
                   </div>
                 </div>

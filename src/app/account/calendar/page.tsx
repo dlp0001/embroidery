@@ -12,8 +12,9 @@ const MONTHS = ['Январь','Февраль','Март','Апрель','Ма�
 function monthBounds(month: string): { first: string; last: string; days: number; lead: number } {
   const [y, m] = month.split('-').map(Number);
   const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  const firstDow = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(); // 0 = вс
-  const lead = (firstDow + 6) % 7; // сетка с понедельника
+  // Неделя начинается с воскресенья: так живёт Израиль, и так же
+  // выложена сетка дней лагеря на «Неделе».
+  const lead = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(); // 0 = вс
   const pad = (n: number) => String(n).padStart(2, '0');
   return { first: `${y}-${pad(m)}-01`, last: `${y}-${pad(m)}-${pad(days)}`, days, lead };
 }
@@ -22,6 +23,15 @@ function shift(month: string, by: number): string {
   const [y, m] = month.split('-').map(Number);
   const d = new Date(Date.UTC(y, m - 1 + by, 1));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Цвет точки под числом. Лагерь и мастер-класс отличаются от обычного
+ * занятия: в календаре это видно раньше, чем человек откроет день.
+ */
+function dot(isEvent: boolean, selected: boolean): string {
+  if (selected) return isEvent ? 'rgba(255,255,255,0.55)' : '#fff';
+  return isEvent ? 'var(--charcoal)' : 'var(--rose)';
 }
 
 export default async function CalendarPage({
@@ -38,10 +48,12 @@ export default async function CalendarPage({
   const rows = await slotsForUser(user.id, first, last);
   // Точек под числом столько, сколько занятий в этот день: в дни лагеря
   // их два — сама смена и обычное занятие после неё.
-  const byDay = new Map<string, Set<string>>();
+  // Дни лагеря помечаем своим цветом: в календаре сразу видно, где смена,
+  // а где обычное занятие.
+  const byDay = new Map<string, Map<string, boolean>>();
   for (const r of rows) {
-    const seen = byDay.get(r.held_on) ?? new Set<string>();
-    seen.add(r.session_id);
+    const seen = byDay.get(r.held_on) ?? new Map<string, boolean>();
+    seen.set(r.session_id, r.kind !== 'lesson');
     byDay.set(r.held_on, seen);
   }
   const withSessions = new Set(byDay.keys());
@@ -68,7 +80,7 @@ export default async function CalendarPage({
 
       <div className="body">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 2, marginBottom: 8 }}>
-          {['пн','вт','ср','чт','пт','сб','вс'].map((d) => (
+          {['вс','пн','вт','ср','чт','пт','сб'].map((d) => (
             <div key={d} style={{ textAlign: 'center', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>{d}</div>
           ))}
         </div>
@@ -77,8 +89,8 @@ export default async function CalendarPage({
           {Array.from({ length: lead }, (_, i) => <div key={`lead-${i}`} />)}
           {Array.from({ length: days }, (_, i) => {
             const iso = `${month}-${pad(i + 1)}`;
-            const count = byDay.get(iso)?.size ?? 0;
-            const has = count > 0;
+            const kinds = [...(byDay.get(iso)?.values() ?? [])].slice(0, 3);
+            const has = kinds.length > 0;
             const isSel = iso === selected;
             const cell = (
               <div style={{
@@ -89,9 +101,9 @@ export default async function CalendarPage({
               }}>
                 {i + 1}
                 <div style={{ display: 'flex', gap: 2 }}>
-                  {Array.from({ length: Math.min(count, 3) }, (_, k) => (
+                  {kinds.map((isEvent, k) => (
                     <div key={k} style={{ width: 4, height: 4, borderRadius: '50%',
-                                          background: isSel ? '#fff' : 'var(--rose)' }} />
+                                          background: dot(isEvent, isSel) }} />
                   ))}
                 </div>
               </div>
