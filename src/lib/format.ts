@@ -74,3 +74,21 @@ export function plural(n: number, one: string, few: string, many: string): strin
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return few;
   return many;
 }
+
+/**
+ * С какого числа дней пакет становится дешевле поштучной оплаты.
+ *
+ * Считается по самим пакетам, а не пишется в тексте руками: пакеты Варя
+ * меняет от смены к смене, и обещание «выгоднее с пяти дней» иначе
+ * переживёт смену, к которой относилось.
+ *
+ * null — пакетов нет или ни один не дешевле дня по отдельности.
+ */
+export function packageFrom(
+  dayPrice: number,
+  offers: { lessons: number; price: number }[] | null,
+): number | null {
+  const cheaper = (offers ?? []).filter((o) => o.lessons > 0 && o.price < dayPrice * o.lessons);
+  if (cheaper.length === 0) return null;
+  return Math.min(...cheaper.map((o) => o.lessons));
+}

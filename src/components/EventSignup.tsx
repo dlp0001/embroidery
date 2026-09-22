@@ -1,4 +1,4 @@
-import { dayMonth, hhmm, money, plural } from '@/lib/format';
+import { dayMonth, hhmm, money, packageFrom, plural } from '@/lib/format';
 import type { SlotRow } from '@/lib/studio';
 import { toggleBooking } from '@/app/account/actions';
 
@@ -71,6 +71,9 @@ export default function EventSignup({ rows }: { rows: SlotRow[] }) {
         const days = [...new Set(slots.map((s) => s.held_on))].sort();
         const people = [...new Map(slots.map((s) => [s.participant_id, s.who])).entries()];
         const grid = calendarDays(days);
+        // С какого дня пакет дешевле поштучной оплаты: считаем по пакетам
+        // этой смены, а не пишем число в тексте.
+        const from = packageFrom(Number(head.price), head.pass_offers);
 
         return (
           <div className="card" key={head.group_id}>
@@ -87,7 +90,11 @@ export default function EventSignup({ rows }: { rows: SlotRow[] }) {
             <div className="sub" style={{ marginBottom: 14 }}>
               День стоит {money(Number(head.price), 'ILS')}
               {head.capacity ? `, мест в день ${head.capacity}` : ''}. Отметьте
-              дни, в которые придёте: пакет дней покупается в «Оплате».
+              дни, в которые придёте.{' '}
+              {from === null
+                ? 'Платится за те дни, в которые ребёнок пришёл.'
+                : `Если планируете ${from} ${plural(from, 'день', 'дня', 'дней')} и больше,
+                   выгоднее взять пакет: он покупается в «Оплате».`}
             </div>
 
             {people.map(([participantId, who]) => {

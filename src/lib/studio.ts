@@ -831,6 +831,8 @@ export type SlotRow = {
   price: string;
   weekday: number | null;
   capacity: number | null;
+  /** Пакеты дней: нужны, чтобы сказать, с какого дня пакет выгоднее. */
+  pass_offers: { lessons: number; price: number }[] | null;
   taken: number;
   participant_id: string;
   who: string;
@@ -843,7 +845,7 @@ export type SlotRow = {
 function slotsQuery(extra: string): string {
   return `select s.id as session_id, s.held_on::text, g.starts_at::text,
             g.id as group_id, g.title as group_title,
-            g.audience, g.kind, g.weekday, g.capacity, g.duration_min,
+            g.audience, g.kind, g.weekday, g.capacity, g.duration_min, g.pass_offers,
             coalesce(g.price::text,
                      (select value from settings where key = 'studio_lesson_price')) as price,
             (select count(*)::int from bookings bb
