@@ -27,21 +27,41 @@ const api = async (method, body) => {
 const me = await api('getMe');
 console.log(`Бот: @${me.username} (${me.first_name})`);
 
-const origin = process.argv[2];
+const origin = process.argv.slice(2).find((a) => !a.startsWith('--'));
+const drop = process.argv.includes('--drop');
+
 if (origin) {
   if (!secret) { console.error('TELEGRAM_WEBHOOK_SECRET не задан: без него вебхук открыт всем'); process.exit(1); }
   const url = `${origin.replace(/\/+$/, '')}/api/telegram`;
+
+  // Телеграм не ходит по редиректам: адрес, отвечающий 307, он считает
+  // сломанным вебхуком и молча копит очередь. Это уже случалось дважды —
+  // у сайта канонический домен с www, а по привычке пишут без него.
+  // Здоровый адрес отвечает 401: роут на месте и просит секрет.
+  const probe = await fetch(url, { method: 'POST', redirect: 'manual' })
+    .catch((err) => ({ status: 0, why: err.message }));
+  if (probe.status >= 300 && probe.status < 400) {
+    console.error(`${url} отвечает ${probe.status} и уводит на ${probe.headers?.get('location') ?? '?'}`);
+    console.error('Телеграм по редиректам не ходит. Возьмите адрес, на который уводит.');
+    process.exit(1);
+  }
+  if (probe.status === 404) {
+    console.error(`${url} отвечает 404: на этом деплое роута бота нет. Сначала выкатите код.`);
+    process.exit(1);
+  }
+
   await api('setWebhook', {
     url,
     secret_token: secret,
     // Сообщения и нажатия на кнопки под ними. Больше боту ничего не нужно,
     // а лишнее телеграм присылать не будет.
     allowed_updates: ['message', 'callback_query'],
-    // Всё, что накопилось, пока вебхука не было, нам не нужно: это старые
-    // сообщения, отвечать на них сутки спустя незачем.
-    drop_pending_updates: true,
+    // Накопившееся выбрасываем только по просьбе. По умолчанию — нет:
+    // очередь копится как раз тогда, когда вебхук сломан, и там лежат
+    // живые сообщения родителей, а не мусор.
+    drop_pending_updates: drop,
   });
-  console.log(`Вебхук: ${url}`);
+  console.log(`Вебхук: ${url}${drop ? ' (очередь очищена)' : ''}`);
 }
 
 const info = await api('getWebhookInfo');
