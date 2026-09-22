@@ -24,7 +24,11 @@ export const CAMP_CSS = `
   .lp .hero-cta { align-self: flex-start; margin-top: 34px; padding: 16px 40px; background: var(--charcoal); color: #fff; text-decoration: none; font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; transition: background 0.3s; }
   .lp .hero-cta:hover { background: var(--rose); }
   .lp .hero-right { position: relative; overflow: hidden; }
-  .lp .hero-right img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* Кадр сдвинут вниз: на широком экране коробка ровно под фото и сдвиг
+     ничего не меняет, а на телефоне полоса низкая, и по центру в неё
+     попадал потолок, а дети уходили за нижний край. */
+  .lp .hero-right img { width: 100%; height: 100%; object-fit: cover;
+                        object-position: 50% 80%; display: block; }
 
   .lp .wrap { max-width: 1020px; margin: 0 auto; padding: 88px 64px; }
   .lp .wrap-tint { background: var(--linen); max-width: none; }
