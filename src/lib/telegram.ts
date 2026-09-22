@@ -1,7 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { one, query, tx } from './db';
 import { hhmm, plusDays, todayISO, weekdayDayMonth } from './format';
-import { slotsForUser, type SlotRow } from './studio';
+import { sessionIsPast, setBooking, slotsForUser, type SlotRow } from './studio';
 
 const API = 'https://api.telegram.org';
 
@@ -58,11 +58,15 @@ async function call<T>(method: string, payload: unknown): Promise<ApiResult<T>> 
  * вечер незачем. Снимаем привязку молча, человек вернёт её кнопкой в
  * профиле, если захочет.
  */
-export async function send(chatId: number, text: string): Promise<boolean> {
+export type Button = { text: string; callback_data: string };
+export type Keyboard = Button[][];
+
+export async function send(chatId: number, text: string, keyboard?: Keyboard): Promise<boolean> {
   const res = await call<{ message_id: number }>('sendMessage', {
     chat_id: chatId,
     text,
     link_preview_options: { is_disabled: true },
+    ...(keyboard?.length ? { reply_markup: { inline_keyboard: keyboard } } : {}),
   });
   if (res.ok) return true;
   if (res.code === 403) {
@@ -72,6 +76,37 @@ export async function send(chatId: number, text: string): Promise<boolean> {
   }
   console.error('telegram: сообщение не ушло', res.code, res.why);
   return false;
+}
+
+/**
+ * Перерисовка того же сообщения после нажатия. Телеграм отвечает ошибкой,
+ * если текст и кнопки не изменились ни на знак: это не беда, а обычное
+ * дело при двойном нажатии, и молчать в ответ правильно.
+ */
+export async function editMessage(
+  chatId: number, messageId: number, text: string, keyboard?: Keyboard,
+): Promise<void> {
+  const res = await call('editMessageText', {
+    chat_id: chatId,
+    message_id: messageId,
+    text,
+    link_preview_options: { is_disabled: true },
+    ...(keyboard?.length ? { reply_markup: { inline_keyboard: keyboard } } : {}),
+  });
+  if (!res.ok && !res.why.includes('message is not modified')) {
+    console.error('telegram: сообщение не перерисовано', res.code, res.why);
+  }
+}
+
+/**
+ * Ответ на нажатие. Обязателен: пока он не придёт, кнопка у родителя
+ * крутится. Поэтому зовём его всегда, в том числе когда отказали.
+ */
+export async function answerCallback(id: string, text?: string): Promise<void> {
+  const res = await call('answerCallbackQuery', { callback_query_id: id, ...(text ? { text } : {}) });
+  // Молчать тут нельзя: отказ виден родителю как навсегда зависшая кнопка,
+  // а в логах не остаётся ничего.
+  if (!res.ok) console.error('telegram: нажатие без ответа', res.code, res.why);
 }
 
 // ── Привязка ──────────────────────────────────────────────
@@ -144,7 +179,55 @@ export async function chatOfUser(userId: string): Promise<number | null> {
   return row?.tg_chat_id ? Number(row.tg_chat_id) : null;
 }
 
-// ── Тексты ────────────────────────────────────────────────
+// ── Кнопки ────────────────────────────────────────────────
+
+/**
+ * Два uuid в callback_data не помещаются: телеграм даёт 64 байта, а
+ * текстом они занимают 72. Кладём их сырыми байтами в base64url — по 22
+ * знака, и вместе с пометкой действия выходит 48.
+ */
+function pack(id: string): string {
+  return Buffer.from(id.replace(/-/g, ''), 'hex').toString('base64url');
+}
+
+function unpack(s: string): string | null {
+  const b = Buffer.from(s, 'base64url');
+  if (b.length !== 16) return null;
+  const h = b.toString('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+export type Tap = { sessionId: string; participantId: string; book: boolean };
+
+/** Разбор нажатия. Всё, что пришло не от нашей кнопки, — мусор. */
+export function readTap(data: string): Tap | null {
+  const m = /^b([01]):([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{22})$/.exec(data);
+  if (!m) return null;
+  const sessionId = unpack(m[2]);
+  const participantId = unpack(m[3]);
+  if (!sessionId || !participantId) return null;
+  return { sessionId, participantId, book: m[1] === '1' };
+}
+
+function tapData(row: SlotRow): string {
+  return `b${row.booked ? '0' : '1'}:${pack(row.session_id)}.${pack(row.participant_id)}`;
+}
+
+/**
+ * Участник из семьи этого взрослого? Проверка та же, что в кабинете:
+ * в callback_data приезжает что угодно, и верить ей нельзя.
+ */
+export async function ownsParticipant(userId: string, participantId: string): Promise<boolean> {
+  const ok = await one(
+    `select 1 from participants p
+      where p.id = $1
+        and (p.user_id = $2 or p.child_id in (select child_id from guardians where user_id = $2))`,
+    [participantId, userId],
+  );
+  return Boolean(ok);
+}
+
+// ── Экран недели ──────────────────────────────────────────
 
 /** Чем занятие отличается от обычного детского. Ничем — значит без пометки. */
 function tag(row: SlotRow): string | null {
@@ -166,17 +249,33 @@ function seats(row: SlotRow, someoneBooked: boolean): string | null {
   return someoneBooked ? null : 'мест нет';
 }
 
+/** "2026-09-25" → "пт 25": подпись на кнопке, где длинной даты не поместится. */
+function shortDay(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const wd = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'][new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  return `${wd} ${d}`;
+}
+
+export type WeekView = { text: string; keyboard: Keyboard };
+
 /**
- * Ближайшая неделя семьи одним сообщением. Читается сверху вниз, как
- * экран кабинета: день, занятие, имена под ним. Кнопок пока нет,
- * записываются на сайте.
+ * Ближайшая неделя семьи: сообщение и кнопки под ним. Одна функция на
+ * оба случая — и на первую отправку, и на перерисовку после нажатия,
+ * иначе они разъедутся.
+ *
+ * На кнопке, в отличие от кабинета, стоит не действие, а состояние:
+ * галочка значит «записан». Кнопка тут единственное, что можно нажать,
+ * и читается она вместе со строчкой над собой, а не вместо неё.
  */
-export async function weekText(userId: string, origin: string): Promise<string> {
+export async function weekView(userId: string, origin: string): Promise<WeekView> {
   const today = todayISO();
   const rows = (await slotsForUser(userId, today, plusDays(today, 7)))
     .filter((r) => r.kind === 'lesson');
   if (rows.length === 0) {
-    return `На ближайшую неделю занятий нет.\n\nРасписание целиком: ${origin}/account/calendar`;
+    return {
+      text: `На ближайшую неделю занятий нет.\n\nРасписание целиком: ${origin}/account/calendar`,
+      keyboard: [],
+    };
   }
 
   // Порядок строк задаёт база, но два занятия в одно время на одном дне
@@ -185,13 +284,16 @@ export async function weekText(userId: string, origin: string): Promise<string> 
   for (const r of rows) bySession.set(r.session_id, [...(bySession.get(r.session_id) ?? []), r]);
 
   const lines: string[] = ['Ближайшая неделя'];
+  const buttons: Button[] = [];
   let day = '';
+
   for (const people of bySession.values()) {
     const head = people[0];
     if (head.held_on !== day) {
       day = head.held_on;
       lines.push('', weekdayDayMonth(day));
     }
+    const free = head.capacity === null ? null : Math.max(head.capacity - head.taken, 0);
     const parts = [hhmm(head.starts_at)];
     if (head.moved) parts.push('перенесено');
     const what = tag(head);
@@ -199,9 +301,42 @@ export async function weekText(userId: string, origin: string): Promise<string> 
     const left = seats(head, people.some((p) => p.booked));
     if (left) parts.push(left);
     lines.push(parts.join(' · '));
-    for (const p of people) lines.push(`   ${p.who}${p.booked ? ' — придёт' : ''}`);
+
+    for (const p of people) {
+      lines.push(`   ${p.who}${p.booked ? ' — придёт' : ''}`);
+      // Занятие прошло — обещать приход поздно. Мест нет — записаться
+      // некуда, но свою запись снять можно всегда.
+      if (head.held_on < today) continue;
+      if (!p.booked && free === 0) continue;
+      buttons.push({
+        text: `${p.booked ? '✓ ' : ''}${shortDay(head.held_on)} · ${p.who}`,
+        callback_data: tapData(p),
+      });
+    }
   }
 
-  lines.push('', `Записаться: ${origin}/account`);
-  return lines.join('\n');
+  lines.push('', 'Галочка — записан. Нажмите, чтобы записать или отменить.');
+  lines.push(`Лагерь, оплата и остальное: ${origin}/account`);
+
+  // По две в ряд: у семьи с тремя детьми кнопок на неделю выходит дюжина,
+  // и столбиком они превращают сообщение в простыню. День подписан на
+  // каждой, поэтому ряд может начинаться с середины занятия.
+  const keyboard: Keyboard = [];
+  for (let i = 0; i < buttons.length; i += 2) keyboard.push(buttons.slice(i, i + 2));
+  return { text: lines.join('\n'), keyboard };
+}
+
+/**
+ * Записать или снять запись по нажатию. Возвращает короткую строку для
+ * всплывающей подсказки над кнопкой.
+ *
+ * Права и прошедший день проверяются здесь, а не на кнопке: кнопка
+ * могла быть нарисована час назад, и с тех пор всё изменилось.
+ */
+export async function applyTap(userId: string, tap: Tap): Promise<string> {
+  if (!(await ownsParticipant(userId, tap.participantId))) return 'Это не ваш участник.';
+  if (tap.book && (await sessionIsPast(tap.sessionId))) return 'Занятие уже прошло.';
+  const res = await setBooking(tap.sessionId, tap.participantId, tap.book);
+  if (!res.ok) return res.reason ?? 'Не получилось.';
+  return tap.book ? 'Записали' : 'Отменили';
 }

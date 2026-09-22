@@ -30,6 +30,9 @@ export async function GET() {
   return Response.json(
     {
       db,
+      // Какой коммит сейчас на этом деплое. Иначе после пуша непонятно,
+      // доехала сборка или отвечает предыдущая.
+      commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
       migrations,
       lastMigration,
       resend: Boolean(process.env.RESEND_API_KEY),

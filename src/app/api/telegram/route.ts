@@ -1,11 +1,14 @@
-import { bindChat, chatUser, secretOk, send, weekText } from '@/lib/telegram';
+import {
+  answerCallback, applyTap, bindChat, chatUser, editMessage, readTap, secretOk, send, weekView,
+} from '@/lib/telegram';
 
 export const runtime = 'nodejs';
 export const maxDuration = 10;
 export const dynamic = 'force-dynamic';
 
 /**
- * Телеграм зовёт этот адрес на каждое сообщение боту.
+ * Телеграм зовёт этот адрес на каждое сообщение боту и на каждое нажатие
+ * кнопки под сообщением.
  *
  * Отвечаем 200 всегда, что бы внутри ни случилось: на ошибку телеграм
  * повторяет тот же апдейт с нарастающей паузой и может долбить им час.
@@ -15,6 +18,11 @@ type Update = {
   message?: {
     chat?: { id?: number };
     text?: string;
+  };
+  callback_query?: {
+    id?: string;
+    data?: string;
+    message?: { message_id?: number; chat?: { id?: number } };
   };
 };
 
@@ -29,7 +37,7 @@ function stranger(origin: string): string {
   ].join('\n');
 }
 
-async function handle(chatId: number, text: string, origin: string): Promise<void> {
+async function onMessage(chatId: number, text: string, origin: string): Promise<void> {
   const start = /^\/start(?:\s+(\S+))?$/.exec(text);
 
   if (start?.[1]) {
@@ -47,7 +55,7 @@ async function handle(chatId: number, text: string, origin: string): Promise<voi
     await send(chatId, [
       `${hello} Теперь я вас узнаю.`,
       '',
-      'Напишите что угодно — покажу ближайшую неделю.',
+      'Напишите что угодно — покажу ближайшую неделю с кнопками записи.',
     ].join('\n'));
     return;
   }
@@ -60,7 +68,36 @@ async function handle(chatId: number, text: string, origin: string): Promise<voi
 
   // Команд пока нет: любое сообщение — просьба показать неделю. Разбирать
   // слова начнём тогда, когда боту будет что ещё ответить.
-  await send(chatId, await weekText(user.id, origin));
+  const view = await weekView(user.id, origin);
+  await send(chatId, view.text, view.keyboard);
+}
+
+/**
+ * Нажатие на кнопку под сообщением. Отвечать телеграму нужно обязательно
+ * и быстро: пока ответа нет, кнопка у родителя крутится.
+ */
+async function onTap(
+  id: string, chatId: number, messageId: number, data: string, origin: string,
+): Promise<void> {
+  const user = await chatUser(chatId);
+  if (!user) {
+    await answerCallback(id, 'Сначала подключите телеграм в профиле.');
+    return;
+  }
+
+  const tap = readTap(data);
+  if (!tap) {
+    await answerCallback(id, 'Кнопка устарела, попросите неделю заново.');
+    return;
+  }
+
+  const said = await applyTap(user.id, tap);
+  await answerCallback(id, said);
+
+  // Перерисовываем всё сообщение: изменилась не одна кнопка, а и число
+  // свободных мест, которое видят все строки этого занятия.
+  const view = await weekView(user.id, origin);
+  await editMessage(chatId, messageId, view.text, view.keyboard);
 }
 
 export async function POST(req: Request): Promise<Response> {
@@ -76,17 +113,23 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ ok: true });
   }
 
-  const chatId = update.message?.chat?.id;
-  const text = (update.message?.text ?? '').trim();
-  // Апдейты бывают всякие: вступление в чат, правка сообщения, стикер.
-  // Всё, что не текст в личке, нас пока не касается.
-  if (!chatId || !text) return Response.json({ ok: true });
+  const origin = new URL(req.url).origin;
+  const tap = update.callback_query;
+  const chatId = update.message?.chat?.id ?? tap?.message?.chat?.id;
 
   try {
-    await handle(chatId, text, new URL(req.url).origin);
+    if (tap?.id && chatId && tap.message?.message_id) {
+      await onTap(tap.id, chatId, tap.message.message_id, tap.data ?? '', origin);
+    } else if (chatId) {
+      const text = (update.message?.text ?? '').trim();
+      // Апдейты бывают всякие: вступление в чат, правка сообщения, стикер.
+      // Всё, что не текст в личке, нас пока не касается.
+      if (text) await onMessage(chatId, text, origin);
+    }
   } catch (err) {
     console.error('telegram: апдейт не обработан', err);
-    await send(chatId, 'Что-то сломалось на нашей стороне. Мы уже знаем, попробуйте позже.');
+    if (tap?.id) await answerCallback(tap.id, 'Что-то сломалось. Попробуйте позже.');
+    else if (chatId) await send(chatId, 'Что-то сломалось на нашей стороне. Попробуйте позже.');
   }
   return Response.json({ ok: true });
 }
