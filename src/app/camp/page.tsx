@@ -5,7 +5,7 @@ import {
   type EventDay, type PublicEvent, type SlotRow,
 } from '@/lib/studio';
 import { toggleBooking } from '@/app/account/actions';
-import { dayMonth, hhmm, money, plural } from '@/lib/format';
+import { dayMonth, hhmm, money, plural, todayISO } from '@/lib/format';
 import { CAMP_CSS } from './styles';
 
 export const dynamic = 'force-dynamic';
@@ -254,6 +254,8 @@ function Day({
 }) {
   const free = day.capacity === null ? null : Math.max(day.capacity - day.taken, 0);
   const text = PROGRAMME[day.held_on];
+  // Прошедший день смены записи не принимает: он уже был.
+  const past = day.held_on < todayISO();
 
   return (
     <div className="prog-row">
@@ -278,7 +280,7 @@ function Day({
         )}
 
         {slots.map((s) => {
-          const full = free === 0 && !s.booked;
+          const full = (free === 0 && !s.booked) || (past && !s.booked);
           return (
             <form action={toggleBooking} key={s.participant_id}>
               <input type="hidden" name="sessionId" value={s.session_id} />
@@ -287,7 +289,9 @@ function Day({
               <button type="submit" className={s.booked ? 'kid kid-on' : 'kid'}
                       disabled={full} aria-pressed={s.booked}
                       aria-label={`${s.who}, ${dayMonth(day.held_on)}: ${
-                        full ? 'мест нет' : s.booked ? 'отменить запись' : 'записать'}`}>
+                        past && !s.booked ? 'день прошёл'
+                          : full ? 'мест нет'
+                          : s.booked ? 'отменить запись' : 'записать'}`}>
                 {s.who}
               </button>
             </form>

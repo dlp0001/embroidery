@@ -6,7 +6,7 @@ import { one } from '@/lib/db';
 import { telegramNick } from '@/lib/format';
 import { requireUser } from '@/lib/session';
 import {
-  addChild, renameChild, saveProfile, setAttends, setBooking, setPreferredDay,
+  addChild, renameChild, saveProfile, sessionIsPast, setAttends, setBooking, setPreferredDay,
 } from '@/lib/studio';
 
 /** Участник принадлежит семье вошедшего? */
@@ -34,6 +34,13 @@ export async function toggleBooking(formData: FormData): Promise<void> {
   const participantId = String(formData.get('participantId'));
   const booked = String(formData.get('booked')) === '1';
   await assertOwn(user.id, participantId);
+  // Записаться назад нельзя: занятие прошло, и «приду» про него — неправда.
+  // Кнопки для прошедшего дня на экране нет, так что сюда доходит разве что
+  // вкладка, открытая вчера. Ей просто показываем, как всё обстоит сейчас.
+  if (booked && await sessionIsPast(sessionId)) {
+    refresh();
+    return;
+  }
   await setBooking(sessionId, participantId, booked);
   refresh();
 }

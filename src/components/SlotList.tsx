@@ -1,4 +1,4 @@
-import { hhmm, money, packageFrom, plural } from '@/lib/format';
+import { hhmm, money, packageFrom, plural, todayISO } from '@/lib/format';
 import type { SlotRow } from '@/lib/studio';
 import { toggleBooking } from '@/app/account/actions';
 
@@ -22,6 +22,9 @@ function seats(free: number | null, booked: boolean): string | null {
 export default function SlotList({ rows }: { rows: SlotRow[] }) {
   const bySession = new Map<string, SlotRow[]>();
   for (const r of rows) bySession.set(r.session_id, [...(bySession.get(r.session_id) ?? []), r]);
+  // «Календарь» пускает и в прошлые дни. Записаться туда нельзя: занятие
+  // прошло, и обещание прийти на него ничего не значит.
+  const today = todayISO();
 
   return (
     <>
@@ -64,7 +67,8 @@ export default function SlotList({ rows }: { rows: SlotRow[] }) {
             {people.map((p) => {
               // Занять последнее место может только тот, кто ещё не записан:
               // себя отменить можно всегда.
-              const full = free === 0 && !p.booked;
+              const past = head.held_on < today;
+              const full = !past && free === 0 && !p.booked;
               return (
                 <div className="row" key={p.participant_id}
                      style={{ minHeight: 52, padding: '8px 0' }}>
@@ -89,11 +93,13 @@ export default function SlotList({ rows }: { rows: SlotRow[] }) {
                       type="submit"
                       className={p.booked ? 'chip-on' : 'chip'}
                       aria-pressed={p.booked}
-                      disabled={full}
-                      style={{ ...signUp, opacity: full ? 0.45 : 1,
-                               cursor: full ? 'default' : 'pointer' }}
+                      disabled={full || (past && !p.booked)}
+                      style={{ ...signUp, opacity: full || (past && !p.booked) ? 0.45 : 1,
+                               cursor: full || (past && !p.booked) ? 'default' : 'pointer' }}
                       aria-label={`${p.who}: ${
-                        full ? 'мест нет' : p.booked ? 'отменить запись' : 'записать'}`}
+                        past && !p.booked ? 'занятие прошло'
+                          : full ? 'мест нет'
+                          : p.booked ? 'отменить запись' : 'записать'}`}
                     >
                       {p.booked ? 'Отменить' : 'Записать'}
                     </button>

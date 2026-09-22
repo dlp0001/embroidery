@@ -1,4 +1,4 @@
-import { dayMonth, hhmm, money, packageFrom, plural } from '@/lib/format';
+import { dayMonth, hhmm, money, packageFrom, plural, todayISO } from '@/lib/format';
 import type { SlotRow } from '@/lib/studio';
 import { toggleBooking } from '@/app/account/actions';
 
@@ -60,6 +60,9 @@ function seats(capacity: number | null, taken: number, booked: boolean): string 
  */
 export default function EventSignup({ rows }: { rows: SlotRow[] }) {
   if (rows.length === 0) return null;
+  // Дни смены, которые уже прошли, остаются в сетке: по ним видно, сколько
+  // ребёнок отходил. Но записаться в них нельзя.
+  const today = todayISO();
 
   const byGroup = new Map<string, SlotRow[]>();
   for (const r of rows) byGroup.set(r.group_id, [...(byGroup.get(r.group_id) ?? []), r]);
@@ -140,8 +143,9 @@ export default function EventSignup({ rows }: { rows: SlotRow[] }) {
                     const left = seats(slot.capacity, slot.taken, slot.booked);
                     // Занять последнее место можно только тому, кто ещё не
                     // записан: себя отменить всегда можно.
-                    const full = slot.capacity !== null
-                      && slot.taken >= slot.capacity && !slot.booked;
+                    const past = day < today;
+                    const full = (slot.capacity !== null
+                      && slot.taken >= slot.capacity && !slot.booked) || (past && !slot.booked);
                     return (
                       <form action={toggleBooking} key={day}>
                         <input type="hidden" name="sessionId" value={slot.session_id} />
@@ -153,7 +157,9 @@ export default function EventSignup({ rows }: { rows: SlotRow[] }) {
                           aria-pressed={slot.booked}
                           disabled={full}
                           aria-label={`${who}, ${dayMonth(day)}${left ? `, ${left}` : ''}: ${
-                            full ? 'мест нет' : slot.booked ? 'отменить запись' : 'записать'}`}
+                            past && !slot.booked ? 'день прошёл'
+                              : full ? 'мест нет'
+                              : slot.booked ? 'отменить запись' : 'записать'}`}
                           style={{ ...cell, opacity: full ? 0.45 : 1,
                                    cursor: full ? 'default' : 'pointer' }}
                         >

@@ -539,6 +539,14 @@ export type UpcomingRow = {
  * на экране полный день не нажимается, но два родителя могут потянуться
  * к последнему месту одновременно, и решает это база, а не экран.
  */
+/** Занятие уже прошло: сегодняшнее прошедшим не считаем. */
+export async function sessionIsPast(sessionId: string): Promise<boolean> {
+  const row = await one<{ past: boolean }>(
+    'select held_on < current_date as past from studio_sessions where id = $1',
+    [sessionId]);
+  return row?.past ?? false;
+}
+
 export async function setBooking(
   sessionId: string,
   participantId: string,
