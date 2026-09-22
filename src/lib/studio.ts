@@ -455,21 +455,53 @@ export async function unpaidCharges(ownerId: string): Promise<UnpaidCharge[]> {
   );
 }
 
-export type VisitRow = UnpaidCharge & { status: AttendanceStatus; state: string };
+export type VisitRow = {
+  session_id: string;
+  held_on: string;
+  group_title: string;
+  kind: GroupKind;
+  participant_id: string;
+  who: string;
+  status: AttendanceStatus;
+  amount: string | null;
+  currency: string | null;
+  /** Чем закрыто: абонементом, платежом, ничем. */
+  money: 'pass' | 'paid' | 'due' | 'none';
+  /** Пакет смены, а не обычный абонемент. */
+  pass_event: boolean;
+  provider: string | null;
+  pay_method: string | null;
+  paid_at: string | null;
+};
 
-export async function visitHistory(userId: string): Promise<VisitRow[]> {
+/**
+ * История посещений семьи: свои занятия и детские.
+ *
+ * Показываем только то, что человека касается. «Был» — с суммой и тем,
+ * чем занятие закрыто. «Не был» — только если на занятие записывались:
+ * отметка «нет» стоит у всего состава группы, и без этого условия родитель
+ * видел бы пропуски в днях, на которые никто и не собирался.
+ *
+ * Болезнь показываем всегда: её ставят руками, а значит, ребёнка ждали.
+ */
+export async function visitHistory(
+  userId: string,
+  filter: { participantId?: string; onlyDue?: boolean } = {},
+): Promise<VisitRow[]> {
   return query<VisitRow>(
-    `select coalesce(ch.id, a.session_id) as id, s.held_on::text, g.title as group_title,
-            coalesce(c.name, u.name, 'Я') as who, a.status,
-            coalesce(ch.amount::text, '0') as amount, coalesce(ch.currency, 'ILS') as currency,
-            case
-              when a.status = 'sick' then 'sick'
-              when a.status = 'absent' then 'absent'
-              when a.status = 'trial' then 'trial'
-              when ch.pass_id is not null then 'pass'
-              when ch.payment_id is not null then 'paid'
-              else 'due'
-            end as state
+    `select a.session_id, s.held_on::text, g.title as group_title, g.kind,
+            p.id as participant_id, coalesce(c.name, u.name, 'Я') as who, a.status,
+            ch.amount::text, ch.currency,
+            case when ch.pass_id is not null then 'pass'
+                 when ch.payment_id is not null then 'paid'
+                 when ch.id is not null then 'due'
+                 else 'none' end as money,
+            (ps.group_id is not null) as pass_event,
+            pay.provider, pay.raw ->> 'pay_method' as pay_method,
+            coalesce((select max(me.at) from money_events me
+                       where me.payment_id = ch.payment_id
+                         and me.kind in ('payment_paid', 'cash_confirmed')),
+                     pay.created_at)::text as paid_at
        from attendance a
        join studio_sessions s on s.id = a.session_id
        join studio_groups g on g.id = s.group_id
@@ -477,10 +509,16 @@ export async function visitHistory(userId: string): Promise<VisitRow[]> {
        left join children c on c.id = p.child_id
        left join users u on u.id = p.user_id
        left join charges ch on ch.session_id = a.session_id and ch.participant_id = a.participant_id
-      where p.user_id = $1
-         or p.child_id in (select child_id from guardians where user_id = $1)
-      order by s.held_on desc`,
-    [userId],
+       left join passes ps on ps.id = ch.pass_id
+       left join payments pay on pay.id = ch.payment_id
+       left join bookings b on b.session_id = a.session_id and b.participant_id = a.participant_id
+      where (p.user_id = $1 or p.child_id in (select child_id from guardians where user_id = $1))
+        and (a.status in ('present', 'trial', 'sick')
+             or (a.status = 'absent' and b.status = 'booked'))
+        and ($2::uuid is null or p.id = $2)
+        and (not $3::boolean or (ch.id is not null and ch.pass_id is null and ch.payment_id is null))
+      order by s.held_on desc, who`,
+    [userId, filter.participantId ?? null, filter.onlyDue ?? false],
   );
 }
 
