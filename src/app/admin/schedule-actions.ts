@@ -181,6 +181,17 @@ export async function bookChildAction(form: FormData): Promise<SaveResult> {
   return { ok: true };
 }
 
+/** Снять запись с занятия. Спрашивает подтверждение на экране, не здесь. */
+export async function unbookChildAction(form: FormData): Promise<SaveResult> {
+  await requireAdmin();
+  const sessionId = String(form.get('sessionId') ?? '');
+  const participantId = String(form.get('participantId') ?? '');
+  if (!sessionId || !participantId) return { ok: false, error: 'Не понял, чью запись снимать.' };
+  await setBooking(sessionId, participantId, false);
+  refresh();
+  return { ok: true };
+}
+
 export async function issuePassAction(form: FormData): Promise<void> {
   const user = await requireAdmin();
   // Форма присылает один ключ вида «id группы:дней»: так пакет лагеря

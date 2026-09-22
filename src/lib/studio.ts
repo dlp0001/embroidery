@@ -1518,6 +1518,26 @@ export type Family = {
   children: FamilyChild[];
 };
 
+export type BookedChild = { session_id: string; participant_id: string; who: string };
+
+/**
+ * Кто записан на эти занятия. Нужно в расписании: Варя видит не только
+ * сколько человек записано, но и кого именно, и может снять запись.
+ */
+export async function bookedInSessions(sessionIds: string[]): Promise<BookedChild[]> {
+  if (sessionIds.length === 0) return [];
+  return query<BookedChild>(
+    `select b.session_id, b.participant_id, coalesce(ch.name, u.name, 'Я') as who
+       from bookings b
+       join participants p on p.id = b.participant_id
+       left join children ch on ch.id = p.child_id
+       left join users u on u.id = p.user_id
+      where b.session_id = any($1::uuid[]) and b.status = 'booked'
+      order by who`,
+    [sessionIds],
+  );
+}
+
 export type MergeCandidate = {
   child_id: string;
   name: string;

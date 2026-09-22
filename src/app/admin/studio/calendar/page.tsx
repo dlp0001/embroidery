@@ -1,13 +1,16 @@
 import Link from 'next/link';
 import { isAdmin, requireTeacher } from '@/lib/session';
 import {
-  allGroups, bookableChildren, ensureSessions, sessionsInRange, type CalendarSession,
+  allGroups, bookableChildren, bookedInSessions, ensureSessions, sessionsInRange,
+  type CalendarSession,
 } from '@/lib/studio';
 import { hhmm, todayISO, weekdayDayMonth } from '@/lib/format';
 import BookChild from '@/components/BookChild';
+import BookedList from '@/components/BookedList';
 import SessionTime from '@/components/SessionTime';
 import {
   addSessionAction, bookChildAction, setSessionStatusAction, setSessionTimeAction,
+  unbookChildAction,
 } from '@/app/admin/schedule-actions';
 
 export const dynamic = 'force-dynamic';
@@ -88,6 +91,9 @@ export default async function AdminCalendarPage({
   ]);
   const selected = /^\d{4}-\d{2}-\d{2}$/.test(params.d ?? '') ? params.d! : today;
   const daySessions = sessions.filter((s) => s.held_on === selected);
+  // Кто записан — только на выбранный день: на весь месяц это был бы
+  // тяжёлый запрос ради строчки под одной карточкой.
+  const booked = await bookedInSessions(daySessions.map((s) => s.session_id));
   const byDay = new Map<string, boolean[]>();
   for (const s of sessions) {
     if (s.status === 'cancelled') continue;
@@ -162,6 +168,15 @@ export default async function AdminCalendarPage({
                 />
                 <div className="what">{s.group_title}</div>
                 <div className="sub">{note(s)}</div>
+                {/* Имена записанных: видно, кого ждём, и можно снять запись,
+                    если родитель отменил её голосом. */}
+                {admin && s.status !== 'cancelled' && (
+                  <BookedList
+                    sessionId={s.session_id}
+                    booked={booked.filter((b) => b.session_id === s.session_id)}
+                    action={unbookChildAction}
+                  />
+                )}
               </div>
               {s.status !== 'cancelled' && (
                 <Link

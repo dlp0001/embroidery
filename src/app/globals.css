@@ -192,6 +192,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
 }
 .linky:hover { color: var(--rose); }
+/* Имя записанного: подчёркнуто пунктиром, чтобы не путалось с действиями
+   рядом — нажатие на него не делает ничего сразу, а спрашивает. */
+.linky-soft { text-decoration-style: dotted; text-underline-offset: 4px; }
 
 /* Поле времени в расписании. Рядом стоят подчёркнутые ссылки, поэтому
    черта под полем спокойная: пока в поле не встали, оно не спорит с ними
