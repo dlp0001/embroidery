@@ -1,10 +1,12 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import type { SaveResult } from '@/components/AutoSave';
 import { one } from '@/lib/db';
 import { telegramNick } from '@/lib/format';
 import { requireUser } from '@/lib/session';
+import { linkUrl, unlinkUser } from '@/lib/telegram';
 import {
   addChild, renameChild, saveProfile, sessionIsPast, setAttends, setBooking, setPreferredDay,
 } from '@/lib/studio';
@@ -103,4 +105,23 @@ export async function updateChild(formData: FormData): Promise<SaveResult> {
   await renameChild(user.id, childId, name);
   refresh();
   return { ok: true };
+}
+
+/**
+ * Подключение телеграма. Уводит сразу в бота: ссылка одноразовая и живёт
+ * четверть часа, показывать её на странице, чтобы человек скопировал
+ * руками, незачем.
+ */
+export async function connectTelegram(): Promise<void> {
+  const user = await requireUser();
+  const url = await linkUrl(user.id);
+  if (!url) redirect('/account/profile?tg=off');
+  redirect(url);
+}
+
+/** Отключение. Чат забываем, история занятий и оплат этим не трогается. */
+export async function disconnectTelegram(): Promise<void> {
+  const user = await requireUser();
+  await unlinkUser(user.id);
+  refresh();
 }

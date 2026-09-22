@@ -3,8 +3,10 @@ import { archivedChildren, familyWithDays } from '@/lib/studio';
 import AutoSave from '@/components/AutoSave';
 import Toggles from '@/components/Toggles';
 import YesNo from '@/components/YesNo';
+import { chatOfUser } from '@/lib/telegram';
 import {
-  createChild, setMyAttendance, togglePreferredDay, updateChild, updateMyProfile,
+  connectTelegram, createChild, disconnectTelegram, setMyAttendance, togglePreferredDay,
+  updateChild, updateMyProfile,
 } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -20,11 +22,15 @@ const WEEK = [
   { n: 5, short: 'пт' }, { n: 6, short: 'сб' }, { n: 7, short: 'вс' },
 ];
 
-export default async function ProfilePage() {
+export default async function ProfilePage(
+  { searchParams }: { searchParams: Promise<{ tg?: string }> },
+) {
   const user = await requireUser();
-  const [family, hidden] = await Promise.all([
+  const [family, hidden, chat, params] = await Promise.all([
     familyWithDays(user.id),
     archivedChildren(user.id),
+    chatOfUser(user.id),
+    searchParams,
   ]);
   // Своя карточка есть всегда, даже если взрослый сам на занятия не ходит
   // и строки участника у него нет: имя-то поменять всё равно нужно.
@@ -94,6 +100,36 @@ export default async function ProfilePage() {
               <div className="hint" style={{ marginTop: 10 }}>
                 Выбранные дни подсвечиваются в расписании. Записью это не является.
               </div>
+            </>
+          )}
+        </div>
+
+        <div className="card">
+          <div className="what" style={{ marginBottom: 6 }}>Телеграм</div>
+          {chat ? (
+            <>
+              <p className="sub">
+                Подключён. Бот покажет ближайшую неделю, если ему написать.
+              </p>
+              <form action={disconnectTelegram} style={{ marginTop: 14 }}>
+                <button className="btn-quiet" type="submit">Отключить</button>
+              </form>
+            </>
+          ) : (
+            <>
+              <p className="sub">
+                Бот покажет ближайшую неделю: кто на какое занятие записан и
+                сколько осталось мест. Кнопка откроет телеграм — там нужно
+                нажать «Запустить».
+              </p>
+              <form action={connectTelegram} style={{ marginTop: 14 }}>
+                <button className="btn" type="submit">Подключить телеграм</button>
+              </form>
+              {params.tg === 'off' && (
+                <p className="hint" style={{ marginTop: 12 }}>
+                  Бот ещё не настроен. Попробуйте позже.
+                </p>
+              )}
             </>
           )}
         </div>

@@ -36,6 +36,12 @@ export function daysUntil(iso: string, from: string): number {
   return Math.round((a - b) / 86400000);
 }
 
+/** Сдвиг даты на n дней. Через UTC, чтобы не поймать переход на летнее время. */
+export function plusDays(iso: string, n: number): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+
 /** Сегодняшняя дата по времени студии, а не по времени сервера. */
 export function todayISO(): string {
   return new Intl.DateTimeFormat('en-CA', {

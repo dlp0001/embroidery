@@ -6,15 +6,9 @@ import { requireUser } from '@/lib/session';
 import {
   PASS_WARN_DAYS, eventSlotsForUser, passBalances, slotsForUser, unpaidCharges,
 } from '@/lib/studio';
-import { dayMonth, daysUntil, money, plural, todayISO, weekdayDayMonth } from '@/lib/format';
+import { dayMonth, daysUntil, money, plural, plusDays, todayISO, weekdayDayMonth } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
-
-function plusDays(iso: string, n: number): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  const dt = new Date(Date.UTC(y, m - 1, d + n));
-  return dt.toISOString().slice(0, 10);
-}
 
 export default async function WeekPage() {
   const user = await requireUser();

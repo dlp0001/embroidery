@@ -33,6 +33,8 @@ export async function GET() {
       migrations,
       lastMigration,
       resend: Boolean(process.env.RESEND_API_KEY),
+      telegram: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_BOT_NAME),
+      telegramHook: Boolean(process.env.TELEGRAM_WEBHOOK_SECRET),
       payplus: payplusReady(),
       payplusEnv: process.env.PAYPLUS_ENV === 'prod' ? 'prod' : 'test',
       icount: icountReady(),

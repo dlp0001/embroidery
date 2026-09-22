@@ -41,7 +41,9 @@
     "fill": "node --env-file-if-exists=.env.local scripts/fill-sessions.mjs",
     "fill:prod": "node --env-file-if-exists=.env.production.local scripts/fill-sessions.mjs --allow-remote",
     "mail": "node --env-file-if-exists=.env.local scripts/mail-blast.mjs",
-    "mail:prod": "node --env-file-if-exists=.env.production.local scripts/mail-blast.mjs"
+    "mail:prod": "node --env-file-if-exists=.env.production.local scripts/mail-blast.mjs",
+    "tg:setup": "node --env-file-if-exists=.env.local scripts/tg-setup.mjs",
+    "tg:setup:prod": "node --env-file-if-exists=.env.production.local scripts/tg-setup.mjs"
   },
   "dependencies": {
     "googleapis": "^140.0.0",
