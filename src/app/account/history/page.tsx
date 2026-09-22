@@ -1,33 +1,53 @@
 import Link from 'next/link';
 import { requireUser } from '@/lib/session';
 import { familyParticipants, visitHistory, type VisitRow } from '@/lib/studio';
-import { dayMonth, money } from '@/lib/format';
+import { dayMonth, money, shortDate } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
 const MONTHS = ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
 
-/** Чем закрыто занятие и когда. Одна строка под именем. */
-function paidWith(r: VisitRow): { text: string; cls: string } {
-  if (r.status === 'absent') return { text: 'Пропуск', cls: 'tag-ok' };
-  if (r.status === 'sick') return { text: 'Болезнь', cls: 'tag-ok' };
-  if (r.status === 'trial') return { text: 'Пробное', cls: 'tag-ok' };
-
-  if (r.money === 'pass') {
-    return { text: r.pass_event ? 'Из пакета' : 'Из абонемента', cls: 'tag-ok' };
-  }
-  if (r.money === 'paid') return { text: 'Оплачено', cls: 'tag-ok' };
-  if (r.money === 'due') return { text: 'Не оплачено', cls: 'tag-due' };
-  return { text: 'Без оплаты', cls: 'tag-ok' };
+/**
+ * Значок оплаты: зелёный — деньги за занятие закрыты, красный — нет.
+ * У пропуска и болезни значка нет: там и платить нечего.
+ */
+function Mark({ r }: { r: VisitRow }) {
+  const came = r.status === 'present' || r.status === 'trial';
+  if (!came || r.money === 'none') return <span className="visit-mark" />;
+  const ok = r.money !== 'due';
+  return (
+    <span className={`visit-mark ${ok ? 'mark-ok' : 'mark-due'}`}
+          title={ok ? 'Оплачено' : 'Не оплачено'} role="img"
+          aria-label={ok ? 'Оплачено' : 'Не оплачено'}>
+      <svg viewBox="0 0 20 20">
+        <circle cx="10" cy="10" r="8" />
+        {ok ? <path d="M6.2 10.4 9 13.2 13.9 7.4" /> : <path d="M10 6.2v5M10 13.4v.9" />}
+      </svg>
+    </span>
+  );
 }
 
-/** Чем именно заплатили: к «Оплачено» нужна подробность, иначе это не ответ. */
-function how(r: VisitRow): string | null {
-  if (r.money !== 'paid') return null;
-  if (r.provider !== 'cash') return 'картой';
-  if (r.pay_method === 'bit') return 'битом';
-  if (r.pay_method === 'paybox') return 'пейбоксом';
-  return 'наличными или переводом';
+/**
+ * Что писать про оплату словами. Значок отвечает «да» или «нет», а здесь
+ * подробности: чем и когда заплатили, из какого пакета списано.
+ *
+ * Способ помечает Варя, когда подтверждает получение денег. Если пометки
+ * нет — платёж старый, и точнее «наличными или переводом» не скажешь.
+ */
+function about(r: VisitRow): string {
+  if (r.status === 'absent') return 'пропуск';
+  if (r.status === 'sick') return 'болезнь';
+  if (r.status === 'trial') return 'пробное';
+  if (r.money === 'pass') return r.pass_event ? 'из пакета' : 'из абонемента';
+  if (r.money === 'none') return 'без оплаты';
+  if (r.money === 'due') return 'не оплачено';
+
+  const way = r.provider !== 'cash' ? 'картой'
+    : r.pay_method === 'bit' ? 'битом'
+    : r.pay_method === 'paybox' ? 'пейбоксом'
+    : r.pay_method === 'cash' ? 'наличными'
+    : 'наличными или переводом';
+  return r.paid_at ? `${way} · ${shortDate(r.paid_at.slice(0, 10))}` : way;
 }
 
 export default async function HistoryPage({
@@ -44,10 +64,15 @@ export default async function HistoryPage({
     visitHistory(user.id, { participantId: person, onlyDue }),
   ]);
 
-  const byMonth = new Map<string, VisitRow[]>();
+  // Месяц → день и группа → кто в этот день был. Дата пишется один раз
+  // на всех: у семьи с тремя детьми она иначе повторяется трижды подряд.
+  const byMonth = new Map<string, Map<string, VisitRow[]>>();
   for (const r of rows) {
-    const key = r.held_on.slice(0, 7);
-    byMonth.set(key, [...(byMonth.get(key) ?? []), r]);
+    const month = r.held_on.slice(0, 7);
+    const day = `${r.held_on}\u0000${r.group_title}`;
+    const days = byMonth.get(month) ?? new Map<string, VisitRow[]>();
+    days.set(day, [...(days.get(day) ?? []), r]);
+    byMonth.set(month, days);
   }
 
   /** Ссылка фильтра: меняет одно, остальное оставляет как было. */
@@ -61,7 +86,7 @@ export default async function HistoryPage({
     return s ? `/account/history?${s}` : '/account/history';
   };
 
-  const chip = (on: boolean): string => (on ? 'chip-on' : 'chip');
+  const chip = (on: boolean): string => `${on ? 'chip-on' : 'chip'} chip-sm`;
 
   return (
     <>
@@ -75,7 +100,7 @@ export default async function HistoryPage({
         {/* Фильтры: у кого две-три строки в истории, тот их не заметит,
             а у семьи, которая ходит второй год, без них не найти нужное. */}
         {family.length > 1 && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
             <Link className={chip(!person)} href={href({ p: null })}>Все</Link>
             {family.map((f) => (
               <Link key={f.id} className={chip(person === f.id)} href={href({ p: f.id })}>
@@ -85,7 +110,7 @@ export default async function HistoryPage({
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
           <Link className={chip(!onlyDue)} href={href({ due: false })}>Все занятия</Link>
           <Link className={chip(onlyDue)} href={href({ due: true })}>Только неоплаченные</Link>
         </div>
@@ -96,36 +121,34 @@ export default async function HistoryPage({
           </p>
         )}
 
-        {[...byMonth.entries()].map(([month, list]) => (
+        {[...byMonth.entries()].map(([month, days]) => (
           <section key={month}>
-            <div className="lbl">{MONTHS[Number(month.slice(5, 7)) - 1]} {month.slice(0, 4)}</div>
-            {list.map((r) => {
-              const label = paidWith(r);
-              const way = how(r);
-              const came = r.status === 'present' || r.status === 'trial';
-              return (
-                <div className="card" key={`${r.session_id}-${r.participant_id}`}>
-                  <div className="row" style={{ alignItems: 'flex-start' }}>
-                    <div>
-                      <div className="when">{dayMonth(r.held_on)} · {r.group_title}</div>
-                      <div className="what">{r.who}</div>
-                      {/* Сумму пишем только там, где она есть: за пропуск
-                          и болезнь денег не берут. */}
-                      {came && r.amount && (
-                        <div className="sub" style={{ marginTop: 4 }}>
-                          {money(Number(r.amount), r.currency ?? 'ILS')}
-                          {way ? `, ${way}` : ''}
-                          {r.money === 'paid' && r.paid_at
-                            ? ` · ${dayMonth(r.paid_at.slice(0, 10))}`
-                            : ''}
-                        </div>
-                      )}
-                    </div>
-                    <div className={`tag ${label.cls}`}>{label.text}</div>
-                  </div>
+            <div className="lbl" style={{ margin: '18px 0 2px' }}>
+              {MONTHS[Number(month.slice(5, 7)) - 1]} {month.slice(0, 4)}
+            </div>
+            {[...days.entries()].map(([key, list]) => (
+              <div key={key}>
+                <div className="when visit-day">
+                  {dayMonth(key.split('\u0000')[0])} · {key.split('\u0000')[1]}
                 </div>
-              );
-            })}
+                {list.map((r) => {
+                  const came = r.status === 'present' || r.status === 'trial';
+                  return (
+                    <div className="visit" key={`${r.session_id}-${r.participant_id}`}>
+                      <div className="visit-who">{r.who}</div>
+                      {/* Сумма только там, где она есть: за пропуск и болезнь
+                          денег не берут. Пустая колонка всё равно нужна,
+                          иначе съедет всё, что правее. */}
+                      <div className="visit-sum">
+                        {came && r.amount ? money(Number(r.amount), r.currency ?? 'ILS') : ''}
+                      </div>
+                      <Mark r={r} />
+                      <div className="visit-how">{about(r)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </section>
         ))}
       </div>

@@ -9,6 +9,12 @@ export function dayMonth(iso: string): string {
   return `${d} ${MONTHS[m - 1]}`;
 }
 
+/** "2026-09-22" → "22.09.26". Короткая дата: для строк, где важнее не читаемость, а длина. */
+export function shortDate(iso: string): string {
+  const [y, m, d] = iso.split('-');
+  return `${d}.${m}.${y.slice(2)}`;
+}
+
 export function weekdayDayMonth(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
   const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
