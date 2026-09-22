@@ -114,6 +114,38 @@ export default async function CampPage() {
         ))
       )}
 
+      {events.length > 0 && (
+        <section className="wrap wrap-tint">
+          <div className="inner">
+            <div className="eyebrow">Как это выглядит</div>
+            <h2 className="h2">Обычный день<br /><em>в смене</em></h2>
+            <p className="lead">
+              Шьют, рисуют по ткани, строят из картона то, что не помещается
+              в руках. Фотографии со смен, без постановки.
+            </p>
+            <div className="shots">
+              <img src="/camp-1.jpg" alt="Дети рисуют за общим столом в студии" />
+              <img src="/camp-2.jpg" alt="Девочка расписывает ткань маркером" />
+              <img src="/camp-3.jpg" alt="Девочка шьёт игрушку из фетра" />
+              <img src="/camp-4.jpg" alt="Девочка держит картонную конструкцию в свой рост" />
+            </div>
+          </div>
+        </section>
+      )}
+
+      {events.length > 0 && (
+        <section className="wrap">
+          <div className="eyebrow">Цены</div>
+          <h2 className="h2">День или пакет,<br /><em>как удобнее</em></h2>
+          <p className="lead" style={{ marginBottom: 34 }}>
+            Платить можно за каждый день отдельно или взять пакет дней. Пакет
+            покупается в кабинете или у Вари и работает на всю семью: сколько
+            дней в нём осталось, видно там же.
+          </p>
+          {events.map((e) => <Prices key={e.id} e={e} />)}
+        </section>
+      )}
+
       {camp && days.length > 0 && (
         <section className="wrap">
           <div className="eyebrow">Программа</div>
@@ -158,8 +190,10 @@ export default async function CampPage() {
               <div className="rule-t">Пакет дней живёт только здесь</div>
               <p className="rule-d">
                 Дни из пакета тратятся на лагерь и ни на что больше. Обычный
-                абонемент студии в лагере не работает, и наоборот. Неиспользованные
-                дни сгорают вместе со сменой.
+                абонемент студии в лагере не работает, и наоборот. Зато пакет
+                общий на всю семью: дни идут на любого из детей, отдельный
+                пакет на каждого не нужен. Неиспользованные дни сгорают
+                вместе со сменой.
               </p>
             </div>
             <div className="rule">
@@ -311,9 +345,8 @@ function Day({
   );
 }
 
-/** Одна смена: когда она идёт и сколько стоит. */
+/** Одна смена: когда она идёт. Цены отдельно, ближе к концу страницы. */
 function Event({ e, tinted }: { e: PublicEvent; tinted: boolean }) {
-  const day = Number(e.price);
   const kind = e.kind === 'camp' ? 'Лагерь' : 'Мастер-класс';
   const who = e.audience === 'adults' ? 'Для взрослых' : 'Для детей';
 
@@ -348,41 +381,48 @@ function Event({ e, tinted }: { e: PublicEvent; tinted: boolean }) {
             </div>
           </div>
         </div>
-
-        <div className="prices">
-          <div className="price">
-            <div className="price-kind">Один день</div>
-            <div className="price-sum">{day} <span>₪</span></div>
-            <p className="price-desc">
-              Платится за тот день, в который ребёнок пришёл. Ничего покупать
-              заранее не нужно.
-            </p>
-          </div>
-
-          {(e.pass_offers ?? []).map((o) => (
-            <div className="price" key={o.lessons}>
-              <div className="price-kind">
-                Пакет · {o.lessons} {plural(o.lessons, 'день', 'дня', 'дней')}
-              </div>
-              <div className="price-sum">{o.price} <span>₪</span></div>
-              <div className="price-per">
-                {money(Math.round(o.price / o.lessons), 'ILS')} за день
-                {o.price < day * o.lessons
-                  ? ` · экономия ${money(day * o.lessons - o.price, 'ILS')}`
-                  : ''}
-              </div>
-              <p className="price-desc">
-                Действует до {dayMonth(e.ends_on)}. Неиспользованные дни сгорают.
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <p className="after">
-          Пакет покупается в кабинете или у Вари. Сколько дней в нём осталось —
-          видно там же.
-        </p>
       </div>
     </section>
+  );
+}
+
+/**
+ * Цены одной смены. Стоят в конце страницы: сначала человек понимает,
+ * что это за смена и как она выглядит, и только потом считает деньги.
+ */
+function Prices({ e }: { e: PublicEvent }) {
+  const day = Number(e.price);
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div className="prices">
+        <div className="price">
+          <div className="price-kind">Один день</div>
+          <div className="price-sum">{day} <span>₪</span></div>
+          <p className="price-desc">
+            Платится за тот день, в который ребёнок пришёл. Ничего покупать
+            заранее не нужно.
+          </p>
+        </div>
+
+        {(e.pass_offers ?? []).map((o) => (
+          <div className="price" key={o.lessons}>
+            <div className="price-kind">
+              Пакет · {o.lessons} {plural(o.lessons, 'день', 'дня', 'дней')}
+            </div>
+            <div className="price-sum">{o.price} <span>₪</span></div>
+            <div className="price-per">
+              {money(Math.round(o.price / o.lessons), 'ILS')} за день
+              {o.price < day * o.lessons
+                ? ` · экономия ${money(day * o.lessons - o.price, 'ILS')}`
+                : ''}
+            </div>
+            <p className="price-desc">
+              Действует до {dayMonth(e.ends_on)}. Неиспользованные дни сгорают.
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

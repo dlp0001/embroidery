@@ -30,6 +30,11 @@ export const CAMP_CSS = `
   .lp .hero-right img { width: 100%; height: 100%; object-fit: cover;
                         object-position: 50% 80%; display: block; }
 
+  /* Полоса фотографий: четыре вертикальных кадра в ряд. На узком экране
+     по два, иначе каждый становится с ноготь. */
+  .lp .shots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 40px; }
+  .lp .shots img { width: 100%; aspect-ratio: 3/4; object-fit: cover; display: block; }
+
   .lp .wrap { max-width: 1020px; margin: 0 auto; padding: 88px 64px; }
   .lp .wrap-tint { background: var(--linen); max-width: none; }
   .lp .wrap-tint > .inner { max-width: 1020px; margin: 0 auto; }
@@ -116,6 +121,7 @@ export const CAMP_CSS = `
     .lp .prog-act { justify-content: flex-start; }
     .lp .prices { grid-template-columns: 1fr; }
     .lp .rules { grid-template-columns: 1fr; gap: 4px 0; }
+    .lp .shots { grid-template-columns: 1fr 1fr; gap: 8px; }
     .lp .split { grid-template-columns: 1fr; }
     .lp .split img { max-height: 380px; }
     .lp footer { padding: 32px 28px; }
