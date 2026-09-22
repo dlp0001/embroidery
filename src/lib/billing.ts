@@ -429,6 +429,8 @@ export type CashClaim = {
   created_at: string;
   owner_name: string | null;
   owner_email: string;
+  /** Чем родитель обещал отдать. У старых заявок пусто: поля тогда не было. */
+  declared_way: 'cash' | 'transfer' | null;
   lessons: number;
 };
 
@@ -439,6 +441,8 @@ export type CashClaim = {
 export async function declareCash(
   user: { id: string },
   chargeIds: string[],
+  /** Чем родитель собирается отдать: наличными или переводом. */
+  way: 'cash' | 'transfer' = 'cash',
 ): Promise<{ ok: true; count: number } | { error: string }> {
   const picked = chargeIds.length ? chargeIds : null;
   const debts = await query<{ id: string; amount: string; currency: string }>(
@@ -462,7 +466,8 @@ export async function declareCash(
     const { rows } = await c.query<{ id: string }>(
       `insert into payments (provider, user_id, amount, currency, status, purpose, raw)
        values ('cash', $1, $2, $3, 'pending', 'studio_debt', $4) returning id`,
-      [user.id, amount, currency, JSON.stringify({ charge_ids: debts.map((d) => d.id) })],
+      [user.id, amount, currency,
+       JSON.stringify({ charge_ids: debts.map((d) => d.id), declared_way: way })],
     );
     await logMoneyIn(c, {
       kind: 'cash_declared', actorId: user.id, ownerId: user.id,
@@ -480,6 +485,7 @@ export async function pendingCash(): Promise<CashClaim[]> {
   return query<CashClaim>(
     `select p.id, p.amount::text, p.currency, p.created_at::text,
             u.name as owner_name, u.email as owner_email,
+            p.raw ->> 'declared_way' as declared_way,
             coalesce(jsonb_array_length(p.raw -> 'charge_ids'), 0) as lessons
        from payments p
        join users u on u.id = p.user_id
@@ -540,7 +546,9 @@ export async function confirmCash(
   if (how.receipt) await issueReceipt(paymentId);
 }
 
-export async function declineCash(paymentId: string, actorId: string): Promise<void> {
+export async function declineCash(
+  paymentId: string, actorId: string, note = 'заявка на оплату отклонена',
+): Promise<void> {
   await tx(async (c) => {
     const { rows } = await c.query<{ id: string; user_id: string; status: string; amount: string; currency: string }>(
       `select id, user_id, status, amount::text, currency from payments
@@ -552,7 +560,7 @@ export async function declineCash(paymentId: string, actorId: string): Promise<v
     await c.query(`update payments set status = 'failed' where id = $1`, [p.id]);
     await logMoneyIn(c, {
       kind: 'cash_declined', actorId, ownerId: p.user_id, paymentId: p.id,
-      amount: p.amount, currency: p.currency, note: 'заявка на оплату отклонена',
+      amount: p.amount, currency: p.currency, note,
     });
   });
 }
@@ -562,6 +570,7 @@ export async function myPendingCash(userId: string): Promise<CashClaim | null> {
   return one<CashClaim>(
     `select p.id, p.amount::text, p.currency, p.created_at::text,
             u.name as owner_name, u.email as owner_email,
+            p.raw ->> 'declared_way' as declared_way,
             coalesce(jsonb_array_length(p.raw -> 'charge_ids'), 0) as lessons
        from payments p join users u on u.id = p.user_id
       where p.user_id = $1 and p.provider = 'cash'

@@ -1,13 +1,24 @@
 'use client';
 
 import { useState } from 'react';
-import { declareCashAction, payDebtAction } from './actions';
+import { declareCashAction, declareTransferAction, payDebtAction } from './actions';
 import type { UnpaidCharge } from '@/lib/studio';
-import { dayMonth, money, plural } from '@/lib/format';
+import { money, plural, weekdayDayMonth } from '@/lib/format';
+
+/** Регулярное занятие или день смены: в долге это первое, что спрашивают. */
+function kindOf(c: UnpaidCharge): string {
+  if (c.kind === 'camp') return 'лагерь';
+  if (c.kind === 'event') return 'мастер-класс';
+  return 'регулярное';
+}
 
 /**
  * Выбор занятий к оплате. Родитель может заплатить не за всё сразу,
  * поэтому итог считается по отмеченным.
+ *
+ * Строки набраны так же, как в «Истории»: день заголовком на всех, кто в
+ * него попал, и колонки под ним. Списки одинаковые по смыслу, и выглядеть
+ * они должны одинаково.
  */
 export default function DebtPicker({
   charges,
@@ -35,9 +46,13 @@ export default function DebtPicker({
 
   const all = picked.size === payable.length;
 
+  // День → занятия этого дня: дата пишется один раз на всех.
+  const byDay = new Map<string, UnpaidCharge[]>();
+  for (const c of charges) byDay.set(c.held_on, [...(byDay.get(c.held_on) ?? []), c]);
+
   return (
     <form>
-      <div className="row" style={{ marginBottom: 12 }}>
+      <div className="row" style={{ marginBottom: 6 }}>
         <p className="hint" style={{ margin: 0 }}>
           Отмечено {picked.size} из {payable.length}
         </p>
@@ -50,48 +65,46 @@ export default function DebtPicker({
         </button>
       </div>
 
-      {charges.map((c) => {
-        if (c.declared) {
-          return (
-            <div className="card" key={c.id}>
-              <div className="row">
-                <div>
-                  <div className="when">{dayMonth(c.held_on)} · {c.group_title}</div>
-                  <div className="what">{c.who}</div>
-                  <div className="money">будет оплачено наличными или переводом</div>
+      {[...byDay.entries()].map(([day, list]) => (
+        <div key={day}>
+          <div className="when visit-day">{weekdayDayMonth(day)}</div>
+          {list.map((c) => {
+            if (c.declared) {
+              return (
+                <div className="visit" key={c.id} style={{ opacity: 0.55 }}>
+                  <span className="box box-sm" />
+                  <span className="visit-who">{c.who}</span>
+                  <span className="visit-sum">{money(c.amount, c.currency)}</span>
+                  <span className="visit-how">{kindOf(c)} · ждёт подтверждения</span>
                 </div>
-                <div className="sum">{money(c.amount, c.currency)}</div>
-              </div>
-            </div>
-          );
-        }
-        const on = picked.has(c.id);
-        return (
-          <div className="card" key={c.id} style={{ opacity: on ? 1 : 0.5 }}>
-            {on && <input type="hidden" name="charge" value={c.id} />}
-            <button type="button" className="pick" onClick={() => toggle(c.id)} aria-pressed={on}>
-              <span className={on ? 'box box-on' : 'box'}>
-                {on && (
-                  <svg viewBox="0 0 24 24">
-                    <path d="M4 12.5 L9.5 18 L20 6" />
-                  </svg>
-                )}
-              </span>
-              <span style={{ flex: 1, textAlign: 'left' }}>
-                <span className="when" style={{ display: 'block', marginBottom: 2 }}>
-                  {dayMonth(c.held_on)} · {c.group_title}
+              );
+            }
+            const on = picked.has(c.id);
+            return (
+              <button type="button" className="visit debt" key={c.id}
+                      onClick={() => toggle(c.id)} aria-pressed={on}
+                      aria-label={`${c.who}, ${money(c.amount, c.currency)}: ${
+                        on ? 'не платить сейчас' : 'оплатить'}`}>
+                {on && <input type="hidden" name="charge" value={c.id} />}
+                <span className={on ? 'box box-sm box-on' : 'box box-sm'}>
+                  {on && (
+                    <svg viewBox="0 0 24 24"><path d="M4 12.5 L9.5 18 L20 6" /></svg>
+                  )}
                 </span>
-                <span className={on ? 'pick-name pick-on' : 'pick-name'}>{c.who}</span>
-              </span>
-              <span className="sum">{money(c.amount, c.currency)}</span>
-            </button>
-          </div>
-        );
-      })}
+                <span className="visit-who" style={{ opacity: on ? 1 : 0.55 }}>{c.who}</span>
+                <span className="visit-sum" style={{ opacity: on ? 1 : 0.55 }}>
+                  {money(c.amount, c.currency)}
+                </span>
+                <span className="visit-how">{kindOf(c)}</span>
+              </button>
+            );
+          })}
+        </div>
+      ))}
 
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
-        padding: '20px 2px 22px', borderTop: '1px solid var(--line)', marginTop: 12,
+        padding: '18px 2px 20px', borderTop: '1px solid var(--line)', marginTop: 12,
       }}>
         <div style={{ fontSize: 12, letterSpacing: '0.2em', textTransform: 'uppercase', color: 'var(--warm-gray)' }}>
           Итого за {picked.size}&nbsp;{plural(picked.size, 'занятие', 'занятия', 'занятий')}
@@ -103,20 +116,31 @@ export default function DebtPicker({
         <p className="hint">Все занятия уже заявлены к оплате наличными или переводом.</p>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <button className="btn-wide" formAction={payDebtAction} disabled={picked.size === 0 || !online}>
-          Оплатить картой
+      {/* Три способа в ряд: карта уводит в банк сразу, перевод и наличные
+          только сообщают Варе, чего ждать. */}
+      <div className="lbl" style={{ margin: '0 0 8px' }}>Способ оплаты</div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button className="btn" formAction={payDebtAction}
+                disabled={picked.size === 0 || !online}
+                style={{ flex: '1 1 96px' }}>
+          Карта
         </button>
-        <button className="btn-quiet" formAction={declareCashAction} disabled={picked.size === 0}
-                style={{ width: '100%' }}>
-          Заплачу наличными или переведу
+        <button className="btn-quiet" formAction={declareTransferAction}
+                disabled={picked.size === 0} style={{ flex: '1 1 96px' }}>
+          Перевод
+        </button>
+        <button className="btn-quiet" formAction={declareCashAction}
+                disabled={picked.size === 0} style={{ flex: '1 1 96px' }}>
+          Наличные
         </button>
       </div>
 
       <p className="hint" style={{ marginTop: 14 }}>
         {online
-          ? 'Картой — на защищённой странице банка. Оплату наличными, битом или пейбоксом Варя подтвердит на занятии, до этого занятия остаются неоплаченными.'
-          : 'Оплата картой ещё не подключена. Оплату наличными, битом или пейбоксом Варя подтвердит на занятии, до этого занятия остаются неоплаченными.'}
+          ? 'Картой — на защищённой странице банка. '
+          : 'Оплата картой ещё не подключена. '}
+        Перевод и наличные Варя подтвердит на занятии: до этого занятия
+        остаются неоплаченными.
       </p>
     </form>
   );

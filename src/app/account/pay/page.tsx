@@ -8,7 +8,7 @@ import { dayMonth, daysUntil, money, plural, todayISO } from '@/lib/format';
 import { STUDIO_TZ } from '@/lib/time';
 import { lastTestPayment, myPendingCash, paymentHistory, TEST_AMOUNT, verifyPending } from '@/lib/billing';
 import DebtPicker from './DebtPicker';
-import { buyPassAction, testPaymentAction } from './actions';
+import { buyPassAction, cancelCashAction, testPaymentAction } from './actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,45 +93,74 @@ export default async function PayPage({
       <div className="body">
         {error && <p className="err">{error}</p>}
 
-        {mine.map((p) => <PassCard key={p.id} p={p} />)}
-
-        <div className="lbl">{hasStudioPass ? 'Продлить абонемент' : 'Абонемент'}</div>
-        <p className="hint" style={{ marginBottom: 16 }}>
-          Пакет занятий общий на всю семью: тратится и на детей, и на взрослого.
-          Пока он действует, его можно использовать для оплаты любого занятия.
-        </p>
-
-        {online ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {packs.map((t) => (
-              <form action={buyPassAction} key={t.lessons}>
-                <input type="hidden" name="offer" value={`:${t.lessons}`} />
-                <button className="btn-quiet" type="submit" style={{ width: '100%', justifyContent: 'space-between' }}>
-                  <span>
-                    {t.lessons}&nbsp;{plural(t.lessons, 'занятие', 'занятия', 'занятий')}
-                    <span className="hint">
-                      {' · на '}{t.months}&nbsp;{plural(t.months, 'месяц', 'месяца', 'месяцев')}
-                    </span>
-                  </span>
-                  <span>
-                    {money(t.price, price.currency)}
-                    {t.price < price.amount * t.lessons && (
-                      <span className="hint">
-                        {' · '}{money(price.amount * t.lessons - t.price, price.currency)} выгоды
-                      </span>
-                    )}
-                  </span>
-                </button>
-              </form>
-            ))}
-            <p className="hint">Срок считается со дня покупки.</p>
-          </div>
+        {/* Долг — первым: за «Оплатой» чаще всего идут именно из-за него,
+            а не за новым абонементом. */}
+        {unpaid.length === 0 ? (
+          <>
+            <div className="lbl day-band" style={{ marginTop: 0 }}>Задолженность</div>
+            <p className="hint">
+              Сейчас всё оплачено. Занятия, которые не покроет абонемент, появятся
+              здесь. Одно занятие стоит {money(price.amount, price.currency)}.
+            </p>
+          </>
         ) : (
-          <div className="note">
-            Купить можно у Вари на занятии или написав на{' '}
-            <a href="mailto:info@re-create.art">info@re-create.art</a>. Оплата картой
-            появится, когда подключим банк.
+          <>
+            {/* Сумма стоит внутри полосы, а не рядом: иначе полоса
+                обрывается на полуслове, а сумма висит сама по себе. */}
+            <div className="lbl day-band" style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+              gap: 12, marginTop: 0,
+            }}>
+              <span>Задолженность</span>
+              <span className="sum" style={{
+                fontSize: 21, letterSpacing: 'normal', textTransform: 'none',
+              }}>
+                {money(unpaid.reduce((n, c) => n + Number(c.amount), 0), unpaid[0].currency)}
+              </span>
+            </div>
+            {/* Ключ по списку долгов: когда он меняется — заявили оплату
+                или отменили её — выбор собирается заново, и по умолчанию
+                снова отмечено всё. */}
+            <DebtPicker key={unpaid.map((c) => `${c.id}${c.declared ? '!' : ''}`).join()}
+                        charges={unpaid} online={online} />
+          </>
+        )}
+
+        {cash && (
+          <div className="note" style={{ marginTop: 16 }}>
+            Заявка отправлена. Отдайте деньги Варе на занятии — она отметит получение,
+            и занятия станут оплаченными.
           </div>
+        )}
+
+        {claim && (
+          <div className="card-lin" style={{ marginTop: 16 }}>
+            <div className="what">Ждёт подтверждения</div>
+            <div className="sub">
+              {claim.declared_way === 'transfer' ? 'Переводом' : 'Наличными'} за{' '}
+              {claim.lessons}&nbsp;{plural(claim.lessons, 'занятие', 'занятия', 'занятий')} ·{' '}
+              {money(claim.amount, claim.currency)}
+            </div>
+            <p className="hint" style={{ marginTop: 10 }}>
+              Пока Варя не отметит получение, занятия числятся неоплаченными.
+            </p>
+            {/* Передумать можно: занятия вернутся в список неоплаченных,
+                и их снова можно будет выбрать. */}
+            <form action={cancelCashAction} style={{ marginTop: 10 }}>
+              <button type="submit" className="linky">Отменить платёж</button>
+            </form>
+          </div>
+        )}
+
+        {/* Всё про абонементы под одним заголовком: что есть, что можно
+            купить в смену и как продлить обычный. */}
+        <div className="lbl day-band">Абонементы и пакеты</div>
+
+        {mine.length > 0 && (
+          <>
+            <div className="lbl" style={{ marginTop: 0 }}>Что уже куплено</div>
+            {mine.map((p) => <PassCard key={p.id} p={p} />)}
+          </>
         )}
 
         {/* Пакет лагеря — отдельная покупка, не «ещё один абонемент».
@@ -175,35 +204,43 @@ export default async function PayPage({
           </div>
         ))}
 
-        <div className="lbl">Неоплаченные разовые занятия</div>
+        <div className="lbl">{hasStudioPass ? 'Продлить абонемент' : 'Абонемент'}</div>
+        <p className="hint" style={{ marginBottom: 16 }}>
+          Пакет занятий общий на всю семью: тратится и на детей, и на взрослого.
+          Пока он действует, его можно использовать для оплаты любого занятия.
+        </p>
 
-        {cash && (
-          <div className="note" style={{ marginBottom: 16 }}>
-            Заявка отправлена. Отдайте деньги Варе на занятии — она отметит получение,
-            и занятия станут оплаченными.
+        {online ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {packs.map((t) => (
+              <form action={buyPassAction} key={t.lessons}>
+                <input type="hidden" name="offer" value={`:${t.lessons}`} />
+                <button className="btn-quiet" type="submit" style={{ width: '100%', justifyContent: 'space-between' }}>
+                  <span>
+                    {t.lessons}&nbsp;{plural(t.lessons, 'занятие', 'занятия', 'занятий')}
+                    <span className="hint">
+                      {' · на '}{t.months}&nbsp;{plural(t.months, 'месяц', 'месяца', 'месяцев')}
+                    </span>
+                  </span>
+                  <span>
+                    {money(t.price, price.currency)}
+                    {t.price < price.amount * t.lessons && (
+                      <span className="hint">
+                        {' · '}{money(price.amount * t.lessons - t.price, price.currency)} выгоды
+                      </span>
+                    )}
+                  </span>
+                </button>
+              </form>
+            ))}
+            <p className="hint">Срок считается со дня покупки.</p>
           </div>
-        )}
-
-        {claim && (
-          <div className="card-lin">
-            <div className="what">Ждёт подтверждения</div>
-            <div className="sub">
-              Наличными за {claim.lessons}&nbsp;{plural(claim.lessons, 'занятие', 'занятия', 'занятий')} ·{' '}
-              {money(claim.amount, claim.currency)}
-            </div>
-            <p className="hint" style={{ marginTop: 10 }}>
-              Пока Варя не отметит получение, занятия числятся неоплаченными.
-            </p>
-          </div>
-        )}
-
-        {unpaid.length === 0 ? (
-          <p className="hint">
-            Сейчас всё оплачено. Занятия, которые не покроет абонемент, появятся
-            здесь. Одно занятие стоит {money(price.amount, price.currency)}.
-          </p>
         ) : (
-          <DebtPicker charges={unpaid} online={online} />
+          <div className="note">
+            Купить можно у Вари на занятии или написав на{' '}
+            <a href="mailto:info@re-create.art">info@re-create.art</a>. Оплата картой
+            появится, когда подключим банк.
+          </div>
         )}
 
         {admin && online && (
@@ -234,7 +271,7 @@ export default async function PayPage({
         )}
         {history.length > 0 && (
           <>
-            <div className="lbl">История платежей</div>
+            <div className="lbl day-band">История платежей</div>
             {history.map((h) => {
               const what = h.purpose === 'studio_pass'
                   ? (h.group_title ?? 'абонемент')

@@ -2,7 +2,9 @@
 
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { declareCash, startPayment, type Intent } from '@/lib/billing';
+import {
+  declareCash, declineCash, myPendingCash, startPayment, type Intent,
+} from '@/lib/billing';
 import { isAdmin, requireUser } from '@/lib/session';
 
 /** Адрес сайта берём из запроса, чтобы совпадал и на превью, и на проде. */
@@ -31,11 +33,32 @@ export async function payDebtAction(form: FormData): Promise<void> {
   await go({ kind: 'debt', chargeIds: pickedCharges(form) });
 }
 
-export async function declareCashAction(form: FormData): Promise<void> {
+/** «Наличные» и «Перевод» — одна и та же заявка, разный способ. */
+async function declare(form: FormData, way: 'cash' | 'transfer'): Promise<never> {
   const user = await requireUser();
-  const res = await declareCash(user, pickedCharges(form));
+  const res = await declareCash(user, pickedCharges(form), way);
   if ('error' in res) redirect('/account/pay?error=' + encodeURIComponent(res.error));
   redirect('/account/pay?cash=' + res.count);
+}
+
+export async function declareCashAction(form: FormData): Promise<void> {
+  await declare(form, 'cash');
+}
+
+export async function declareTransferAction(form: FormData): Promise<void> {
+  await declare(form, 'transfer');
+}
+
+/**
+ * Родитель передумал платить напрямую. Занятия снова становятся
+ * неоплаченными и их можно выбрать заново.
+ */
+export async function cancelCashAction(): Promise<void> {
+  const user = await requireUser();
+  const claim = await myPendingCash(user.id);
+  // Отменять можно только свою заявку и только пока её не подтвердили.
+  if (claim) await declineCash(claim.id, user.id, 'родитель отменил заявку');
+  redirect('/account/pay');
 }
 
 /** Проверочный платёж на маленькую сумму. Только для админа. */

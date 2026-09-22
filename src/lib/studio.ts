@@ -426,6 +426,8 @@ export type UnpaidCharge = {
   id: string;
   held_on: string;
   group_title: string;
+  /** Регулярное занятие, лагерь или мастер-класс: в списке долгов это видно. */
+  kind: GroupKind;
   who: string;
   amount: string;
   currency: string;
@@ -435,7 +437,8 @@ export type UnpaidCharge = {
 
 export async function unpaidCharges(ownerId: string): Promise<UnpaidCharge[]> {
   return query<UnpaidCharge>(
-    `select ch.id, s.held_on::text, g.title as group_title, ch.amount::text, ch.currency,
+    `select ch.id, s.held_on::text, g.title as group_title, g.kind,
+            ch.amount::text, ch.currency,
             coalesce(c.name, u.name, 'Я') as who,
             exists (
               select 1 from payments pay
