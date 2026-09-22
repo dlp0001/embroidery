@@ -1151,6 +1151,8 @@ export type CalendarSession = {
   session_id: string;
   group_id: string;
   group_title: string;
+  /** Детское занятие или взрослое: ребёнка записывают только на детское. */
+  audience: 'kids' | 'adults';
   held_on: string;
   starts_at: string;
   status: string;
@@ -1498,6 +1500,30 @@ export type Family = {
   own_days: number[];
   children: FamilyChild[];
 };
+
+export type BookableChild = {
+  participant_id: string;
+  name: string;
+  /** Чей это ребёнок: тёзки в списке иначе неразличимы. */
+  parent: string | null;
+};
+
+/**
+ * Дети, которых можно записать на занятие: все, кто ходит в студию.
+ * Нужен Варе, когда родитель договаривается голосом, а не через кабинет.
+ */
+export async function bookableChildren(): Promise<BookableChild[]> {
+  return query<BookableChild>(
+    `select p.id as participant_id, ch.name,
+            (select coalesce(u.name, u.email) from guardians g
+               join users u on u.id = g.user_id
+              where g.child_id = ch.id order by u.name limit 1) as parent
+       from participants p
+       join children ch on ch.id = p.child_id
+      where ch.archived_at is null
+      order by ch.name`,
+  );
+}
 
 /** Все взрослые с детьми и составом групп. */
 export async function families(): Promise<Family[]> {

@@ -2,10 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { confirmCash, declineCash } from '@/lib/billing';
+import type { SaveResult } from '@/components/AutoSave';
 import { isAdmin, requireUser } from '@/lib/session';
 import {
   addSession, createGroup, issuePass, resyncGroupSessions, saleOffers,
-  setGroupActive, setSessionStatus, setSessionTime, updateGroup,
+  setBooking, setGroupActive, setSessionStatus, setSessionTime, updateGroup,
   type GroupInput, type GroupKind, type PassOffer,
 } from '@/lib/studio';
 
@@ -161,6 +162,24 @@ export async function setSessionTimeAction(form: FormData): Promise<void> {
   refresh();
 }
 
+
+/**
+ * Запись ребёнка на занятие руками. Родители отмечаются сами, в кабинете,
+ * но договариваются и голосом — тогда записывает Варя.
+ *
+ * Отвечает результатом, а не переходом: «мест нет» надо сказать прямо
+ * в том месте, где выбирали ребёнка.
+ */
+export async function bookChildAction(form: FormData): Promise<SaveResult> {
+  await requireAdmin();
+  const sessionId = String(form.get('sessionId') ?? '');
+  const participantId = String(form.get('participantId') ?? '');
+  if (!sessionId || !participantId) return { ok: false, error: 'Выберите ребёнка.' };
+  const res = await setBooking(sessionId, participantId, true);
+  if (!res.ok) return { ok: false, error: res.reason ?? 'Записать не вышло.' };
+  refresh();
+  return { ok: true };
+}
 
 export async function issuePassAction(form: FormData): Promise<void> {
   const user = await requireAdmin();

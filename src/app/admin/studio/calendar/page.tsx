@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { isAdmin, requireTeacher } from '@/lib/session';
 import {
-  allGroups, ensureSessions, sessionsInRange, type CalendarSession,
+  allGroups, bookableChildren, ensureSessions, sessionsInRange, type CalendarSession,
 } from '@/lib/studio';
 import { hhmm, todayISO, weekdayDayMonth } from '@/lib/format';
+import BookChild from '@/components/BookChild';
 import SessionTime from '@/components/SessionTime';
 import {
-  addSessionAction, setSessionStatusAction, setSessionTimeAction,
+  addSessionAction, bookChildAction, setSessionStatusAction, setSessionTimeAction,
 } from '@/app/admin/schedule-actions';
 
 export const dynamic = 'force-dynamic';
@@ -71,7 +72,9 @@ export default async function AdminCalendarPage({
   const month = /^\d{4}-\d{2}$/.test(params.m ?? '') ? params.m! : today.slice(0, 7);
   const { first, last, days, lead } = bounds(month);
 
-  const [sessions, groups] = await Promise.all([sessionsInRange(first, last), allGroups()]);
+  const [sessions, groups, kids] = await Promise.all([
+    sessionsInRange(first, last), allGroups(), admin ? bookableChildren() : Promise.resolve([]),
+  ]);
   const selected = /^\d{4}-\d{2}-\d{2}$/.test(params.d ?? '') ? params.d! : today;
   const daySessions = sessions.filter((s) => s.held_on === selected);
   const byDay = new Map<string, number>();
@@ -126,7 +129,7 @@ export default async function AdminCalendarPage({
           })}
         </div>
 
-        <div className="lbl">{weekdayDayMonth(selected)}</div>
+        <div className="lbl day-band">{weekdayDayMonth(selected)}</div>
 
         {daySessions.length === 0 && <p className="hint">Занятий в этот день нет.</p>}
 
@@ -155,7 +158,8 @@ export default async function AdminCalendarPage({
             </div>
 
             {admin && (
-              <div style={{ marginTop: 14 }}>
+              <div style={{ display: 'flex', gap: 18, marginTop: 14,
+                            alignItems: 'baseline', flexWrap: 'wrap' }}>
                 {locked(s, today) ? (
                   <p className="hint" style={{ margin: 0 }}>
                     Занятие прошло и отмечено, отменить его уже нельзя: по нему
@@ -170,25 +174,39 @@ export default async function AdminCalendarPage({
                     </button>
                   </form>
                 )}
+
+                {/* Записывают руками, когда родитель договорился голосом.
+                    На отменённое и на взрослое занятие ребёнка не пишем. */}
+                {s.status !== 'cancelled' && s.audience === 'kids' && (
+                  <BookChild sessionId={s.session_id} children={kids} action={bookChildAction} />
+                )}
               </div>
             )}
           </div>
         ))}
 
         {admin && (
+          /* Блок разовый и редкий: занимать им пол-экрана незачем. Поэтому
+             список и кнопка стоят в одну строку, а не широкой колонкой. */
           <div className="card" style={{ borderStyle: 'dashed', marginTop: 16 }}>
-            <div className="what" style={{ marginBottom: 14 }}>Добавить занятие</div>
-            <form action={addSessionAction} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div className="lbl" style={{ margin: '0 0 10px' }}>Добавить занятие</div>
+            <form action={addSessionAction}
+                  style={{ display: 'flex', gap: 12, alignItems: 'center',
+                           justifyContent: 'space-between', flexWrap: 'wrap' }}>
               <input type="hidden" name="heldOn" value={selected} />
               <select name="groupId" defaultValue={groups[0]?.id}
-                      style={{ width: '100%', padding: '11px 0', border: 0, borderBottom: '1.5px solid rgba(180,160,140,0.4)', background: 'transparent', fontSize: 16, outline: 'none' }}>
+                      aria-label="Какую группу добавить"
+                      style={{ flex: '1 1 auto', minWidth: 0, padding: '5px 0',
+                               border: 0, borderBottom: '1px solid var(--line)',
+                               background: 'transparent', fontFamily: 'inherit', fontSize: 14,
+                               outline: 'none' }}>
                 {groups.filter((g) => g.active).map((g) => (
                   <option key={g.id} value={g.id}>{g.title} · {hhmm(g.starts_at)}</option>
                 ))}
               </select>
-              <button className="btn-wide" type="submit">Добавить на {weekdayDayMonth(selected).toLowerCase()}</button>
+              <button className="btn-quiet" type="submit">Добавить</button>
             </form>
-            <p className="hint" style={{ marginTop: 14 }}>
+            <p className="hint" style={{ marginTop: 12 }}>
               Разовое занятие вне обычного расписания группы. Время берётся у группы.
             </p>
           </div>

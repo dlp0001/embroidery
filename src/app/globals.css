@@ -207,3 +207,10 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .time-field:invalid { border-bottom-color: var(--rose-dark); }
 .time-field:hover { border-bottom-color: var(--edge); }
 .time-field:focus { border-bottom-color: var(--rose); }
+
+/* День в расписании: полоса, за которую цепляется глаз при прокрутке.
+   Без фона строка терялась между карточками занятий. */
+.day-band {
+  background: var(--linen); padding: 9px 14px; margin: 20px 0 12px;
+  color: var(--charcoal);
+}
