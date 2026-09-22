@@ -1518,6 +1518,29 @@ export type Family = {
   children: FamilyChild[];
 };
 
+export type MergeCandidate = {
+  child_id: string;
+  name: string;
+  parent: string | null;
+  archived: boolean;
+};
+
+/**
+ * Все дети студии для объединения записей. Скрытых тоже показываем: чаще
+ * всего склеивают как раз спрятанный дубль с живой записью.
+ */
+export async function mergeCandidates(): Promise<MergeCandidate[]> {
+  return query<MergeCandidate>(
+    `select ch.id as child_id, ch.name, ch.archived_at is not null as archived,
+            (select coalesce(u.name, u.email) from guardians g
+               join users u on u.id = g.user_id
+              where g.child_id = ch.id order by u.name limit 1) as parent
+       from children ch
+       join participants p on p.child_id = ch.id
+      order by ch.archived_at nulls first, ch.name`,
+  );
+}
+
 export type BookableChild = {
   participant_id: string;
   name: string;

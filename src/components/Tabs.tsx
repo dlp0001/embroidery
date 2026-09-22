@@ -9,6 +9,7 @@ const ICONS: Record<string, React.ReactNode> = {
   hist: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
   pay: <><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></>,
   person: <><circle cx="12" cy="8" r="3.6" /><path d="M4.5 20c0-4.1 3.4-7.5 7.5-7.5s7.5 3.4 7.5 7.5" /></>,
+  tool: <><circle cx="12" cy="12" r="3.2" /><path d="M12 3v2.4M12 18.6V21M21 12h-2.4M5.4 12H3M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7M18.4 18.4l-1.7-1.7M7.3 7.3 5.6 5.6" /></>,
   groups: <><circle cx="9" cy="8" r="3.2" /><path d="M2.8 20c0-3.4 2.8-6.2 6.2-6.2s6.2 2.8 6.2 6.2" /><circle cx="17.6" cy="9" r="2.4" /><path d="M17.6 13.6c2.2 0 3.8 1.8 3.8 4" /></>,
 };
 

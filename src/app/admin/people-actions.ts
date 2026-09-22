@@ -121,7 +121,8 @@ export async function mergeChildAction(form: FormData): Promise<void> {
   refresh();
   revalidatePath('/admin/studio/debts');
   revalidatePath('/admin/studio/calendar');
-  redirect('/admin/studio/people?' + (res.ok
+  revalidatePath('/admin/studio/admin');
+  redirect('/admin/studio/admin?' + (res.ok
     ? 'note=' + encodeURIComponent(
         `Записи объединены${res.name ? `: «${res.name}» больше нет` : ''}. Перенесено ${res.moved}.`)
     : 'error=' + encodeURIComponent(res.reason ?? 'Объединить не вышло.')));
