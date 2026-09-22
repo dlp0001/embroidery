@@ -5,7 +5,7 @@ import { confirmCash, declineCash } from '@/lib/billing';
 import { isAdmin, requireUser } from '@/lib/session';
 import {
   addSession, createGroup, issuePass, resyncGroupSessions, saleOffers,
-  setGroupActive, setSessionStatus, updateGroup,
+  setGroupActive, setSessionStatus, setSessionTime, updateGroup,
   type GroupInput, type GroupKind, type PassOffer,
 } from '@/lib/studio';
 
@@ -136,7 +136,28 @@ export async function setSessionStatusAction(form: FormData): Promise<void> {
   await requireAdmin();
   const status = String(form.get('status'));
   if (status !== 'planned' && status !== 'cancelled') throw new Error('BAD_STATUS');
-  await setSessionStatus(String(form.get('id')), status);
+  // Отказ возможен только у прошедшего занятия с отметками: кнопки для
+  // него на экране нет, так что сюда доходят разве что старой вкладкой.
+  const done = await setSessionStatus(String(form.get('id')), status);
+  if (!done) throw new Error('PAST_WITH_ATTENDANCE');
+  refresh();
+}
+
+/**
+ * Перенос одного занятия на другое время. Пустое поле возвращает занятию
+ * обычное время группы.
+ */
+export async function setSessionTimeAction(form: FormData): Promise<void> {
+  await requireAdmin();
+  const usual = String(form.get('usual') ?? '') === '1';
+  // Набирают по-разному: «9:00», «09:00», «0900». Приводим к одному виду,
+  // прежде чем проверять, — отказывать из-за пропущенного нуля незачем.
+  const digits = String(form.get('startsAt') ?? '').replace(/\D/g, '');
+  const time = digits.length === 3 || digits.length === 4
+    ? `${digits.slice(0, -2).padStart(2, '0')}:${digits.slice(-2)}`
+    : '';
+  if (!usual && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error('BAD_TIME');
+  await setSessionTime(String(form.get('id')), usual ? null : time);
   refresh();
 }
 

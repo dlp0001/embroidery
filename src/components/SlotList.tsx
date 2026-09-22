@@ -35,7 +35,11 @@ export default function SlotList({ rows }: { rows: SlotRow[] }) {
           <div className="card" key={head.session_id}>
             <div className="row" style={{ alignItems: 'baseline', marginBottom: 4 }}>
               <div className="when" style={{ marginBottom: 0 }}>
-                {hhmm(head.starts_at)} · {head.group_title}{left ? ` · ${left}` : ''}
+                {hhmm(head.starts_at)}
+                {/* Перенос показываем сразу за временем: родитель смотрит
+                    на эту строку, чтобы понять, когда приходить. */}
+                {head.moved && <span style={{ color: 'var(--rose)' }}> · перенесено</span>}
+                {' · '}{head.group_title}{left ? ` · ${left}` : ''}
               </div>
               <div className="tag tag-ok">
                 {head.kind === 'camp' ? 'лагерь'

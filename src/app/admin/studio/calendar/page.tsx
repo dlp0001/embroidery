@@ -4,8 +4,9 @@ import {
   allGroups, ensureSessions, sessionsInRange, type CalendarSession,
 } from '@/lib/studio';
 import { hhmm, todayISO, weekdayDayMonth } from '@/lib/format';
+import SessionTime from '@/components/SessionTime';
 import {
-  addSessionAction, setSessionStatusAction,
+  addSessionAction, setSessionStatusAction, setSessionTimeAction,
 } from '@/app/admin/schedule-actions';
 
 export const dynamic = 'force-dynamic';
@@ -45,6 +46,15 @@ function note(s: CalendarSession): string {
   if (s.booked > 0) return `${s.booked} записано`;
   if (rest > 0) return `ждём ${rest}, записи пока нет`;
   return 'журнал пуст';
+}
+
+/**
+ * Прошедшее занятие, в журнале которого уже есть отметки, отменять нельзя:
+ * деньги по нему посчитаны, и «отменено» рядом с начисленным долгом было бы
+ * не отменой, а расхождением.
+ */
+function locked(s: CalendarSession, today: string): boolean {
+  return s.held_on < today && s.marked > 0;
 }
 
 export default async function AdminCalendarPage({
@@ -124,9 +134,15 @@ export default async function AdminCalendarPage({
           <div className="card" key={s.session_id} style={{ opacity: s.status === 'cancelled' ? 0.55 : 1 }}>
             <div className="row" style={{ alignItems: 'flex-start' }}>
               <div>
-                <div className="when">{hhmm(s.starts_at)}</div>
+                <SessionTime
+                  sessionId={s.session_id}
+                  startsAt={s.starts_at}
+                  moved={s.moved}
+                  action={setSessionTimeAction}
+                  canEdit={admin && s.status !== 'cancelled'}
+                />
                 <div className="what">{s.group_title}</div>
-<div className="sub">{note(s)}</div>
+                <div className="sub">{note(s)}</div>
               </div>
               {s.status !== 'cancelled' && (
                 <Link
@@ -139,14 +155,21 @@ export default async function AdminCalendarPage({
             </div>
 
             {admin && (
-              <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-                <form action={setSessionStatusAction}>
-                  <input type="hidden" name="id" value={s.session_id} />
-                  <input type="hidden" name="status" value={s.status === 'cancelled' ? 'planned' : 'cancelled'} />
-                  <button className="btn-quiet" type="submit">
-                    {s.status === 'cancelled' ? 'Вернуть' : 'Отменить'}
-                  </button>
-                </form>
+              <div style={{ marginTop: 14 }}>
+                {locked(s, today) ? (
+                  <p className="hint" style={{ margin: 0 }}>
+                    Занятие прошло и отмечено, отменить его уже нельзя: по нему
+                    посчитаны деньги.
+                  </p>
+                ) : (
+                  <form action={setSessionStatusAction}>
+                    <input type="hidden" name="id" value={s.session_id} />
+                    <input type="hidden" name="status" value={s.status === 'cancelled' ? 'planned' : 'cancelled'} />
+                    <button className="linky" type="submit">
+                      {s.status === 'cancelled' ? 'Вернуть занятие' : 'Отменить занятие'}
+                    </button>
+                  </form>
+                )}
               </div>
             )}
           </div>

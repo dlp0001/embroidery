@@ -98,12 +98,17 @@ export default async function WeekPage() {
 
         <EventSignup rows={events} />
 
+        {/* Заголовок нужен там, где на экране есть ещё и лагерь: без него
+            два разных списка с кнопками «Записать» читаются как один. */}
         {days.length === 0 ? (
           <p className="hint" style={{ marginTop: 20 }}>
             На ближайшую неделю обычных занятий нет.
           </p>
         ) : (
-          <BookingHint />
+          <>
+            <div className="what" style={{ margin: '26px 0 12px' }}>Регулярные занятия</div>
+            <BookingHint />
+          </>
         )}
 
         {days.length > 0 && (

@@ -600,7 +600,8 @@ export type TeacherSession = {
 export async function teacherSessions(teacherId: string | null): Promise<TeacherSession[]> {
   return query<TeacherSession>(
     `select s.id as session_id, g.id as group_id, g.title as group_title,
-            s.held_on::text, g.starts_at::text, s.status, g.audience, g.kind,
+            s.held_on::text, coalesce(s.starts_at, g.starts_at)::text as starts_at,
+            s.status, g.audience, g.kind,
             coalesce(g.price::text,
                      (select value from settings where key = 'studio_lesson_price')) as price,
             (select count(*)::int
@@ -619,7 +620,7 @@ export async function teacherSessions(teacherId: string | null): Promise<Teacher
       where ($1::uuid is null or g.teacher_id = $1)
         and s.held_on = current_date
         and s.status <> 'cancelled'
-      order by g.starts_at`,
+      order by coalesce(s.starts_at, g.starts_at)`,
     [teacherId],
   );
 }
@@ -636,7 +637,8 @@ export async function nextSessions(teacherId: string | null): Promise<TeacherSes
           and s.status <> 'cancelled'
      )
      select s.id as session_id, g.id as group_id, g.title as group_title,
-            s.held_on::text, g.starts_at::text, s.status, g.audience, g.kind,
+            s.held_on::text, coalesce(s.starts_at, g.starts_at)::text as starts_at,
+            s.status, g.audience, g.kind,
             coalesce(g.price::text,
                      (select value from settings where key = 'studio_lesson_price')) as price,
             (select count(*)::int from participants p
@@ -654,7 +656,7 @@ export async function nextSessions(teacherId: string | null): Promise<TeacherSes
        join soonest on s.held_on = soonest.day
       where ($1::uuid is null or g.teacher_id = $1)
         and s.status <> 'cancelled'
-      order by g.starts_at`,
+      order by coalesce(s.starts_at, g.starts_at)`,
     [teacherId],
   );
 }
@@ -663,7 +665,8 @@ export async function nextSessions(teacherId: string | null): Promise<TeacherSes
 export async function unclosedBefore(teacherId: string | null): Promise<TeacherSession[]> {
   return query<TeacherSession>(
     `select s.id as session_id, g.id as group_id, g.title as group_title,
-            s.held_on::text, g.starts_at::text, s.status, g.audience,
+            s.held_on::text, coalesce(s.starts_at, g.starts_at)::text as starts_at,
+            s.status, g.audience,
             (select count(*)::int from participants p
               where ((g.audience = 'adults' and p.user_id is not null)
                   or (g.audience = 'kids' and p.child_id is not null))
@@ -681,7 +684,7 @@ export async function unclosedBefore(teacherId: string | null): Promise<TeacherS
         and s.held_on > current_date - interval '30 days'
         and s.status <> 'cancelled'
         and not exists (select 1 from attendance a where a.session_id = s.id)
-      order by s.held_on desc, g.starts_at`,
+      order by s.held_on desc, coalesce(s.starts_at, g.starts_at)`,
     [teacherId],
   );
 }
@@ -777,7 +780,8 @@ export type SessionHead = {
 export async function sessionHead(sessionId: string): Promise<SessionHead | null> {
   return one<SessionHead>(
     `select s.id as session_id, g.title as group_title, g.age_hint,
-            s.held_on::text, g.starts_at::text, s.status, g.audience, g.teacher_id, g.kind,
+            s.held_on::text, coalesce(s.starts_at, g.starts_at)::text as starts_at,
+            s.status, g.audience, g.teacher_id, g.kind,
             coalesce(g.price::text,
                      (select value from settings where key = 'studio_lesson_price')) as price
        from studio_sessions s join studio_groups g on g.id = s.group_id
@@ -831,6 +835,8 @@ export type SlotRow = {
   price: string;
   weekday: number | null;
   capacity: number | null;
+  /** Занятие перенесли на другое время: родителю это надо видеть. */
+  moved: boolean;
   /** Пакеты дней: нужны, чтобы сказать, с какого дня пакет выгоднее. */
   pass_offers: { lessons: number; price: number }[] | null;
   taken: number;
@@ -843,7 +849,9 @@ export type SlotRow = {
 
 /** Общая часть запроса: кто из семьи на какое занятие может записаться. */
 function slotsQuery(extra: string): string {
-  return `select s.id as session_id, s.held_on::text, g.starts_at::text,
+  return `select s.id as session_id, s.held_on::text,
+            coalesce(s.starts_at, g.starts_at)::text as starts_at,
+            (s.starts_at is not null) as moved,
             g.id as group_id, g.title as group_title,
             g.audience, g.kind, g.weekday, g.capacity, g.duration_min, g.pass_offers,
             coalesce(g.price::text,
@@ -870,7 +878,7 @@ function slotsQuery(extra: string): string {
         and (p.user_id is null or u.attends or g.kind <> 'lesson')
         and s.status <> 'cancelled'
         ${extra}
-      order by s.held_on, g.starts_at, (p.user_id is not null) desc, who`;
+      order by s.held_on, coalesce(s.starts_at, g.starts_at), (p.user_id is not null) desc, who`;
 }
 
 export async function slotsForUser(userId: string, from: string, to: string): Promise<SlotRow[]> {
@@ -1146,6 +1154,8 @@ export type CalendarSession = {
   held_on: string;
   starts_at: string;
   status: string;
+  /** Время этому дню поставили руками: идёт не тогда, когда обычно. */
+  moved: boolean;
   /** Журнал закрыт: хоть одна отметка есть, неважно какая. */
   marked: number;
   /** Пришли: только те, у кого стоит «был». */
@@ -1159,7 +1169,9 @@ export type CalendarSession = {
 export async function sessionsInRange(from: string, to: string): Promise<CalendarSession[]> {
   return query<CalendarSession>(
     `select s.id as session_id, g.id as group_id, g.title as group_title,
-            s.held_on::text, g.starts_at::text, s.status, g.audience,
+            s.held_on::text, coalesce(s.starts_at, g.starts_at)::text as starts_at,
+            (s.starts_at is not null) as moved,
+            s.status, g.audience,
             (select count(*)::int from attendance a where a.session_id = s.id) as marked,
             (select count(*)::int from attendance a
               where a.session_id = s.id and a.status = 'present') as came,
@@ -1189,7 +1201,7 @@ export async function sessionsInRange(from: string, to: string): Promise<Calenda
        from studio_sessions s
        join studio_groups g on g.id = s.group_id
       where s.held_on between $1::date and $2::date
-      order by s.held_on, g.starts_at`,
+      order by s.held_on, coalesce(s.starts_at, g.starts_at)`,
     [from, to],
   );
 }
@@ -1203,8 +1215,28 @@ export async function addSession(groupId: string, heldOn: string): Promise<void>
   );
 }
 
-export async function setSessionStatus(id: string, status: 'planned' | 'cancelled'): Promise<void> {
-  await query('update studio_sessions set status = $2 where id = $1', [id, status]);
+/**
+ * Отмена занятия или возврат его в расписание.
+ *
+ * Прошедшее занятие с отметками отменить нельзя: по нему уже посчитаны
+ * деньги, и «отменено» рядом с начисленным долгом — это не отмена, а
+ * расхождение. Проверку держим здесь, в запросе, а не только на экране.
+ */
+export async function setSessionStatus(id: string, status: 'planned' | 'cancelled'): Promise<boolean> {
+  const rows = await query(
+    `update studio_sessions s set status = $2
+      where s.id = $1
+        and ($2 <> 'cancelled'
+             or s.held_on >= current_date
+             or not exists (select 1 from attendance a where a.session_id = s.id))
+      returning s.id`,
+    [id, status]);
+  return rows.length > 0;
+}
+
+/** Время одного занятия. null возвращает ему обычное время группы. */
+export async function setSessionTime(id: string, startsAt: string | null): Promise<void> {
+  await query('update studio_sessions set starts_at = $2 where id = $1', [id, startsAt]);
 }
 
 /**
@@ -1225,6 +1257,8 @@ export async function resyncGroupSessions(groupId: string, weeksAhead = 6): Prom
       `delete from studio_sessions s
         where s.group_id = $1
           and s.held_on >= current_date
+          /* Перенесённый день не трогаем: время ему поставили руками. */
+          and s.starts_at is null
           and not exists (select 1 from attendance a where a.session_id = s.id)
           and not exists (select 1 from charges ch where ch.session_id = s.id)
           and not exists (select 1 from bookings b where b.session_id = s.id

@@ -182,3 +182,28 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .chip-money:disabled { border-bottom-color: transparent; cursor: default; }
 .dot-on svg, .dot-off svg { width: 18px; height: 18px; fill: none; stroke: #fff; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
 .dot-on, .dot-off { cursor: pointer; padding: 0; }
+
+/* Действие, которое не должно выглядеть кнопкой: отмена занятия и перенос
+   времени стоят рядом с делом, а не над ним, и подчёркнутая строчка тут
+   честнее кнопки — она не зовёт на себя нажать. */
+.linky {
+  background: none; border: 0; padding: 0; font-family: inherit;
+  font-size: 12px; letter-spacing: 0.04em; color: var(--warm-gray);
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.linky:hover { color: var(--rose); }
+
+/* Поле времени в расписании. Рядом стоят подчёркнутые ссылки, поэтому
+   черта под полем спокойная: пока в поле не встали, оно не спорит с ними
+   за внимание, а под курсором и в фокусе подкрашивается. */
+.time-field {
+  border: 0; border-bottom: 1px solid var(--line); background: transparent;
+  font-family: inherit; font-size: 12px; letter-spacing: 0.14em;
+  line-height: 1.58; padding: 0; outline: none; color: var(--warm-gray);
+}
+/* Ширина одна и та же у поля и у обычной строки времени: иначе всё, что
+   правее, уезжает на несколько пикселей, стоит открыть поле. */
+.time-slot, .time-field { display: inline-block; width: 46px; height: 19px; }
+.time-field:invalid { border-bottom-color: var(--rose-dark); }
+.time-field:hover { border-bottom-color: var(--edge); }
+.time-field:focus { border-bottom-color: var(--rose); }
