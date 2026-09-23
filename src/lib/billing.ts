@@ -234,6 +234,30 @@ function line(ru: string, he: string): string {
 
 const LESSON = line('Занятие', 'שיעור');
 
+/**
+ * Как называется занятие в чеке. Кейтана — отдельная услуга, и в ивритской
+ * половине строки это должно быть видно: её читает бухгалтерия, а название
+ * смены у нас русское.
+ */
+function lessonOf(kind: string): string {
+  if (kind === 'camp') return line('Занятие в дни лагеря', 'שיעור בקייטנה');
+  if (kind === 'event') return line('Занятие на мастер-классе', 'שיעור בסדנה');
+  return LESSON;
+}
+
+/**
+ * Пакет дней в чеке. Русскому родителю — с названием смены целиком, чтобы
+ * было видно, за что платил. Ивритской половине название не подставить:
+ * оно у нас русское, а читать её будет бухгалтерия.
+ */
+function packageLine(kind: string, title: string, days: number): string {
+  const he = kind === 'event' ? 'סדנה' : 'קייטנה';
+  return line(
+    `Пакет занятий: ${title}, ${days} ${plural(days, 'день', 'дня', 'дней')}`,
+    `חבילה ל${he}: ${days} ימים`,
+  );
+}
+
 type ToBill = {
   id: string; provider: string; amount: string; currency: string; purpose: string | null;
   raw: Record<string, unknown> | null; user_id: string; email: string;
@@ -259,9 +283,13 @@ async function receiptItems(p: ToBill): Promise<ReceiptItem[]> {
   if (p.purpose === 'studio_pass') {
     const n = Number(p.raw?.lessons ?? 0);
     const title = (p.raw?.group_title as string | null | undefined) ?? null;
+    const groupId = (p.raw?.group_id as string | null | undefined) ?? null;
+    const kind = groupId
+      ? (await one<{ kind: string }>('select kind from studio_groups where id = $1', [groupId]))?.kind ?? 'camp'
+      : 'lesson';
     return [{
       description: title
-        ? line(`${title}: ${n} ${plural(n, 'день', 'дня', 'дней')}`, `${title}: ${n} ימים`)
+        ? packageLine(kind, title, n)
         : line(
             `Абонемент на ${n} ${plural(n, 'занятие', 'занятия', 'занятий')}`,
             n === 1 ? 'מנוי לשיעור אחד' : `מנוי ל-${n} שיעורים`,
@@ -272,9 +300,16 @@ async function receiptItems(p: ToBill): Promise<ReceiptItem[]> {
   }
 
   if (p.purpose === 'studio_debt') {
-    const groups = await query<{ price: string; count: number }>(
-      `select amount::text as price, count(*)::int as count
-         from charges where payment_id = $1 group by amount order by amount`,
+    // Делим не только по цене, но и по виду: день лагеря за 330 ₪ и
+    // обычное занятие за 100 ₪ — разные услуги, а не разный прайс.
+    const groups = await query<{ kind: string; price: string; count: number }>(
+      `select g.kind, ch.amount::text as price, count(*)::int as count
+         from charges ch
+         join studio_sessions s on s.id = ch.session_id
+         join studio_groups g on g.id = s.group_id
+        where ch.payment_id = $1
+        group by g.kind, ch.amount
+        order by g.kind, ch.amount`,
       [p.id],
     );
     const sum = groups.reduce((s, g) => s + Number(g.price) * g.count, 0);
@@ -282,7 +317,7 @@ async function receiptItems(p: ToBill): Promise<ReceiptItem[]> {
     // на всю сумму, чем красивая разбивка, которая врёт в итоге.
     if (groups.length > 0 && Math.abs(sum - total) < 0.01) {
       return groups.map((g) => ({
-        description: LESSON, quantity: g.count, price: Number(g.price),
+        description: lessonOf(g.kind), quantity: g.count, price: Number(g.price),
       }));
     }
     return [{ description: LESSON, quantity: 1, price: total }];
