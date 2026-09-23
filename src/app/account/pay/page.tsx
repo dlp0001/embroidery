@@ -22,18 +22,27 @@ export default async function PayPage({
   const { error, cash } = await searchParams;
   const online = isConfigured();
   const admin = isAdmin(user);
-  // Зависшие платежи доводим до конца сами, не дожидаясь обратного вызова.
-  await verifyPending(user.id);
-  const lastTest = admin ? await lastTestPayment(user.id) : null;
-  const claim = await myPendingCash(user.id);
-  const history = await paymentHistory(user.id);
   const mode = process.env.PAYPLUS_ENV === 'prod' ? 'боевая' : 'тестовая';
-  const [unpaid, passes, price, offers] = await Promise.all([
+  // Всё разом, а не по очереди. Дольше всех обычно проверка зависших
+  // платежей: она спрашивает про каждый у PayPlus, по сети. Раньше страница
+  // ждала сначала её, потом всё остальное, и складывала одно с другим.
+  const [check, lastTest, claim, history0, unpaid0, passes0, price, offers] = await Promise.all([
+    // Зависшие платежи доводим до конца сами, не дожидаясь обратного вызова.
+    verifyPending(user.id),
+    admin ? lastTestPayment(user.id) : Promise.resolve(null),
+    myPendingCash(user.id),
+    paymentHistory(user.id),
     unpaidCharges(user.id),
     passBalances(user.id),
     lessonPrice(),
     saleOffers(),
   ]);
+
+  // Проверка могла довести платёж до конца: тогда долги и абонементы,
+  // прочитанные с ней заодно, уже устарели и их надо взять заново.
+  const [history, unpaid, passes] = check.paid > 0
+    ? await Promise.all([paymentHistory(user.id), unpaidCharges(user.id), passBalances(user.id)])
+    : [history0, unpaid0, passes0];
   // Пакет лагеря живёт рядом с обычным абонементом: показываем оба.
   const mine = passes.filter((p) => p.left > 0);
   const hasStudioPass = mine.some((p) => !p.group_id);

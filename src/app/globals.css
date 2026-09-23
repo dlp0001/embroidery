@@ -263,3 +263,10 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   background: var(--linen); padding: 9px 14px; margin: 20px 0 12px;
   color: var(--charcoal);
 }
+
+/* Заглушка на время, пока сервер собирает страницу. Нужна затем, что
+   страницы кабинета собираются на каждый заход, и между нажатием на
+   закладку и ответом ничего не происходило: казалось, что подвисло. */
+.skel { background: var(--line-soft); animation: skel 1.3s ease-in-out infinite; }
+@keyframes skel { 0%, 100% { opacity: 0.5 } 50% { opacity: 1 } }
+@media (prefers-reduced-motion: reduce) { .skel { animation: none } }
