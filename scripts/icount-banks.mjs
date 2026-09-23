@@ -35,7 +35,15 @@ for (const item of list) {
   const имя = a.name ?? a.account_name ?? a.nickname ?? '';
   const банк = a.bank_name ?? a.bank ?? '';
   const счёт = a.account_number ?? a.account ?? '';
-  console.log(`id ${id} · ${[имя, банк, счёт].filter(Boolean).join(' · ') || JSON.stringify(a)}`);
+  console.log(`id ${id} · ${[имя, банк, счёт].filter(Boolean).join(' · ') || ''}`);
+  // Остальные поля карточки: отделение, валюта и прочее, что отдал iCount.
+  // Пригождаются, когда счетов несколько и надо не перепутать.
+  const прочее = Object.entries(a)
+    .filter(([k, v]) => v !== null && v !== '' && typeof v !== 'object'
+                        && !['account_id', 'id', 'name', 'account_name', 'nickname',
+                             'bank_name', 'bank', 'account_number', 'account'].includes(k))
+    .map(([k, v]) => `${k}: ${v}`);
+  if (прочее.length > 0) console.log(`      ${прочее.join(' · ')}`);
 }
 
 console.log('\nНужный id впишите в ICOUNT_BANK_ACCOUNT на Vercel.');
