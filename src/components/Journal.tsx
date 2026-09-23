@@ -63,9 +63,10 @@ function settledWay(r: RosterRow): PayWay | null {
 function defaults(r: RosterRow): Row {
   return {
     present: r.status === 'present',
-    // Про чек говорим только там, где о нём уже просили: сам собой он
-    // не выписывается никогда.
-    receipt: r.receipt === 'none' ? '' : (r.pay_method ?? ''),
+    // Про чек говорим только там, где о нём уже просили, и только если
+    // деньги действительно взяты на месте: чек ездит на таком платеже и
+    // сам по себе, без него, не существует.
+    receipt: r.cash && r.receipt !== 'none' ? (r.pay_method ?? '') : '',
     // Абонемент предлагаем только тем, кого сейчас отмечают впервые.
     // Занятие с уже проставленной отметкой — прошлое: подставлять ему
     // абонемент нельзя, иначе экран обещает списание, которого не было.
@@ -210,7 +211,10 @@ export default function Journal({
               )}
               {/* Чек просят прямо здесь: деньги уже в руках, а бумага
                   нужна не всем и не всегда. Выписанный показываем ссылкой:
-                  по ней видно, что именно ушло родителю. */}
+                  по ней видно, что именно ушло родителю. Кнопка идёт без
+                  guard: просьба о чеке денег не двигает, и спрашивать
+                  «точно ли менять» тут не о чем — занятие, оплаченное в
+                  прошлый раз, так и остаётся оплаченным. */}
               {receipts && row.present && row.pay === 'cash' && (
                 billed ? (
                   r.receipt_url ? (
@@ -223,7 +227,7 @@ export default function Journal({
                   <button
                     type="button"
                     className={`chip-money ${row.receipt ? 'money' : 'money-off'}`}
-                    onClick={guard(() => nextReceipt(r))}
+                    onClick={() => nextReceipt(r)}
                   >
                     {receiptText(row.receipt)}
                     {r.receipt === 'wanted' && ' · не вышел'}

@@ -6,6 +6,13 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 4321
+    },
+    {
+      "_": "То же самое, но с нерабочим ключом iCount: чеки в журнале видно, а выписать их нельзя — в настоящую бухгалтерию с дева ничего не уйдёт.",
+      "name": "site-demo",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-lc", "ICOUNT_TOKEN=demo-not-a-real-token npm run dev"],
+      "port": 4321
     }
   ]
 }

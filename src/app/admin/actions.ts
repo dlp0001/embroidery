@@ -46,7 +46,12 @@ export async function saveJournal(formData: FormData): Promise<void> {
   // Преподаватель ведёт только свои группы, админ — любые.
   if (!isAdmin(user) && head.teacher_id !== user.id) throw new Error('FORBIDDEN');
 
-  const marks: Mark[] = [];
+  // По одной отметке на человека. Форма присылает скрытые поля, и если
+  // в ней почему-то оказались две строки про одного и того же (дважды
+  // отрисованный журнал, залипшая разметка), брать надо одну: иначе тот
+  // же человек проходит по деньгам дважды, и второй проход видит уже не
+  // то состояние, что первый.
+  const seen = new Map<string, Mark>();
   for (const [key, value] of formData.entries()) {
     if (!key.startsWith('mark:')) continue;
     const status = String(value) as AttendanceStatus;
@@ -54,13 +59,14 @@ export async function saveJournal(formData: FormData): Promise<void> {
     const participantId = key.slice(5);
     const way = String(formData.get(`pay:${participantId}`) ?? 'none') as PayWay;
     const want = String(formData.get(`receipt:${participantId}`) ?? '') as PayMethod;
-    marks.push({
+    seen.set(participantId, {
       participantId,
       status,
       pay: WAYS.includes(way) ? way : 'none',
       receipt: METHODS.includes(want) ? want : null,
     });
   }
+  const marks: Mark[] = [...seen.values()];
 
   const res = await saveAttendance(sessionId, marks, { id: user.id });
   // Квитанции — после того, как журнал записан: отказ iCount не должен
