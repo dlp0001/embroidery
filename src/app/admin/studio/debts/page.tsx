@@ -3,9 +3,9 @@ import {
   PASS_WARN_DAYS, allActivePasses, debtors, lessonPrice, passOwners, saleOffers,
   unbilledVisits,
 } from '@/lib/studio';
-import { pendingCash, WAY } from '@/lib/billing';
+import { pendingCash } from '@/lib/billing';
 import { isConfigured as receiptsConfigured } from '@/lib/icount';
-import { dayMonth, daysUntil, money, plural, todayISO } from '@/lib/format';
+import { dayMonth, daysUntil, money, plural, todayISO, WAY } from '@/lib/format';
 import Link from 'next/link';
 import { confirmCashAction, declineCashAction, issuePassAction } from '@/app/admin/schedule-actions';
 

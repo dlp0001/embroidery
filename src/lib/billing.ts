@@ -1,5 +1,5 @@
 import { one, query, tx } from './db';
-import { plural, todayISO } from './format';
+import { plural, todayISO, WAY, type PayMethod } from './format';
 import {
   ALREADY_ISSUED, createReceipt, ICountError,
   isConfigured as receiptsConfigured,
@@ -179,7 +179,7 @@ export async function applyPayment(
     // убедиться, что деньги доходят и обратный вызов срабатывает.
     if (p.purpose === 'studio_test') return;
 
-    if (p.purpose === 'studio_debt') {
+    if (p.purpose === 'studio_debt' || p.purpose === 'studio_lesson') {
       const ids = (p.raw?.charge_ids as string[] | undefined) ?? [];
       if (ids.length > 0) {
         const { rows: settled } = await c.query<{ id: string }>(
@@ -310,7 +310,7 @@ async function receiptItems(p: ToBill): Promise<ReceiptItem[]> {
     }];
   }
 
-  if (p.purpose === 'studio_debt') {
+  if (p.purpose === 'studio_debt' || p.purpose === 'studio_lesson') {
     // Делим не только по цене, но и по виду: день лагеря за 330 ₪ и
     // обычное занятие за 100 ₪ — разные услуги, а не разный прайс.
     const groups = await query<{ kind: string; price: string; count: number }>(
@@ -551,14 +551,9 @@ export async function pendingCash(): Promise<CashClaim[]> {
   );
 }
 
-/** Как способ оплаты называется словами: одинаково в реестре и на экранах. */
-export const WAY: Record<'cash' | 'transfer' | 'bit' | 'paybox', string> = {
-  cash: 'наличными', transfer: 'переводом', bit: 'Bit', paybox: 'PayBox',
-};
-
 /** Студия подтверждает получение денег: занятия закрываются. */
 /** Чем родитель на самом деле отдал деньги и нужна ли ему квитанция. */
-export type CashDetails = { method: 'cash' | 'transfer' | 'bit' | 'paybox'; receipt: boolean };
+export type CashDetails = { method: PayMethod; receipt: boolean };
 
 export async function confirmCash(
   paymentId: string, actorId: string, how: CashDetails,
@@ -702,7 +697,7 @@ export type PaymentRow = {
   lessons: number;
   invoice_url: string | null;
   /** Чем отдали деньги напрямую: наличными, переводом, битом, пейбоксом. */
-  pay_method: 'cash' | 'transfer' | 'bit' | 'paybox' | null;
+  pay_method: PayMethod | null;
   /** Пакет лагеря: в истории он зовётся своим именем, а не абонементом. */
   group_title: string | null;
 };

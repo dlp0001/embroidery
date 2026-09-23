@@ -2,10 +2,29 @@
 
 import { useActionState, useState } from 'react';
 import { addWalkInAction, saveJournal } from '@/app/admin/actions';
-import { plural } from '@/lib/format';
+import { plural, type PayMethod } from '@/lib/format';
 import type { PayWay, RosterRow } from '@/lib/studio';
 
-type Row = { present: boolean; pay: PayWay };
+/** Чек: не нужен или нужен, и тогда с тем способом, который назвала Варя. */
+type Want = '' | PayMethod;
+
+type Row = { present: boolean; pay: PayWay; receipt: Want };
+
+/**
+ * Способы по кругу, начиная с «без чека». Названия короткие и такие же,
+ * как их произносят вслух: «битом», «пейбоксом», «переводом».
+ */
+const RECEIPTS: { key: Want; text: string }[] = [
+  { key: '', text: 'без чека' },
+  { key: 'cash', text: 'чек: наличные' },
+  { key: 'bit', text: 'чек: bit' },
+  { key: 'paybox', text: 'чек: paybox' },
+  { key: 'transfer', text: 'чек: перевод' },
+];
+
+function receiptText(want: Want): string {
+  return RECEIPTS.find((r) => r.key === want)?.text ?? 'без чека';
+}
 
 /** Ждём ли этого человека: родитель записал или день отмечен в профиле. */
 function expected(r: RosterRow): boolean {
@@ -44,6 +63,9 @@ function settledWay(r: RosterRow): PayWay | null {
 function defaults(r: RosterRow): Row {
   return {
     present: r.status === 'present',
+    // Про чек говорим только там, где о нём уже просили: сам собой он
+    // не выписывается никогда.
+    receipt: r.receipt === 'none' ? '' : (r.pay_method ?? ''),
     // Абонемент предлагаем только тем, кого сейчас отмечают впервые.
     // Занятие с уже проставленной отметкой — прошлое: подставлять ему
     // абонемент нельзя, иначе экран обещает списание, которого не было.
@@ -57,12 +79,15 @@ export default function Journal({
   price,
   saved,
   kids = false,
+  receipts = false,
   passWord = 'по абонементу',
 }: {
   sessionId: string;
   roster: RosterRow[];
   price: string;
   saved: boolean;
+  /** iCount подключён: без него просить чек не у кого. */
+  receipts?: boolean;
   /** Как называется списание: у лагеря это пакет, а не абонемент. */
   passWord?: string;
   /** Детское занятие: сюда можно завести ребёнка прямо с порога. */
@@ -122,7 +147,23 @@ export default function Journal({
     const list = ways(r);
     const row = rowFor(r);
     const at = list.indexOf(row.pay);
-    setEdits((p) => ({ ...p, [r.participant_id]: { ...row, pay: list[(at + 1) % list.length] } }));
+    const pay = list[(at + 1) % list.length];
+    // Чек бывает только у денег, отданных в руки: ушли с наличных —
+    // просьба о чеке уходит вместе с ними.
+    setEdits((p) => ({
+      ...p,
+      [r.participant_id]: { ...row, pay, receipt: pay === 'cash' ? row.receipt : '' },
+    }));
+  }
+
+  /** Клик по чеку перебирает способы: без чека, наличные, бит, пейбокс, перевод. */
+  function nextReceipt(r: RosterRow) {
+    const row = rowFor(r);
+    const at = RECEIPTS.findIndex((x) => x.key === row.receipt);
+    setEdits((p) => ({
+      ...p,
+      [r.participant_id]: { ...row, receipt: RECEIPTS[(at + 1) % RECEIPTS.length].key },
+    }));
   }
 
   function line(r: RosterRow) {
@@ -130,8 +171,11 @@ export default function Journal({
     const m = moneyFor(r);
     const card = r.paid && !r.cash;
     const settled = Boolean(card || settledWay(r));
-    // Проведённые деньги не запрещают правку, но спрашивают перед ней.
-    const locked = settled && !unlocked.has(r.participant_id);
+    // Чек выписан — строка закрыта навсегда: бумага уже у родителя и в
+    // бухгалтерии, и снять по ней явку или переписать оплату нельзя.
+    const billed = r.receipt === 'done';
+    // Остальные проведённые деньги правку не запрещают, но спрашивают.
+    const locked = billed || (settled && !unlocked.has(r.participant_id));
     const askingHere = asking === r.participant_id;
 
     /** Любое касание закрытой строки сначала спрашивает, потом делает. */
@@ -145,6 +189,7 @@ export default function Journal({
         <div className="mark">
           <input type="hidden" name={`mark:${r.participant_id}`} value={row.present ? 'present' : 'absent'} />
           <input type="hidden" name={`pay:${r.participant_id}`} value={row.pay} />
+          <input type="hidden" name={`receipt:${r.participant_id}`} value={row.receipt} />
 
           <div style={{ flex: 1, minWidth: 0 }}>
             <button type="button" className="plain" onClick={guard(() => togglePresent(r))}>
@@ -152,16 +197,40 @@ export default function Journal({
             </button>
             <Booked on={r.booked} />
             <NoParent on={!r.owner_id} />
-            {m && (
-              <button
-                type="button"
-                className={`chip-money ${m.cls}`}
-                disabled={!row.present || card}
-                onClick={guard(() => nextWay(r))}
-              >
-                {m.text}
-              </button>
-            )}
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'baseline' }}>
+              {m && (
+                <button
+                  type="button"
+                  className={`chip-money ${m.cls}`}
+                  disabled={!row.present || card || billed}
+                  onClick={guard(() => nextWay(r))}
+                >
+                  {m.text}
+                </button>
+              )}
+              {/* Чек просят прямо здесь: деньги уже в руках, а бумага
+                  нужна не всем и не всегда. Выписанный показываем ссылкой:
+                  по ней видно, что именно ушло родителю. */}
+              {receipts && row.present && row.pay === 'cash' && (
+                billed ? (
+                  r.receipt_url ? (
+                    <a className="chip-money money" href={r.receipt_url}
+                       target="_blank" rel="noreferrer">чек выписан</a>
+                  ) : (
+                    <span className="chip-money money">чек выписан</span>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    className={`chip-money ${row.receipt ? 'money' : 'money-off'}`}
+                    onClick={guard(() => nextReceipt(r))}
+                  >
+                    {receiptText(row.receipt)}
+                    {r.receipt === 'wanted' && ' · не вышел'}
+                  </button>
+                )
+              )}
+            </div>
           </div>
 
           <button
@@ -181,23 +250,38 @@ export default function Journal({
 
         {askingHere && (
           <div className="note" style={{ margin: '0 0 14px' }}>
-            По этому занятию деньги уже проведены. Изменение попадёт в реестр
-            и будет видно, кто его сделал.
-            <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => {
-                  setUnlocked((p) => new Set(p).add(r.participant_id));
-                  setAsking(null);
-                }}
-              >
-                Всё равно изменить
-              </button>
-              <button type="button" className="btn-quiet" onClick={() => setAsking(null)}>
-                Отмена
-              </button>
-            </div>
+            {billed ? (
+              <>
+                По этому занятию выписан чек. Снять отметку и поменять оплату
+                из журнала уже нельзя: бумага ушла родителю и в бухгалтерию.
+                Если всё-таки надо — сначала отменяется чек, и делает это Дима.
+                <div style={{ marginTop: 12 }}>
+                  <button type="button" className="btn-quiet" onClick={() => setAsking(null)}>
+                    Понятно
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                По этому занятию деньги уже проведены. Изменение попадёт в реестр
+                и будет видно, кто его сделал.
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => {
+                      setUnlocked((p) => new Set(p).add(r.participant_id));
+                      setAsking(null);
+                    }}
+                  >
+                    Всё равно изменить
+                  </button>
+                  <button type="button" className="btn-quiet" onClick={() => setAsking(null)}>
+                    Отмена
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>

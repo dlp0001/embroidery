@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg';
 import { one, query, tx } from './db';
-import { plural } from './format';
+import { plural, WAY, type PayMethod } from './format';
 import { logMoneyIn } from './ledger';
 
 export type AttendanceStatus = 'present' | 'absent' | 'sick' | 'trial';
@@ -110,7 +110,17 @@ export async function familyParticipants(userId: string): Promise<Participant[]>
 
 export type PayWay = 'none' | 'cash' | 'pass';
 
-export type Mark = { participantId: string; status: AttendanceStatus; pay?: PayWay };
+/**
+ * Отметка в журнале. Чек — необязательная просьба: если он назван, то
+ * при сохранении выписывается квитанция, и способ оплаты в ней тот, что
+ * выбрала Варя. Бит и пейбокс для iCount разные вещи, поэтому спрашиваем.
+ */
+export type Mark = {
+  participantId: string;
+  status: AttendanceStatus;
+  pay?: PayWay;
+  receipt?: PayMethod | null;
+};
 
 /**
  * Сохраняет журнал занятия. Деньги считаются здесь и только здесь:
@@ -126,6 +136,8 @@ export type SaveResult = {
   cash: number;
   /** Сколько уже проведённых строк переписали: это видно в реестре. */
   changed: number;
+  /** Платежи, на которые просили чек. Выписывает их уже вызывающий. */
+  bill: string[];
 };
 
 type ChargeRow = {
@@ -135,6 +147,10 @@ type ChargeRow = {
   owner_id: string | null;
   pass_id: string | null;
   payment_id: string | null;
+  /** Чек уже выписан: такую строку журнал больше не трогает. */
+  billed: boolean;
+  /** Чем закрыт платёж: наличные правятся руками, карта нет. */
+  provider: string | null;
 };
 
 /**
@@ -154,18 +170,30 @@ export async function saveAttendance(
   const ids = marks.map((m) => m.participantId);
 
   return tx(async (c) => {
-    const stat: SaveResult = { present: 0, onPass: 0, toDebt: 0, cash: 0, changed: 0 };
+    const stat: SaveResult = { present: 0, onPass: 0, toDebt: 0, cash: 0, changed: 0, bill: [] };
     if (ids.length === 0) return stat;
 
     // 1. Что уже начислено по этому занятию.
     const charges = new Map<string, ChargeRow>();
     const { rows: existing } = await c.query<ChargeRow>(
-      `select id, participant_id, owner_id, pass_id, payment_id
-         from charges where session_id = $1 and participant_id = any($2::uuid[])
-         for update`,
+      `select ch.id, ch.participant_id, ch.owner_id, ch.pass_id, ch.payment_id,
+              pay.provider,
+              coalesce(pay.invoice_url is not null or pay.raw ? 'receipt', false) as billed
+         from charges ch
+         left join payments pay on pay.id = ch.payment_id
+        where ch.session_id = $1 and ch.participant_id = any($2::uuid[])
+        for update of ch`,
       [sessionId, ids],
     );
     for (const row of existing) charges.set(row.participant_id, row);
+
+    // Строку с выписанным чеком не двигаем совсем: бумага ушла родителю и
+    // в бухгалтерию, а отменить её из журнала нельзя. Такие отметки
+    // пропускаем целиком, чтобы их не переписала и вкладка,
+    // открытая до того, как чек появился.
+    const live = marks.filter((m) => !charges.get(m.participantId)?.billed);
+    if (live.length === 0) return stat;
+    const liveIds = live.map((m) => m.participantId);
 
     // 2. Отметки — одним запросом на всех.
     await c.query(
@@ -174,11 +202,11 @@ export async function saveAttendance(
          from unnest($2::uuid[], $3::text[]) as t(p, s)
        on conflict (session_id, participant_id)
        do update set status = excluded.status, marked_by = excluded.marked_by, marked_at = now()`,
-      [sessionId, ids, marks.map((m) => m.status), actor.id],
+      [sessionId, liveIds, live.map((m) => m.status), actor.id],
     );
 
     // 3. Кому выставлять счёт: для взрослого он сам, для ребёнка опекун.
-    const needOwner = marks
+    const needOwner = live
       .filter((m) => m.status === 'present' && !charges.has(m.participantId))
       .map((m) => m.participantId);
     const owners = new Map<string, string[]>();
@@ -201,7 +229,7 @@ export async function saveAttendance(
     //    Варя вправе переставить оплату на абонемент задним числом.
     const candidates = [...new Set([
       ...[...owners.values()].flat(),
-      ...marks
+      ...live
         .filter((m) => m.status === 'present')
         .map((m) => charges.get(m.participantId)?.owner_id)
         .filter((id): id is string => Boolean(id)),
@@ -247,7 +275,7 @@ export async function saveAttendance(
       passes.set(ownerId, list);
     };
 
-    for (const mark of marks) {
+    for (const mark of live) {
       let charge = charges.get(mark.participantId);
       const wasSettled = Boolean(charge && (charge.pass_id || charge.payment_id));
       if (wasSettled) stat.changed++;
@@ -280,7 +308,8 @@ export async function saveAttendance(
         const inserted = await c.query<ChargeRow>(
           `insert into charges (participant_id, session_id, owner_id, amount, currency, pass_id)
            values ($1, $2, $3, $4, $5, $6)
-           returning id, participant_id, owner_id, pass_id, payment_id`,
+           returning id, participant_id, owner_id, pass_id, payment_id,
+                     false as billed, null::text as provider`,
           [mark.participantId, sessionId, owner, amount, currency, passId],
         );
         charge = inserted.rows[0];
@@ -308,21 +337,49 @@ export async function saveAttendance(
         });
       }
 
-      // Наличные: заводим платёж.
+      // Наличные: заводим платёж. Просьбу о чеке и способ оплаты кладём
+      // в сам платёж: по ним квитанция выпишется уже после транзакции, а
+      // если iCount откажет, пометка останется и следующая попытка
+      // подхватит её сама.
       if (way === 'cash') {
+        const want = mark.receipt ?? null;
+        const detail = want
+          ? JSON.stringify({ pay_method: want, receipt_wanted: 'yes' })
+          : null;
         if (!charge.payment_id) {
           const pay = await c.query<{ id: string }>(
-            `insert into payments (provider, user_id, amount, currency, status, purpose)
-             values ('cash', $1, $2, $3, 'paid', 'studio_lesson') returning id`,
-            [charge.owner_id, amount, currency],
+            `insert into payments (provider, user_id, amount, currency, status, purpose, raw)
+             values ('cash', $1, $2, $3, 'paid', 'studio_lesson', $4::jsonb) returning id`,
+            [charge.owner_id, amount, currency, detail],
           );
           await c.query('update charges set payment_id = $2 where id = $1', [charge.id, pay.rows[0].id]);
-          charge = { ...charge, payment_id: pay.rows[0].id };
+          charge = { ...charge, payment_id: pay.rows[0].id, provider: 'cash' };
           await logMoneyIn(c, {
             kind: 'cash_taken', actorId: actor.id, ownerId: charge.owner_id,
             participantId: mark.participantId, sessionId, chargeId: charge.id,
-            paymentId: pay.rows[0].id, amount, currency, note: 'оплачено наличными или переводом, 1 занятие',
+            paymentId: pay.rows[0].id, amount, currency,
+            note: want
+              ? `оплачено ${WAY[want]}, 1 занятие, с чеком`
+              : 'оплачено наличными или переводом, 1 занятие',
+            details: want ? { pay_method: want, receipt: true } : undefined,
           });
+        } else if (detail && charge.provider === 'cash') {
+          // Деньги взяли раньше, чек попросили теперь — или он не вышел с
+          // первого раза. Способ мог и поменяться: пишем тот, что назвали.
+          await c.query(
+            `update payments set raw = coalesce(raw, '{}'::jsonb) || $2::jsonb where id = $1`,
+            [charge.payment_id, detail],
+          );
+          await logMoneyIn(c, {
+            kind: 'cash_taken', actorId: actor.id, ownerId: charge.owner_id,
+            participantId: mark.participantId, sessionId, chargeId: charge.id,
+            paymentId: charge.payment_id, amount, currency,
+            note: `запрошен чек, ${WAY[want!]}`,
+            details: { pay_method: want, receipt: true },
+          });
+        }
+        if (want && charge.payment_id && charge.provider === 'cash') {
+          stat.bill.push(charge.payment_id);
         }
         stat.cash++;
         continue;
@@ -758,6 +815,14 @@ export type RosterRow = {
   preferred: boolean;
   /** Деньги уже проведены: менять может только суперадмин. */
   locked: boolean;
+  /**
+   * Чек: 'none' — не просили, 'wanted' — попросили, но iCount ещё не
+   * ответил, 'done' — выписан. Выписанный чек запирает строку насовсем.
+   */
+  receipt: 'none' | 'wanted' | 'done';
+  receipt_url: string | null;
+  /** Каким способом провели оплату, если про чек уже говорили. */
+  pay_method: PayMethod | null;
 };
 
 export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
@@ -805,6 +870,13 @@ export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
             (c.pass_id is not null) as on_pass,
             (c.payment_id is not null) as paid,
             coalesce((select pay.provider = 'cash' from payments pay where pay.id = c.payment_id), false) as cash,
+            coalesce((select case
+                        when pay.invoice_url is not null or pay.raw ? 'receipt' then 'done'
+                        when pay.raw ->> 'receipt_wanted' = 'yes' then 'wanted'
+                        else 'none' end
+                        from payments pay where pay.id = c.payment_id), 'none') as receipt,
+            (select pay.invoice_url from payments pay where pay.id = c.payment_id) as receipt_url,
+            (select pay.raw ->> 'pay_method' from payments pay where pay.id = c.payment_id) as pay_method,
             (c.id is not null) as locked,
             coalesce(b.status = 'booked', false) as booked,
             exists (select 1 from preferred_days pd cross join ses

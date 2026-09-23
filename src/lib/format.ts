@@ -104,3 +104,14 @@ export function packageFrom(
   if (cheaper.length === 0) return null;
   return Math.min(...cheaper.map((o) => o.lessons));
 }
+
+/**
+ * Чем отданы деньги напрямую, помимо карты. Слова одни и те же в реестре,
+ * в кабинете родителя и в журнале, поэтому живут здесь, а не в billing:
+ * про них знает и studio, а ему на billing ссылаться нельзя.
+ */
+export type PayMethod = 'cash' | 'transfer' | 'bit' | 'paybox';
+
+export const WAY: Record<PayMethod, string> = {
+  cash: 'наличными', transfer: 'переводом', bit: 'Bit', paybox: 'PayBox',
+};

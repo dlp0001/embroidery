@@ -6,6 +6,7 @@ import {
   unclosedBefore,
 } from '@/lib/studio';
 import { dayMonth, hhmm, money, plural, todayISO, weekdayDayMonth } from '@/lib/format';
+import { isConfigured as receiptsConfigured } from '@/lib/icount';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,8 @@ export default async function TodayPage() {
   const isToday = todaySessions.length > 0;
 
   const rosters = await Promise.all(today.map((s) => sessionRoster(s.session_id)));
+  // Без iCount чек попросить не у кого: тогда и выбора в журнале нет.
+  const receipts = receiptsConfigured();
   const debtTotal = debts.reduce((s, d) => s + Number(d.amount), 0);
 
   return (
@@ -73,6 +76,7 @@ export default async function TodayPage() {
                   passWord={s.kind === 'camp' ? 'по пакету' : 'по абонементу'}
                   saved={s.marked > 0}
                   kids={s.audience === 'kids'}
+                  receipts={receipts}
                 />
               </div>
             )}

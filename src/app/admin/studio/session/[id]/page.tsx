@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { isAdmin, requireTeacher } from '@/lib/session';
 import { KIND_NAME, sessionHead, sessionRoster } from '@/lib/studio';
 import { dayMonth, hhmm, money } from '@/lib/format';
+import { isConfigured as receiptsConfigured } from '@/lib/icount';
 import Journal from '@/components/Journal';
 
 export const dynamic = 'force-dynamic';
@@ -47,10 +48,12 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
               passWord={camp ? 'по пакету' : 'по абонементу'}
               saved={head.status === 'done'}
               kids={head.audience === 'kids'}
+              receipts={receiptsConfigured()}
             />
             <p className="hint" style={{ marginTop: 18 }}>
               Нажмите на имя, чтобы снять отметку. Нажмите на строчку про деньги,
-              чтобы выбрать, как занятие оплачено.
+              чтобы выбрать, как занятие оплачено. Рядом с наличными выбирается
+              чек: нажатия перебирают способы, а выписанный чек занятие запирает.
             </p>
           </>
         )}
