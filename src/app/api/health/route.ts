@@ -12,6 +12,10 @@ export const dynamic = 'force-dynamic';
  * переменных в Vercel.
  */
 export async function GET() {
+  // Сколько времени уходит на базу: без этого числа непонятно, тормозит
+  // ли запрос или сама сборка ответа.
+  const started = Date.now();
+  let dbMs = 0;
   let db = false;
   let lastMigration: string | null = null;
   let migrations = 0;
@@ -26,10 +30,12 @@ export async function GET() {
   } catch {
     db = false;
   }
+  dbMs = Date.now() - started;
 
   return Response.json(
     {
       db,
+      dbMs,
       // Какой коммит сейчас на этом деплое. Иначе после пуша непонятно,
       // доехала сборка или отвечает предыдущая.
       commit: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
