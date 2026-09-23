@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { isAdmin, requireUser } from '@/lib/session';
 import {
   PASS_WARN_DAYS, lessonPrice, passBalances, saleOffers, unpaidCharges,
@@ -6,9 +7,13 @@ import {
 import { isConfigured } from '@/lib/payplus';
 import { dayMonth, daysUntil, money, plural, todayISO } from '@/lib/format';
 import { STUDIO_TZ } from '@/lib/time';
-import { lastTestPayment, myPendingCash, paymentHistory, TEST_AMOUNT, verifyPending } from '@/lib/billing';
+import {
+  lastTestPayment, myPendingCash, paymentHistory, TEST_AMOUNT, unfinishedPayments, verifyPending,
+} from '@/lib/billing';
 import DebtPicker from './DebtPicker';
-import { buyPassAction, cancelCashAction, testPaymentAction } from './actions';
+import {
+  buyPassAction, cancelCashAction, dropPaymentAction, testPaymentAction,
+} from './actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,12 +31,14 @@ export default async function PayPage({
   // Всё разом, а не по очереди. Дольше всех обычно проверка зависших
   // платежей: она спрашивает про каждый у PayPlus, по сети. Раньше страница
   // ждала сначала её, потом всё остальное, и складывала одно с другим.
-  const [check, lastTest, claim, history0, unpaid0, passes0, price, offers] = await Promise.all([
+  const [check, lastTest, claim, history0, started0, unpaid0, passes0, price, offers] =
+    await Promise.all([
     // Зависшие платежи доводим до конца сами, не дожидаясь обратного вызова.
     verifyPending(user.id),
     admin ? lastTestPayment(user.id) : Promise.resolve(null),
     myPendingCash(user.id),
     paymentHistory(user.id),
+    unfinishedPayments(user.id),
     unpaidCharges(user.id),
     passBalances(user.id),
     lessonPrice(),
@@ -40,9 +47,12 @@ export default async function PayPage({
 
   // Проверка могла довести платёж до конца: тогда долги и абонементы,
   // прочитанные с ней заодно, уже устарели и их надо взять заново.
-  const [history, unpaid, passes] = check.paid > 0
-    ? await Promise.all([paymentHistory(user.id), unpaidCharges(user.id), passBalances(user.id)])
-    : [history0, unpaid0, passes0];
+  const [history, unpaid, passes, started] = check.paid > 0
+    ? await Promise.all([
+        paymentHistory(user.id), unpaidCharges(user.id), passBalances(user.id),
+        unfinishedPayments(user.id),
+      ])
+    : [history0, unpaid0, passes0, started0];
   // Пакет лагеря живёт рядом с обычным абонементом: показываем оба.
   const mine = passes.filter((p) => p.left > 0);
   const hasStudioPass = mine.some((p) => !p.group_id);
@@ -134,6 +144,32 @@ export default async function PayPage({
                         charges={unpaid} online={online} />
           </>
         )}
+
+        {/* Платёж картой, начатый и брошенный: касса у PayPlus ещё жива,
+            и продолжить можно с того же места. */}
+        {started.map((s) => (
+          <div className="card-lin" key={s.id} style={{ marginTop: 16 }}>
+            <div className="what">Незавершённый платёж</div>
+            <div className="sub">
+              {s.purpose === 'studio_pass'
+                ? (s.group_title ?? 'абонемент')
+                : s.purpose === 'studio_test' ? 'проверочный платёж'
+                : `занятия${s.lessons ? `, ${s.lessons}` : ''}`}
+              {' · '}{money(s.amount, s.currency)}
+            </div>
+            <p className="hint" style={{ marginTop: 10 }}>
+              Страница банка была открыта, но оплата не завершилась. Можно
+              вернуться к ней и доплатить.
+            </p>
+            <div style={{ display: 'flex', gap: 14, alignItems: 'baseline', marginTop: 10 }}>
+              <Link className="btn-quiet" href={`/account/pay/go/${s.id}`}>Продолжить</Link>
+              <form action={dropPaymentAction}>
+                <input type="hidden" name="id" value={s.id} />
+                <button type="submit" className="linky">Отменить</button>
+              </form>
+            </div>
+          </div>
+        ))}
 
         {cash && (
           <div className="note" style={{ marginTop: 16 }}>

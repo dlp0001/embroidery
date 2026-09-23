@@ -600,6 +600,55 @@ export async function declineCash(
   });
 }
 
+export type UnfinishedPayment = {
+  id: string;
+  amount: string;
+  currency: string;
+  purpose: string;
+  created_at: string;
+  group_title: string | null;
+  lessons: number;
+};
+
+/**
+ * Платежи картой, начатые и не доведённые до конца: человек ушёл со
+ * страницы банка или закрыл её. Ссылка на кассу у нас сохранена, так что
+ * такой платёж можно продолжить, а не начинать заново.
+ *
+ * Берём только свежие: страницы оплаты у PayPlus живут недолго.
+ */
+export async function unfinishedPayments(userId: string): Promise<UnfinishedPayment[]> {
+  return query<UnfinishedPayment>(
+    `select id, amount::text, currency, purpose, created_at::text,
+            raw ->> 'group_title' as group_title,
+            coalesce(jsonb_array_length(raw -> 'charge_ids'), 0) as lessons
+       from payments
+      where user_id = $1 and provider = 'payplus' and status = 'pending'
+        and raw ? 'url' and created_at > now() - interval '2 days'
+      order by created_at desc`,
+    [userId],
+  );
+}
+
+/** Родитель отказался от начатого платежа: ссылка на кассу больше не нужна. */
+export async function dropPayment(paymentId: string, userId: string): Promise<void> {
+  await tx(async (c) => {
+    const { rows } = await c.query<{ id: string; amount: string; currency: string }>(
+      `select id, amount::text, currency from payments
+        where id = $1 and user_id = $2 and provider = 'payplus' and status = 'pending'
+        for update`,
+      [paymentId, userId],
+    );
+    const p = rows[0];
+    if (!p) return;
+    await c.query(`update payments set status = 'failed' where id = $1`, [p.id]);
+    await logMoneyIn(c, {
+      kind: 'payment_dropped', actorId: userId, ownerId: userId, paymentId: p.id,
+      amount: p.amount, currency: p.currency, note: 'начатый платёж отменён родителем',
+    });
+  });
+}
+
 /** Заявка родителя, которая ещё ждёт подтверждения. */
 export async function myPendingCash(userId: string): Promise<CashClaim | null> {
   return one<CashClaim>(

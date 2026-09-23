@@ -16,6 +16,7 @@ const KIND: Record<MoneyKind, { text: string; good: boolean }> = {
   pass_issued: { text: 'продан абонемент', good: true },
   pass_covered_debt: { text: 'долг закрыт абонементом', good: true },
   payment_paid: { text: 'оплачено картой', good: true },
+  payment_dropped: { text: 'начатый платёж отменён', good: false },
   cash_declared: { text: 'заявлена оплата наличными или переводом', good: false },
   cash_confirmed: { text: 'оплата подтверждена', good: true },
   cash_declined: { text: 'заявка отклонена', good: false },

@@ -3,7 +3,7 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import {
-  declareCash, declineCash, myPendingCash, startPayment, type Intent,
+  declareCash, declineCash, dropPayment, myPendingCash, startPayment, type Intent,
 } from '@/lib/billing';
 import { isAdmin, requireUser } from '@/lib/session';
 
@@ -58,6 +58,13 @@ export async function cancelCashAction(): Promise<void> {
   const claim = await myPendingCash(user.id);
   // Отменять можно только свою заявку и только пока её не подтвердили.
   if (claim) await declineCash(claim.id, user.id, 'родитель отменил заявку');
+  redirect('/account/pay');
+}
+
+/** Начатый платёж картой, который решили не доводить до конца. */
+export async function dropPaymentAction(form: FormData): Promise<void> {
+  const user = await requireUser();
+  await dropPayment(String(form.get('id') ?? ''), user.id);
   redirect('/account/pay');
 }
 
