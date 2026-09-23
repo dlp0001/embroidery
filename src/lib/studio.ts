@@ -1480,6 +1480,8 @@ export type SaleOffer = {
   months: number;
   /** Последний день у пакета группы; у абонемента считается от покупки. */
   validTo: string | null;
+  /** Цена одного дня в этой смене: нужна, чтобы объяснить, за что платят. */
+  dayPrice: number | null;
 };
 
 /**
@@ -1490,8 +1492,11 @@ export type SaleOffer = {
 export async function saleOffers(): Promise<SaleOffer[]> {
   const [types, groups] = await Promise.all([
     passTypes(),
-    query<{ id: string; title: string; kind: GroupKind; pass_offers: PassOffer[] | null; ends_on: string | null }>(
-      `select g.id, g.title, g.kind, g.pass_offers, g.ends_on::text
+    query<{
+      id: string; title: string; kind: GroupKind; pass_offers: PassOffer[] | null;
+      ends_on: string | null; price: string | null;
+    }>(
+      `select g.id, g.title, g.kind, g.pass_offers, g.ends_on::text, g.price::text
          from studio_groups g
         where g.active and g.kind <> 'lesson' and g.pass_offers is not null
           and (g.ends_on is null or g.ends_on >= current_date)
@@ -1501,13 +1506,14 @@ export async function saleOffers(): Promise<SaleOffer[]> {
 
   const studio: SaleOffer[] = types.map((t) => ({
     groupId: null, groupTitle: null, kind: 'lesson' as const,
-    lessons: t.lessons, price: t.price, months: t.months, validTo: null,
+    lessons: t.lessons, price: t.price, months: t.months, validTo: null, dayPrice: null,
   }));
 
   const packs: SaleOffer[] = groups.flatMap((g) =>
     (g.pass_offers ?? []).map((o) => ({
       groupId: g.id, groupTitle: g.title, kind: g.kind,
       lessons: o.lessons, price: o.price, months: 0, validTo: g.ends_on,
+      dayPrice: g.price === null ? null : Number(g.price),
     })),
   );
 

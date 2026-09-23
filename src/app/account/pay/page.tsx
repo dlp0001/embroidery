@@ -57,6 +57,8 @@ export default async function PayPage({
   const mine = passes.filter((p) => p.left > 0);
   const hasStudioPass = mine.some((p) => !p.group_id);
   const packs = offers.filter((o) => !o.groupId);
+  // Цена дня ближайшей смены: нужна, чтобы объяснить, что ещё тут бывает.
+  const campDay = offers.find((o) => o.groupId && o.dayPrice !== null)?.dayPrice ?? null;
   const events = [...new Map(
     offers.filter((o) => o.groupId).map((o) => [o.groupId!, o]),
   ).keys()].map((gid) => ({
@@ -116,10 +118,12 @@ export default async function PayPage({
             а не за новым абонементом. */}
         {unpaid.length === 0 ? (
           <>
-            <div className="lbl day-band" style={{ marginTop: 0 }}>Задолженность</div>
+            <div className="lbl day-band" style={{ marginTop: 0 }}>Статус оплаты</div>
             <p className="hint">
-              Сейчас всё оплачено. Занятия, которые не покроет абонемент, появятся
-              здесь. Одно занятие стоит {money(price.amount, price.currency)}.
+              Сейчас всё оплачено. Здесь появятся занятия, которые не покрыл
+              абонемент{campDay === null ? '' : ', и дни лагеря, не покрытые пакетом'}.
+              Занятие стоит {money(price.amount, price.currency)}
+              {campDay === null ? '' : `, день лагеря — ${money(campDay, price.currency)}`}.
             </p>
           </>
         ) : (
@@ -130,7 +134,7 @@ export default async function PayPage({
               display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
               gap: 12, marginTop: 0,
             }}>
-              <span>Задолженность</span>
+              <span>Статус оплаты</span>
               <span className="sum" style={{
                 fontSize: 21, letterSpacing: 'normal', textTransform: 'none',
               }}>
@@ -208,6 +212,10 @@ export default async function PayPage({
           </>
         )}
 
+        <div className="lbl">
+          Покупка нового абонемента{events.length > 0 ? ' или пакета' : ''}
+        </div>
+
         {/* Пакет лагеря — отдельная покупка, не «ещё один абонемент».
             Поэтому он живёт в своей рамке, а не в общем списке. */}
         {events.map((e) => (
@@ -249,8 +257,12 @@ export default async function PayPage({
           </div>
         ))}
 
-        <div className="lbl">{hasStudioPass ? 'Продлить абонемент' : 'Абонемент'}</div>
-        <p className="hint" style={{ marginBottom: 16 }}>
+        {/* Подзаголовок нужен, только когда рядом есть пакет смены:
+            иначе он повторяет то, что уже сказано строкой выше. */}
+        {events.length > 0 && (
+          <div className="lbl">{hasStudioPass ? 'Продлить абонемент' : 'Абонемент студии'}</div>
+        )}
+        <p className="hint" style={{ marginBottom: 16, marginTop: events.length > 0 ? 0 : 14 }}>
           Пакет занятий общий на всю семью: тратится и на детей, и на взрослого.
           Пока он действует, его можно использовать для оплаты любого занятия.
         </p>
