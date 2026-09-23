@@ -1,7 +1,8 @@
 import { redirect } from 'next/navigation';
-import { currentUser, isAdmin } from '@/lib/session';
-import { mergeCandidates, type MergeCandidate } from '@/lib/studio';
+import { currentUser, isAdmin, isSuperadmin } from '@/lib/session';
+import { cabinetOwners, mergeCandidates, type MergeCandidate } from '@/lib/studio';
 import { mergeChildAction } from '@/app/admin/people-actions';
+import { viewAsAction } from '@/app/admin/view-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,11 @@ export default async function AdminToolsPage({
   if (!user || !isAdmin(user)) redirect('/admin/studio');
 
   const { note, error } = await searchParams;
-  const kids = await mergeCandidates();
+  const looker = isSuperadmin(user);
+  const [kids, owners] = await Promise.all([
+    mergeCandidates(),
+    looker ? cabinetOwners() : [],
+  ]);
 
   return (
     <>
@@ -76,6 +81,37 @@ export default async function AdminToolsPage({
             </form>
           )}
         </div>
+
+        {looker && (
+          <div className="card" style={{ marginTop: 16 }}>
+            <div className="what" style={{ marginBottom: 6 }}>Посмотреть кабинет родителя</div>
+            <p className="hint" style={{ marginBottom: 16 }}>
+              Открывает кабинет чужими глазами: те же занятия, долги и кнопки,
+              что видит человек. Только смотреть — записать, оплатить или
+              переименовать оттуда нельзя. Наверху будет полоса с возвратом
+              к себе.
+            </p>
+
+            {owners.length === 0 ? (
+              <p className="hint">Кабинетов пока ни у кого нет.</p>
+            ) : (
+              <form action={viewAsAction}
+                    style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label htmlFor="view-as">Чей кабинет</label>
+                  <select id="view-as" name="userId" defaultValue="" required>
+                    <option value="" disabled>— выберите человека —</option>
+                    {owners.map((o) => (
+                      <option key={o.id} value={o.id}>{o.name ?? o.email}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button className="btn-wide" type="submit">Посмотреть</button>
+              </form>
+            )}
+          </div>
+        )}
       </div>
     </>
   );

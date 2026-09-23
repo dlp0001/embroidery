@@ -1351,6 +1351,22 @@ export async function resyncGroupSessions(groupId: string, weeksAhead = 6): Prom
 
 // ── Абонементы ────────────────────────────────────────────
 
+export type CabinetOwner = { id: string; name: string | null; email: string };
+
+/**
+ * Все, у кого есть свой кабинет: родители и взрослые ученики. Нужен,
+ * чтобы суперадмин мог открыть кабинет глазами конкретного человека.
+ */
+export async function cabinetOwners(): Promise<CabinetOwner[]> {
+  return query<CabinetOwner>(
+    `select u.id, u.name, u.email
+       from users u
+      where exists (select 1 from guardians g where g.user_id = u.id)
+         or exists (select 1 from user_roles r where r.user_id = u.id and r.role in ('parent', 'student'))
+      order by coalesce(u.name, u.email)`,
+  );
+}
+
 export type PassOwner = { id: string; name: string | null; email: string; active_left: number };
 
 /** Взрослые, кому можно продать абонемент: родители и взрослые ученики. */

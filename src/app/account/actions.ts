@@ -5,11 +5,14 @@ import { redirect } from 'next/navigation';
 import type { SaveResult } from '@/components/AutoSave';
 import { one } from '@/lib/db';
 import { telegramNick } from '@/lib/format';
-import { requireUser } from '@/lib/session';
+import { onlyLooking, requireUser } from '@/lib/session';
 import { linkUrl, unlinkUser } from '@/lib/telegram';
 import {
   addChild, renameChild, saveProfile, sessionIsPast, setAttends, setBooking, setPreferredDay,
 } from '@/lib/studio';
+
+/** Чужой кабинет открыт на просмотр: менять в нём нельзя. */
+const LOOKING: SaveResult = { ok: false, error: 'Это чужой кабинет: отсюда только смотрят.' };
 
 /** Участник принадлежит семье вошедшего? */
 async function assertOwn(userId: string, participantId: string): Promise<void> {
@@ -31,6 +34,7 @@ function refresh(): void {
 }
 
 export async function toggleBooking(formData: FormData): Promise<void> {
+  if (await onlyLooking()) return;
   const user = await requireUser();
   const sessionId = String(formData.get('sessionId'));
   const participantId = String(formData.get('participantId'));
@@ -48,6 +52,7 @@ export async function toggleBooking(formData: FormData): Promise<void> {
 }
 
 export async function togglePreferredDay(formData: FormData): Promise<void> {
+  if (await onlyLooking()) return;
   const user = await requireUser();
   const participantId = String(formData.get('participantId'));
   const weekday = Number(formData.get('weekday'));
@@ -59,6 +64,7 @@ export async function togglePreferredDay(formData: FormData): Promise<void> {
 }
 
 export async function createChild(formData: FormData): Promise<void> {
+  if (await onlyLooking()) return;
   const user = await requireUser();
   const name = String(formData.get('name') ?? '').trim().slice(0, 120);
   if (!name) return;
@@ -68,6 +74,7 @@ export async function createChild(formData: FormData): Promise<void> {
 
 /** Ходит ли взрослый на занятия сам. Пока не сказал — считаем, что нет. */
 export async function setMyAttendance(formData: FormData): Promise<void> {
+  if (await onlyLooking()) return;
   const user = await requireUser();
   await setAttends(user.id, String(formData.get('on')) === '1');
   refresh();
@@ -82,6 +89,7 @@ export async function setMyAttendance(formData: FormData): Promise<void> {
  * и ошибку надо показать прямо под полем, никуда человека не уводя.
  */
 export async function updateMyProfile(formData: FormData): Promise<SaveResult> {
+  if (await onlyLooking()) return LOOKING;
   const user = await requireUser();
   const name = String(formData.get('name') ?? '').trim().slice(0, 120);
   const tg = telegramNick(String(formData.get('telegram') ?? '').slice(0, 80));
@@ -97,6 +105,7 @@ export async function updateMyProfile(formData: FormData): Promise<SaveResult> {
 }
 
 export async function updateChild(formData: FormData): Promise<SaveResult> {
+  if (await onlyLooking()) return LOOKING;
   const user = await requireUser();
   const childId = String(formData.get('childId'));
   const name = String(formData.get('name') ?? '').trim().slice(0, 120);
@@ -113,6 +122,8 @@ export async function updateChild(formData: FormData): Promise<SaveResult> {
  * руками, незачем.
  */
 export async function connectTelegram(): Promise<void> {
+  // Из чужого кабинета бот привязался бы к чужому человеку.
+  if (await onlyLooking()) return;
   const user = await requireUser();
   const url = await linkUrl(user.id);
   if (!url) redirect('/account/profile?tg=off');
@@ -121,6 +132,7 @@ export async function connectTelegram(): Promise<void> {
 
 /** Отключение. Чат забываем, история занятий и оплат этим не трогается. */
 export async function disconnectTelegram(): Promise<void> {
+  if (await onlyLooking()) return;
   const user = await requireUser();
   await unlinkUser(user.id);
   refresh();

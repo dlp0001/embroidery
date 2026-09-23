@@ -5,6 +5,8 @@ import { redirect } from 'next/navigation';
 import { one, query } from './db';
 
 const COOKIE = 'rc_session';
+/** Чей кабинет суперадмин сейчас разглядывает. */
+const AS_COOKIE = 'rc_as';
 const DAYS = 30;
 
 export type Role = 'parent' | 'student' | 'teacher' | 'admin' | 'superadmin';
@@ -44,6 +46,7 @@ export async function destroySession(): Promise<void> {
   const token = store.get(COOKIE)?.value;
   if (token) await query('delete from sessions where token_hash = $1', [hash(token)]);
   store.delete(COOKIE);
+  store.delete(AS_COOKIE);
 }
 
 /**
@@ -51,7 +54,8 @@ export async function destroySession(): Promise<void> {
  * разу, а до базы за один рендер ходим один раз. При латентности до Neon
  * это не мелочь: лишний поход стоит дороже, чем весь запрос.
  */
-export const currentUser = cache(async (): Promise<CurrentUser | null> => {
+/** Кто вошёл на самом деле. Подмена кабинета это не меняет. */
+export const realUser = cache(async (): Promise<CurrentUser | null> => {
   const store = await cookies();
   const token = store.get(COOKIE)?.value;
   if (!token) return null;
@@ -74,6 +78,72 @@ export const currentUser = cache(async (): Promise<CurrentUser | null> => {
     telegram: row.telegram, roles: row.roles ?? [],
   };
 });
+
+/**
+ * Чей кабинет показываем вместо своего. Работает, только если настоящая
+ * сессия принадлежит суперадмину: подделанная кука сама по себе не даёт
+ * ничего, поэтому подписывать её незачем.
+ */
+export const actingAs = cache(async (): Promise<CurrentUser | null> => {
+  const store = await cookies();
+  const id = store.get(AS_COOKIE)?.value;
+  if (!id) return null;
+
+  const real = await realUser();
+  if (!real || !isSuperadmin(real)) return null;
+  if (id === real.id) return null;
+
+  const row = await one<{
+    id: string; email: string; name: string | null; telegram: string | null; roles: Role[] | null;
+  }>(
+    `select u.id, u.email, u.name, u.telegram,
+            array_remove(array_agg(r.role), null) as roles
+       from users u
+       left join user_roles r on r.user_id = u.id
+      where u.id = $1
+      group by u.id`,
+    [id],
+  );
+  if (!row) return null;
+  return {
+    id: row.id, email: row.email, name: row.name,
+    telegram: row.telegram, roles: row.roles ?? [],
+  };
+});
+
+/**
+ * Кто смотрит страницу. Обычно это вошедший, но суперадмин может
+ * разглядывать чужой кабинет — тогда всё собирается так, будто вошёл тот
+ * человек. Менять при этом ничего нельзя: действия отказывают.
+ */
+export const currentUser = cache(async (): Promise<CurrentUser | null> => {
+  return (await actingAs()) ?? (await realUser());
+});
+
+/** Чужой кабинет — только для чтения. true значит «трогать нельзя». */
+export async function onlyLooking(): Promise<boolean> {
+  return (await actingAs()) !== null;
+}
+
+/** Начать и закончить просмотр чужого кабинета. */
+export async function startActing(userId: string): Promise<void> {
+  const real = await realUser();
+  if (!real || !isSuperadmin(real)) return;
+  const store = await cookies();
+  store.set(AS_COOKIE, userId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    // Живёт до конца дня работы: забытая подмена хуже, чем лишний заход.
+    maxAge: 60 * 60 * 8,
+  });
+}
+
+export async function stopActing(): Promise<void> {
+  const store = await cookies();
+  store.delete(AS_COOKIE);
+}
 
 /**
  * Страница и layout рендерятся параллельно, поэтому проверка в layout

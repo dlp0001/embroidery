@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation';
 import Tabs, { type Tab } from '@/components/Tabs';
 import SignOut from '@/components/SignOut';
 import NotConfigured from '@/components/NotConfigured';
-import { canTeach, currentUser } from '@/lib/session';
+import { actingAs, canTeach, currentUser } from '@/lib/session';
+import { stopViewAction } from '@/app/admin/view-actions';
 
 const TABS: Tab[] = [
   { href: '/account', icon: 'week', label: 'Неделя' },
@@ -16,13 +17,40 @@ export default async function AccountLayout({ children }: { children: React.Reac
   if (!process.env.DATABASE_URL) return <NotConfigured />;
   const user = await currentUser();
   if (!user) redirect('/login');
+  // Суперадмин смотрит чужой кабинет: подписываем, чей он, и оставляем
+  // дорогу назад. Без полосы легко решить, что это твои долги и дети.
+  const peek = await actingAs();
   return (
     <div className="app">
+      {peek && (
+        <div className="peek">
+          <span>
+            Кабинет: <b style={{ color: 'var(--charcoal)' }}>{peek.name ?? peek.email}</b>
+            {' · '}только смотрите, менять ничего нельзя
+          </span>
+          <form action={stopViewAction}>
+            <button className="linky" type="submit">Вернуться к себе</button>
+          </form>
+        </div>
+      )}
       {children}
-      <SignOut
-        email={user.email}
-        cross={canTeach(user) ? { href: '/admin/studio', label: 'Журнал преподавателя' } : undefined}
-      />
+      {/* В чужом кабинете «Выйти» значило бы «выйти совсем»: вместо него
+          второй выход из просмотра, внизу страницы, где его и ищут. */}
+      {peek ? (
+        <div style={{ padding: '18px 20px 24px' }}>
+          <form action={stopViewAction}>
+            <button className="btn-quiet" type="submit"
+                    style={{ width: '100%', justifyContent: 'center' }}>
+              Вернуться в свой кабинет
+            </button>
+          </form>
+        </div>
+      ) : (
+        <SignOut
+          email={user.email}
+          cross={canTeach(user) ? { href: '/admin/studio', label: 'Журнал преподавателя' } : undefined}
+        />
+      )}
       <Tabs tabs={TABS} />
     </div>
   );

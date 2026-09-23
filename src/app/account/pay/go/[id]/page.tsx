@@ -1,7 +1,7 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { checkoutUrl } from '@/lib/billing';
-import { requireUser } from '@/lib/session';
+import { onlyLooking, requireUser } from '@/lib/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,6 +11,8 @@ export const dynamic = 'force-dynamic';
  */
 export default async function GoPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // Касса — уже не «посмотреть»: из чужого кабинета туда не пускаем.
+  if (await onlyLooking()) redirect('/account/pay');
   const user = await requireUser();
   const url = await checkoutUrl(id, user.id);
   if (!url) notFound();

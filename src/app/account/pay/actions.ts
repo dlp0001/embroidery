@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import {
   declareCash, declineCash, dropPayment, myPendingCash, startPayment, type Intent,
 } from '@/lib/billing';
-import { isAdmin, requireUser } from '@/lib/session';
+import { isAdmin, onlyLooking, requireUser } from '@/lib/session';
 
 /** Адрес сайта берём из запроса, чтобы совпадал и на превью, и на проде. */
 async function origin(): Promise<string> {
@@ -30,6 +30,7 @@ function pickedCharges(form: FormData): string[] {
 }
 
 export async function payDebtAction(form: FormData): Promise<void> {
+  if (await onlyLooking()) return;
   await go({ kind: 'debt', chargeIds: pickedCharges(form) });
 }
 
@@ -42,10 +43,12 @@ async function declare(form: FormData, way: 'cash' | 'transfer'): Promise<never>
 }
 
 export async function declareCashAction(form: FormData): Promise<void> {
+  if (await onlyLooking()) return;
   await declare(form, 'cash');
 }
 
 export async function declareTransferAction(form: FormData): Promise<void> {
+  if (await onlyLooking()) return;
   await declare(form, 'transfer');
 }
 
@@ -54,6 +57,7 @@ export async function declareTransferAction(form: FormData): Promise<void> {
  * неоплаченными и их можно выбрать заново.
  */
 export async function cancelCashAction(): Promise<void> {
+  if (await onlyLooking()) return;
   const user = await requireUser();
   const claim = await myPendingCash(user.id);
   // Отменять можно только свою заявку и только пока её не подтвердили.
@@ -63,6 +67,7 @@ export async function cancelCashAction(): Promise<void> {
 
 /** Начатый платёж картой, который решили не доводить до конца. */
 export async function dropPaymentAction(form: FormData): Promise<void> {
+  if (await onlyLooking()) return;
   const user = await requireUser();
   await dropPayment(String(form.get('id') ?? ''), user.id);
   redirect('/account/pay');
@@ -70,12 +75,14 @@ export async function dropPaymentAction(form: FormData): Promise<void> {
 
 /** Проверочный платёж на маленькую сумму. Только для админа. */
 export async function testPaymentAction(): Promise<void> {
+  if (await onlyLooking()) return;
   const user = await requireUser();
   if (!isAdmin(user)) redirect('/account/pay');
   await go({ kind: 'test' });
 }
 
 export async function buyPassAction(form: FormData): Promise<void> {
+  if (await onlyLooking()) return;
   // Один ключ «id группы:дней»: пакет лагеря не перепутать с абонементом.
   const [groupId, lessonsKey] = String(form.get('offer') ?? '').split(':');
   const lessons = Number(lessonsKey);
