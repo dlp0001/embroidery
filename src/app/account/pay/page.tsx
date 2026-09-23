@@ -116,25 +116,24 @@ export default async function PayPage({
 
         {/* Долг — первым: за «Оплатой» чаще всего идут именно из-за него,
             а не за новым абонементом. */}
+        <div className="lbl day-band" style={{ marginTop: 0 }}>Статус оплаты</div>
+
         {unpaid.length === 0 ? (
-          <>
-            <div className="lbl day-band" style={{ marginTop: 0 }}>Статус оплаты</div>
-            <p className="hint">
-              Сейчас всё оплачено. Здесь появятся занятия, которые не покрыл
-              абонемент{campDay === null ? '' : ', и дни лагеря, не покрытые пакетом'}.
-              Занятие стоит {money(price.amount, price.currency)}
-              {campDay === null ? '' : `, день лагеря — ${money(campDay, price.currency)}`}.
-            </p>
-          </>
+          <p className="hint">
+            Сейчас всё оплачено. Здесь появятся занятия, которые не покрыл
+            абонемент{campDay === null ? '' : ', и дни лагеря, не покрытые пакетом'}.
+            Занятие стоит {money(price.amount, price.currency)}
+            {campDay === null ? '' : `, день лагеря — ${money(campDay, price.currency)}`}.
+          </p>
         ) : (
           <>
-            {/* Сумма стоит внутри полосы, а не рядом: иначе полоса
-                обрывается на полуслове, а сумма висит сама по себе. */}
-            <div className="lbl day-band" style={{
+            {/* Сумма стоит в одной строке с заголовком долга: так видно,
+                сколько всего, не считая занятия глазами. */}
+            <div className="lbl" style={{
               display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
               gap: 12, marginTop: 0,
             }}>
-              <span>Статус оплаты</span>
+              <span>Задолженность</span>
               <span className="sum" style={{
                 fontSize: 21, letterSpacing: 'normal', textTransform: 'none',
               }}>
