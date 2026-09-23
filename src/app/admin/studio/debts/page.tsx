@@ -3,7 +3,7 @@ import {
   PASS_WARN_DAYS, allActivePasses, debtors, lessonPrice, passOwners, saleOffers,
   unbilledVisits,
 } from '@/lib/studio';
-import { pendingCash } from '@/lib/billing';
+import { pendingCash, WAY } from '@/lib/billing';
 import { isConfigured as receiptsConfigured } from '@/lib/icount';
 import { dayMonth, daysUntil, money, plural, todayISO } from '@/lib/format';
 import Link from 'next/link';
@@ -80,7 +80,10 @@ export default async function DebtsPage() {
               <div className="card-lin" key={cl.id}>
                 <div className="what">{cl.owner_name ?? cl.owner_email}</div>
                 <div className="sub">
-                  наличными или переводом за {cl.lessons}&nbsp;
+                  {/* Пишем то, что сказал родитель. У старых заявок способа
+                      нет: они были до того, как о нём стали спрашивать. */}
+                  {cl.declared_way ? WAY[cl.declared_way] : 'наличными или переводом'} за{' '}
+                  {cl.lessons}&nbsp;
                   {plural(cl.lessons, 'занятие', 'занятия', 'занятий')} ·{' '}
                   {money(cl.amount, cl.currency)}
                 </div>
@@ -91,8 +94,16 @@ export default async function DebtsPage() {
 
                   <div className="field" style={{ marginBottom: 14, maxWidth: 260 }}>
                     <label htmlFor={`how-${cl.id}`}>Чем заплатили</label>
-                    <select id={`how-${cl.id}`} name="payMethod" defaultValue="cash">
+                    {/* «Перевод» у родителя значит и биток, и пейбокс, и
+                        банковский перевод, а в чеке это три разные вещи.
+                        Поэтому не подставляем ничего: Варя видит, куда
+                        деньги пришли, и говорит это сама. Наличные другое
+                        дело — их она берёт в руки. */}
+                    <select id={`how-${cl.id}`} name="payMethod" required
+                            defaultValue={cl.declared_way === 'transfer' ? '' : 'cash'}>
+                      <option value="" disabled>— чем именно —</option>
                       <option value="cash">наличными</option>
+                      <option value="transfer">банковским переводом</option>
                       <option value="bit">Bit</option>
                       <option value="paybox">PayBox</option>
                     </select>

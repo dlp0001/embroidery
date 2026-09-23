@@ -46,6 +46,7 @@ function about(r: VisitRow): string {
     : r.pay_method === 'bit' ? 'битом'
     : r.pay_method === 'paybox' ? 'пейбоксом'
     : r.pay_method === 'cash' ? 'наличными'
+    : r.pay_method === 'transfer' ? 'переводом'
     : 'наличными или переводом';
   return r.paid_at ? `${way} · ${shortDate(r.paid_at.slice(0, 10))}` : way;
 }

@@ -74,7 +74,7 @@ async function call<T>(method: string, body: Record<string, unknown>): Promise<T
  * приложение. Приложение налоговая просит указывать отдельно от наличных,
  * поэтому Bit и PayBox идут своим блоком, а не как деньги в кассу.
  */
-export type Method = 'cc' | 'cash' | 'app';
+export type Method = 'cc' | 'cash' | 'app' | 'transfer';
 
 /** Какое именно приложение. Значения — коды iCount, не наши выдумки. */
 export type PayApp = 'bit' | 'paybox';
@@ -112,6 +112,11 @@ export type ReceiptInput = {
   card?: Card | null;
   /** Только для method: 'app'. */
   app?: PayApp | null;
+  /**
+   * Только для method: 'transfer'. Банковский перевод iCount принимает
+   * своим блоком и требует, на какой счёт компании деньги пришли.
+   */
+  transfer?: { account: number; date: string } | null;
 };
 
 export type Receipt = { docnum: number | null; url: string | null };
@@ -150,6 +155,14 @@ export async function createReceipt(input: ReceiptInput): Promise<Receipt> {
         ? {
             payments: {
               [APP_METHOD]: { sum: input.amount, card_brand: input.app ?? 'bit' },
+            },
+          }
+      : input.method === 'transfer' && input.transfer
+        ? {
+            banktransfer: {
+              sum: input.amount,
+              date: input.transfer.date,
+              account: input.transfer.account,
             },
           }
         : { cash: { sum: input.amount } }),

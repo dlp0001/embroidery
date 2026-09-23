@@ -51,6 +51,8 @@ export async function GET() {
       payplusEnv: process.env.PAYPLUS_ENV === 'prod' ? 'prod' : 'test',
       icount: icountReady(),
       icountDoctype: doctype(),
+      // Без номера счёта перевод в квитанцию не оформить.
+      icountBank: Boolean(process.env.ICOUNT_BANK_ACCOUNT),
       sheets: Boolean(process.env.GOOGLE_SERVICE_ACCOUNT && process.env.GOOGLE_SHEET_ID),
       bunny: Boolean(process.env.BUNNY_TOKEN_KEY),
     },

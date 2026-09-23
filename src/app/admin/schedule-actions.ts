@@ -224,16 +224,16 @@ export async function issuePassAction(form: FormData): Promise<void> {
   revalidatePath('/account/pay');
 }
 
-const HOW = ['cash', 'bit', 'paybox'] as const;
+const HOW = ['cash', 'transfer', 'bit', 'paybox'] as const;
 
 export async function confirmCashAction(form: FormData): Promise<void> {
   const user = await requireAdmin();
-  const raw = String(form.get('payMethod') ?? 'cash');
-  const method = (HOW as readonly string[]).includes(raw)
-    ? (raw as (typeof HOW)[number])
-    : 'cash';
+  const raw = String(form.get('payMethod') ?? '');
+  // Способ должен быть назван: от него зависит, каким блоком уйдёт чек.
+  // Молча считать наличными нельзя — деньги могли прийти в банк.
+  if (!(HOW as readonly string[]).includes(raw)) return;
   await confirmCash(String(form.get('paymentId')), user.id, {
-    method,
+    method: raw as (typeof HOW)[number],
     receipt: form.get('receipt') === 'on',
   });
   revalidatePath('/admin/studio/debts');

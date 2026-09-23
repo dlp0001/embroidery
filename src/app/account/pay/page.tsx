@@ -9,6 +9,7 @@ import { dayMonth, daysUntil, money, plural, todayISO } from '@/lib/format';
 import { STUDIO_TZ } from '@/lib/time';
 import {
   lastTestPayment, myPendingCash, paymentHistory, TEST_AMOUNT, unfinishedPayments, verifyPending,
+  WAY,
 } from '@/lib/billing';
 import DebtPicker from './DebtPicker';
 import {
@@ -322,7 +323,9 @@ export default async function PayPage({
                   ? (h.group_title ?? 'абонемент')
                 : h.purpose === 'studio_test' ? 'проверочный платёж'
                 : `занятия${h.lessons ? `, ${h.lessons}` : ''}`;
-              const how = h.provider === 'cash' ? 'наличными или переводом' : 'картой';
+              const how = h.provider !== 'cash' ? 'картой'
+                : h.pay_method ? WAY[h.pay_method]
+                : 'наличными или переводом';
               const state = h.status === 'paid'
                 ? (h.provider === 'cash' ? 'получены' : 'проведён')
                 : h.status === 'pending' ? 'ждёт подтверждения'

@@ -1,5 +1,5 @@
 import { one, query, tx } from './db';
-import { plural } from './format';
+import { plural, todayISO } from './format';
 import {
   ALREADY_ISSUED, createReceipt, ICountError,
   isConfigured as receiptsConfigured,
@@ -269,7 +269,18 @@ function receiptMethod(p: ToBill): { method: Method; app: PayApp | null } {
   if (p.provider !== 'cash') return { method: 'cc', app: null };
   const how = p.raw?.pay_method;
   if (how === 'bit' || how === 'paybox') return { method: 'app', app: how };
+  if (how === 'transfer') return { method: 'transfer', app: null };
   return { method: 'cash', app: null };
+}
+
+/**
+ * На какой счёт компании пришёл перевод. iCount без этого номера
+ * банковский перевод не примет, а списать его на кассу нельзя: деньги
+ * лежат в банке, и в отчётности это разные места.
+ */
+function transferAccount(): number | null {
+  const raw = Number(process.env.ICOUNT_BANK_ACCOUNT ?? '');
+  return Number.isInteger(raw) && raw > 0 ? raw : null;
 }
 
 /**
@@ -349,6 +360,16 @@ export async function issueReceipt(paymentId: string, card?: Card | null): Promi
   const p = await one<ToBill>(`${UNBILLED} and p.id = $1`, [paymentId]);
   if (!p) return;
 
+  const way = receiptMethod(p);
+  const account = way.method === 'transfer' ? transferAccount() : null;
+  if (way.method === 'transfer' && account === null) {
+    // Лучше не выписать бумагу, чем выписать неверную: перевод, поданный
+    // как наличные, расходится с банковской выпиской.
+    console.error(
+      'icount: перевод не оформить, не задан ICOUNT_BANK_ACCOUNT. Платёж', p.id);
+    return;
+  }
+
   try {
     const doc = await createReceipt({
       paymentId: p.id,
@@ -360,7 +381,8 @@ export async function issueReceipt(paymentId: string, card?: Card | null): Promi
       items: await receiptItems(p),
       amount: Number(p.amount),
       currency: p.currency,
-      ...receiptMethod(p),
+      ...way,
+      transfer: account === null ? null : { account, date: todayISO() },
       card,
     });
     await query(
@@ -507,7 +529,7 @@ export async function declareCash(
     await logMoneyIn(c, {
       kind: 'cash_declared', actorId: user.id, ownerId: user.id,
       paymentId: rows[0].id, amount, currency,
-      note: `родитель заявил оплату наличными или переводом за ${debts.length} ${plural(debts.length, 'занятие', 'занятия', 'занятий')}`,
+      note: `родитель заявил оплату ${WAY[way]} за ${debts.length} ${plural(debts.length, 'занятие', 'занятия', 'занятий')}`,
       details: { charge_ids: debts.map((d) => d.id) },
     });
   });
@@ -529,9 +551,14 @@ export async function pendingCash(): Promise<CashClaim[]> {
   );
 }
 
+/** Как способ оплаты называется словами: одинаково в реестре и на экранах. */
+export const WAY: Record<'cash' | 'transfer' | 'bit' | 'paybox', string> = {
+  cash: 'наличными', transfer: 'переводом', bit: 'Bit', paybox: 'PayBox',
+};
+
 /** Студия подтверждает получение денег: занятия закрываются. */
 /** Чем родитель на самом деле отдал деньги и нужна ли ему квитанция. */
-export type CashDetails = { method: 'cash' | 'bit' | 'paybox'; receipt: boolean };
+export type CashDetails = { method: 'cash' | 'transfer' | 'bit' | 'paybox'; receipt: boolean };
 
 export async function confirmCash(
   paymentId: string, actorId: string, how: CashDetails,
@@ -570,8 +597,7 @@ export async function confirmCash(
       kind: 'cash_confirmed', actorId, ownerId: p.user_id, paymentId: p.id,
       amount: p.amount, currency: p.currency,
       note: `подтверждено получение денег за ${ids.length} ${
-        plural(ids.length, 'занятие', 'занятия', 'занятий')}${
-        how.method === 'cash' ? '' : `, ${how.method === 'bit' ? 'Bit' : 'PayBox'}`}`,
+        plural(ids.length, 'занятие', 'занятия', 'занятий')}, ${WAY[how.method]}`,
       details: { pay_method: how.method, receipt: how.receipt },
     });
   });
@@ -675,6 +701,8 @@ export type PaymentRow = {
   currency: string;
   lessons: number;
   invoice_url: string | null;
+  /** Чем отдали деньги напрямую: наличными, переводом, битом, пейбоксом. */
+  pay_method: 'cash' | 'transfer' | 'bit' | 'paybox' | null;
   /** Пакет лагеря: в истории он зовётся своим именем, а не абонементом. */
   group_title: string | null;
 };
@@ -684,6 +712,7 @@ export async function paymentHistory(userId: string): Promise<PaymentRow[]> {
   return query<PaymentRow>(
     `select p.id, p.created_at::text as at, p.provider, p.status, p.purpose,
             p.amount::text, p.currency, p.invoice_url,
+            p.raw ->> 'pay_method' as pay_method,
             (select g.title from passes ps
                join studio_groups g on g.id = ps.group_id
               where ps.payment_id = p.id) as group_title,
