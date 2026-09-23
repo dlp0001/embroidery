@@ -32,10 +32,23 @@ export type MonthStats = {
  * Реализация: занятия, которые прошли в этом месяце, и сколько они стоят.
  * Разовое стоит столько, сколько за него начислено. Занятие по абонементу
  * — свою долю от цены абонемента: восьмёрка за 680 даёт 85 за занятие,
- * а не сотню.
+ * а не сотню. День лагеря считается так же, но от своей цены и своего
+ * пакета, поэтому лежит отдельной строкой: смешивать сотню с тремястами
+ * тридцатью значит не понимать ни одной цифры.
  */
 export type DoneRow = { count: number; sum: number };
-export type Done = { single: DoneRow; pass: DoneRow; total: DoneRow; average: number };
+export type Done = {
+  /** Обычные занятия, оплаченные поштучно. */
+  single: DoneRow;
+  /** Обычные занятия, списанные с абонемента. */
+  pass: DoneRow;
+  /** Дни лагеря и мастер-классов, оплаченные поштучно. */
+  event: DoneRow;
+  /** Дни лагеря, списанные с пакета. */
+  eventPass: DoneRow;
+  total: DoneRow;
+  average: number;
+};
 
 type LessonAgg = {
   cash_n: number; cash_sum: string;
@@ -85,13 +98,14 @@ export async function monthStats(month: string): Promise<MonthStats> {
 
   // Реализация считается по занятиям месяца, а не по платежам.
   const delivered = await query<{
-    pass_id: string | null; amount: string;
+    pass_id: string | null; amount: string; kind: string;
     lessons_total: number | null; pass_paid: string | null;
   }>(
-    `select ch.pass_id, ch.amount::text, ps.lessons_total,
+    `select ch.pass_id, ch.amount::text, g.kind, ps.lessons_total,
             coalesce(pay.amount, ${OFFER_PRICE})::text as pass_paid
        from charges ch
        join studio_sessions s on s.id = ch.session_id
+       join studio_groups g on g.id = s.group_id
        left join passes ps on ps.id = ch.pass_id
        left join payments pay on pay.id = ps.payment_id
       where s.held_on >= $1::date and s.held_on < ($1::date + interval '1 month')`,
@@ -131,22 +145,30 @@ export async function monthStats(month: string): Promise<MonthStats> {
 
   const single: DoneRow = { count: 0, sum: 0 };
   const onPass: DoneRow = { count: 0, sum: 0 };
+  const event: DoneRow = { count: 0, sum: 0 };
+  const onEventPass: DoneRow = { count: 0, sum: 0 };
+
   for (const d of delivered) {
+    const camp = d.kind !== 'lesson';
     if (!d.pass_id) {
-      single.count++;
-      single.sum += Number(d.amount);
+      const row = camp ? event : single;
+      row.count++;
+      row.sum += Number(d.amount);
       continue;
     }
     const lessons = d.lessons_total ?? 0;
     const paid = d.pass_paid !== null
       ? Number(d.pass_paid)
       : (types.find((t) => t.lessons === lessons)?.price ?? price.amount * lessons);
-    onPass.count++;
-    onPass.sum += lessons > 0 ? paid / lessons : 0;
+    const row = camp ? onEventPass : onPass;
+    row.count++;
+    row.sum += lessons > 0 ? paid / lessons : 0;
   }
+
+  const parts = [single, onPass, event, onEventPass];
   const totalDone: DoneRow = {
-    count: single.count + onPass.count,
-    sum: single.sum + onPass.sum,
+    count: parts.reduce((n, r) => n + r.count, 0),
+    sum: parts.reduce((n, r) => n + r.sum, 0),
   };
 
   return {
@@ -155,6 +177,8 @@ export async function monthStats(month: string): Promise<MonthStats> {
     done: {
       single,
       pass: onPass,
+      event,
+      eventPass: onEventPass,
       total: totalDone,
       average: totalDone.count > 0 ? totalDone.sum / totalDone.count : 0,
     },

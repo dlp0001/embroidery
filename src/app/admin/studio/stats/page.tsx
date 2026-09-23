@@ -46,7 +46,25 @@ export default async function StatsPage({
   const [stats, months] = await Promise.all([monthStats(month), monthsWithData()]);
 
   const cur = stats.currency;
+  // Что студия отработала, по видам. Лагерь появляется в списке только
+  // в те месяцы, когда он был.
+  const camp = stats.done.event.count > 0 || stats.done.eventPass.count > 0;
+  const done = [
+    { label: 'Разовые занятия', row: stats.done.single },
+    { label: 'По абонементам', row: stats.done.pass },
+    ...(camp
+      ? [
+          { label: 'Дни лагеря', row: stats.done.event },
+          { label: 'По пакетам лагеря', row: stats.done.eventPass },
+        ]
+      : []),
+  ];
   const sum = (c: Cell[]) => c.reduce((s, x) => s + x.sum, 0);
+  /** Среднее по нескольким строкам реализации. */
+  const mean = (rows: { count: number; sum: number }[]) => {
+    const n = rows.reduce((s, r) => s + r.count, 0);
+    return n === 0 ? 0 : rows.reduce((s, r) => s + r.sum, 0) / n;
+  };
   const cnt = (c: Cell[]) => c.reduce((s, x) => s + x.count, 0);
 
   // Итог — вся выручка месяца, вместе с тем, что ещё не заплатили.
@@ -133,7 +151,8 @@ export default async function StatsPage({
         <div className="lbl" style={{ marginTop: 30 }}>Реализация</div>
         <p className="hint" style={{ marginBottom: 14 }}>
           Занятия, которые прошли в этом месяце, и сколько они стоят. Занятие
-          по абонементу считается своей долей от его цены, а не ценой разового.
+          по абонементу считается своей долей от его цены, а не ценой разового;
+          день лагеря — своей долей от цены пакета.
         </p>
 
         <div style={{ overflowX: 'auto' }}>
@@ -146,16 +165,19 @@ export default async function StatsPage({
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>Разовые</td>
-                <td>{stats.done.single.count || <span className="dim">—</span>}</td>
-                <td>{money(stats.done.single.sum, cur)}</td>
-              </tr>
-              <tr>
-                <td>По абонементам</td>
-                <td>{stats.done.pass.count || <span className="dim">—</span>}</td>
-                <td>{money(stats.done.pass.sum, cur)}</td>
-              </tr>
+              {/* Строки лагеря показываем, только когда он был: в обычный
+                  месяц два вечных прочерка ничего не объясняют. */}
+              {done.map((r) => (
+                <tr key={r.label}>
+                  <td>{r.label}</td>
+                  <td>{r.row.count || <span className="dim">—</span>}</td>
+                  <td>
+                    {r.row.count === 0
+                      ? <span className="dim">—</span>
+                      : money(r.row.sum, cur)}
+                  </td>
+                </tr>
+              ))}
               <tr className="total">
                 <td>Итого</td>
                 <td>{stats.done.total.count}</td>
@@ -165,10 +187,18 @@ export default async function StatsPage({
           </table>
         </div>
 
+        {/* Среднее по обычным занятиям и по дням лагеря — врозь: сотня
+            и триста тридцать в одной средней не значат ничего. */}
         <p className="hint" style={{ marginTop: 16 }}>
-          {stats.done.total.count > 0
-            ? <>Среднее занятие в этом месяце стоило {money(stats.done.average, cur)}.</>
-            : 'Занятий в этом месяце ещё не было.'}
+          {stats.done.total.count === 0
+            ? 'Занятий в этом месяце ещё не было.'
+            : camp
+              ? <>
+                  Среднее обычное занятие стоило {money(mean(
+                    [stats.done.single, stats.done.pass]), cur)}, день лагеря —{' '}
+                  {money(mean([stats.done.event, stats.done.eventPass]), cur)}.
+                </>
+              : <>Среднее занятие в этом месяце стоило {money(stats.done.average, cur)}.</>}
         </p>
 
         <div className="card-lin" style={{ marginTop: 18 }}>
