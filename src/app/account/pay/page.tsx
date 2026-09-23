@@ -140,6 +140,9 @@ export default async function PayPage({
                 {money(unpaid.reduce((n, c) => n + Number(c.amount), 0), unpaid[0].currency)}
               </span>
             </div>
+            {/* Сумма отделена от списка: она про всё сразу, а ниже —
+                занятие за занятием. */}
+            <div style={{ borderTop: '1px solid var(--line)', margin: '0 0 14px' }} />
             {/* Ключ по списку долгов: когда он меняется — заявили оплату
                 или отменили её — выбор собирается заново, и по умолчанию
                 снова отмечено всё. */}

@@ -27,10 +27,16 @@ export function hhmm(time: string): string {
 }
 
 export function money(amount: string | number, currency = 'ILS'): string {
-  const n = Math.round(Number(amount) * 100) / 100;
+  const raw = Number(amount);
+  // Копейки в студии не ходят: суммы показываем целыми, половину округляем
+  // вверх по модулю, как учили в школе. Дробными бывают только средние и
+  // доли абонемента, и там десятые ничего не решают.
+  const n = Math.sign(raw) * Math.round(Math.abs(raw));
   const sign = currency === 'ILS' ? '₪' : currency;
-  // Неразрывный пробел: сумма и знак валюты не должны расходиться по строкам.
-  return `${Number.isInteger(n) ? n : n.toFixed(2)}\u00a0${sign}`;
+  // Тысячи отделяет узкий неразрывный пробел, сумму от знака валюты —
+  // обычный неразрывный: ни то, ни другое не должно переноситься.
+  const digits = n.toLocaleString('ru-RU').replace(/\u00a0/g, '\u202f');
+  return `${digits}\u00a0${sign}`;
 }
 
 /** Сколько дней осталось до даты. Отрицательное — дата уже прошла. */
