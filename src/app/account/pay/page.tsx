@@ -116,7 +116,7 @@ export default async function PayPage({
 
         {/* Долг — первым: за «Оплатой» чаще всего идут именно из-за него,
             а не за новым абонементом. */}
-        <div className="lbl day-band" style={{ marginTop: 0 }}>Статус оплаты</div>
+        <div className="lbl day-band" style={{ marginTop: 0 }}>Текущий статус</div>
 
         {unpaid.length === 0 ? (
           <p className="hint">
@@ -133,7 +133,7 @@ export default async function PayPage({
               display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
               gap: 12, marginTop: 0,
             }}>
-              <span>Задолженность</span>
+              <span>Общая задолженность</span>
               <span className="sum" style={{
                 fontSize: 21, letterSpacing: 'normal', textTransform: 'none',
               }}>
@@ -145,6 +145,9 @@ export default async function PayPage({
                 снова отмечено всё. */}
             <DebtPicker key={unpaid.map((c) => `${c.id}${c.declared ? '!' : ''}`).join()}
                         charges={unpaid} online={online} />
+            {/* Черта закрывает долг: дальше идёт уже не он, а то, что
+                можно купить, и без неё одно перетекает в другое. */}
+            <div style={{ borderTop: '1px solid var(--line)', margin: '26px 0 4px' }} />
           </>
         )}
 
