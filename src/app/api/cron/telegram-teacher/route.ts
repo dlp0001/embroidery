@@ -1,4 +1,4 @@
-import { cronRights } from '@/lib/cron-auth';
+import { cronRights, describeAuth } from '@/lib/cron-auth';
 import { sendDue, type Force } from '@/lib/tg-due';
 
 export const runtime = 'nodejs';
@@ -21,8 +21,9 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: Request): Promise<Response> {
   const rights = cronRights(req);
   if (rights === 'none') {
-    console.error('cron-teacher: вызов без ключа');
-    return Response.json({ error: 'forbidden' }, { status: 401 });
+    const got = describeAuth(req);
+    console.error('cron-teacher: вызов без ключа —', got);
+    return Response.json({ error: 'ключ не подошёл', got }, { status: 401 });
   }
 
   const asked = new URL(req.url).searchParams.get('force');

@@ -1,4 +1,4 @@
-import { cronRights } from '@/lib/cron-auth';
+import { cronRights, describeAuth } from '@/lib/cron-auth';
 import {
   askTargets, askView, claimSend, isConfigured, recordSent, releaseSend, send,
 } from '@/lib/telegram';
@@ -23,8 +23,9 @@ function pause(): Promise<void> {
 
 export async function GET(req: Request): Promise<Response> {
   if (cronRights(req) === 'none') {
-    console.error('cron: вызов без ключа');
-    return Response.json({ error: 'forbidden' }, { status: 401 });
+    const got = describeAuth(req);
+    console.error('cron: вызов без ключа —', got);
+    return Response.json({ error: 'ключ не подошёл', got }, { status: 401 });
   }
   if (!isConfigured()) return Response.json({ skipped: 'бот не настроен' });
 

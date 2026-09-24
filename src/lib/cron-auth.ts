@@ -27,5 +27,29 @@ export function cronRights(req: Request): CronRights {
   // Сильный ключ проверяем первым: он годится и для обычного тика.
   if (force && same(given, `Bearer ${force}`)) return 'force';
   if (tick && same(given, `Bearer ${tick}`)) return 'tick';
+
+  // Запасной путь для пингеров, которые не умеют свои заголовки: слабый
+  // ключ принимается и в адресе. Ключ в адресе попадает в логи, и обычно
+  // так делать нельзя — но этим ключом навредить и нельзя: он умеет
+  // только спросить «что пора», а окна и tg_log гасят любой лишний вызов.
+  // Сильный ключ так не принимаем никогда.
+  const inUrl = new URL(req.url).searchParams.get('key');
+  if (tick && inUrl && same(inUrl, tick)) return 'tick';
   return 'none';
+}
+
+/**
+ * Что за ключ приехал — для ответа на отказ. Значение не показываем, только
+ * способ и длину: без этого внешний сервис отвечает глухим 401, и понять,
+ * заголовок ли не дошёл или секрет не тот, нельзя.
+ */
+export function describeAuth(req: Request): string {
+  const given = req.headers.get('authorization');
+  const inUrl = new URL(req.url).searchParams.get('key');
+  if (!given && !inUrl) return 'ни заголовка Authorization, ни key в адресе';
+  if (!given) return `key в адресе, ${inUrl!.length} знаков`;
+  const [scheme, ...rest] = given.split(' ');
+  const value = rest.join(' ');
+  if (!value) return `заголовок есть, но в нём одно слово (${given.length} знаков), а нужно «Bearer ключ»`;
+  return `заголовок «${scheme} …», ключ ${value.length} знаков`;
 }
