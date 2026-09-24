@@ -25,10 +25,12 @@ export default async function AdminToolsPage({
 
   const { note, error } = await searchParams;
   const looker = isSuperadmin(user);
-  const [kids, owners] = await Promise.all([
+  const [kids, all] = await Promise.all([
     mergeCandidates(),
     looker ? cabinetOwners() : [],
   ]);
+  // Себя в списке не показываем: свой кабинет открывается без подмены.
+  const owners = all.filter((o) => o.id !== user.id);
 
   return (
     <>
@@ -84,12 +86,13 @@ export default async function AdminToolsPage({
 
         {looker && (
           <div className="card" style={{ marginTop: 16 }}>
-            <div className="what" style={{ marginBottom: 6 }}>Посмотреть кабинет родителя</div>
+            <div className="what" style={{ marginBottom: 6 }}>Посмотреть чужой кабинет</div>
             <p className="hint" style={{ marginBottom: 16 }}>
               Открывает кабинет чужими глазами: те же занятия, долги и кнопки,
               что видит человек. Только смотреть — записать, оплатить или
               переименовать оттуда нельзя. Наверху будет полоса с возвратом
-              к себе.
+              к себе, и там же можно перейти к следующему человеку, не
+              возвращаясь сюда.
             </p>
 
             {owners.length === 0 ? (
@@ -102,7 +105,9 @@ export default async function AdminToolsPage({
                   <select id="view-as" name="userId" defaultValue="" required>
                     <option value="" disabled>— выберите человека —</option>
                     {owners.map((o) => (
-                      <option key={o.id} value={o.id}>{o.name ?? o.email}</option>
+                      <option key={o.id} value={o.id}>
+                        {o.name ?? o.email}{o.teaches ? ' · студия' : ''}
+                      </option>
                     ))}
                   </select>
                 </div>

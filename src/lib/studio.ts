@@ -1438,18 +1438,28 @@ export async function resyncGroupSessions(groupId: string, weeksAhead = 6): Prom
 
 // ── Абонементы ────────────────────────────────────────────
 
-export type CabinetOwner = { id: string; name: string | null; email: string };
+export type CabinetOwner = {
+  id: string;
+  name: string | null;
+  email: string;
+  /** Варя и админы: у них кабинет тоже есть, и смотреть его тоже нужно. */
+  teaches: boolean;
+};
 
 /**
- * Все, у кого есть свой кабинет: родители и взрослые ученики. Нужен,
- * чтобы суперадмин мог открыть кабинет глазами конкретного человека.
+ * Все, у кого есть свой кабинет: родители, взрослые ученики и те, кто
+ * ведёт занятия. Нужен, чтобы суперадмин мог открыть кабинет чужими
+ * глазами — в том числе Вариными: у неё свои дети и свои оплаты.
  */
 export async function cabinetOwners(): Promise<CabinetOwner[]> {
   return query<CabinetOwner>(
-    `select u.id, u.name, u.email
+    `select u.id, u.name, u.email,
+            exists (select 1 from user_roles r
+                     where r.user_id = u.id
+                       and r.role in ('teacher', 'admin', 'superadmin')) as teaches
        from users u
       where exists (select 1 from guardians g where g.user_id = u.id)
-         or exists (select 1 from user_roles r where r.user_id = u.id and r.role in ('parent', 'student'))
+         or exists (select 1 from user_roles r where r.user_id = u.id)
       order by coalesce(u.name, u.email)`,
   );
 }

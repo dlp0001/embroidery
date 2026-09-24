@@ -2,8 +2,10 @@ import { redirect } from 'next/navigation';
 import Tabs, { type Tab } from '@/components/Tabs';
 import SignOut from '@/components/SignOut';
 import NotConfigured from '@/components/NotConfigured';
-import { actingAs, canTeach, currentUser } from '@/lib/session';
-import { stopViewAction } from '@/app/admin/view-actions';
+import PeekSwitch from '@/components/PeekSwitch';
+import { actingAs, canTeach, currentUser, realUser } from '@/lib/session';
+import { cabinetOwners } from '@/lib/studio';
+import { stopViewAction, viewAsAction } from '@/app/admin/view-actions';
 
 const TABS: Tab[] = [
   { href: '/account', icon: 'week', label: 'Неделя' },
@@ -20,17 +22,27 @@ export default async function AccountLayout({ children }: { children: React.Reac
   // Суперадмин смотрит чужой кабинет: подписываем, чей он, и оставляем
   // дорогу назад. Без полосы легко решить, что это твои долги и дети.
   const peek = await actingAs();
+  // Список кабинетов нужен только в режиме просмотра: обычному родителю
+  // незачем ни список, ни лишний запрос.
+  const me = peek ? await realUser() : null;
+  const owners = peek
+    ? (await cabinetOwners()).filter((o) => o.id !== me?.id)
+    : [];
+
   return (
     <div className="app">
       {peek && (
         <div className="peek">
           <span>
-            Кабинет: <b style={{ color: 'var(--charcoal)' }}>{peek.name ?? peek.email}</b>
-            {' · '}только смотрите, менять ничего нельзя
+            Кабинет:{' '}
+            {owners.length > 1
+              ? <PeekSwitch action={viewAsAction} people={owners} current={peek.id} />
+              : <b style={{ color: 'var(--charcoal)' }}>{peek.name ?? peek.email}</b>}
           </span>
           <form action={stopViewAction}>
             <button className="linky" type="submit">Вернуться к себе</button>
           </form>
+          <span className="peek-note">только смотрите, менять ничего нельзя</span>
         </div>
       )}
       {children}
