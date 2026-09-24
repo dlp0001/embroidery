@@ -1,7 +1,10 @@
 import { query } from './db';
 import { hhmm, money, plural, weekdayDayMonth } from './format';
 import { siteOrigin } from './site';
-import { isConfigured, send } from './telegram';
+import { isConfigured as receiptsReady } from './icount';
+import {
+  isConfigured, packId, send, PAY_LETTER, type Keyboard, type PayLetter, type View,
+} from './telegram';
 
 /**
  * Сообщения по событию: занятие отменили, деньги заявили, деньги зачли.
@@ -110,13 +113,20 @@ async function moneyStaff(): Promise<{ chat: string }[]> {
       where r.role = 'admin' and u.tg_chat_id is not null`);
 }
 
-type Claim = { who: string; chat: string | null; amount: string; currency: string; ids: number };
+export type Claim = {
+  id: string; who: string; chat: string | null;
+  amount: string; currency: string; ids: number;
+  /** Что сказал сам родитель: от этого зависит, подставлять ли способ. */
+  way: 'cash' | 'transfer' | null;
+  status: string;
+};
 
 async function claimById(paymentId: string): Promise<Claim | null> {
   return (await query<Claim>(
-    `select coalesce(u.name, u.email) as who, u.tg_chat_id::text as chat,
-            p.amount::text, p.currency,
-            coalesce(jsonb_array_length(p.raw -> 'charge_ids'), 0) as ids
+    `select p.id, coalesce(u.name, u.email) as who, u.tg_chat_id::text as chat,
+            p.amount::text, p.currency, p.status,
+            coalesce(jsonb_array_length(p.raw -> 'charge_ids'), 0) as ids,
+            (p.raw ->> 'declared_way') as way
        from payments p join users u on u.id = p.user_id
       where p.id = $1`,
     [paymentId]))[0] ?? null;
@@ -125,9 +135,10 @@ async function claimById(paymentId: string): Promise<Claim | null> {
 /** Свежая неподтверждённая заявка этого родителя. */
 async function claimPending(userId: string): Promise<Claim | null> {
   return (await query<Claim>(
-    `select coalesce(u.name, u.email) as who, u.tg_chat_id::text as chat,
-            p.amount::text, p.currency,
-            coalesce(jsonb_array_length(p.raw -> 'charge_ids'), 0) as ids
+    `select p.id, coalesce(u.name, u.email) as who, u.tg_chat_id::text as chat,
+            p.amount::text, p.currency, p.status,
+            coalesce(jsonb_array_length(p.raw -> 'charge_ids'), 0) as ids,
+            (p.raw ->> 'declared_way') as way
        from payments p join users u on u.id = p.user_id
       where p.user_id = $1 and p.provider = 'cash' and p.status = 'pending'
         and p.purpose = 'studio_debt'
@@ -141,27 +152,81 @@ function lessons(n: number): string {
 
 /**
  * Родитель заявил, что заплатил наличными или переводом. Пока Варя не
- * подтвердит, деньги висят незачтёнными, а узнать об этом можно только
- * открыв «Финансы».
+ * подтвердит, деньги висят незачтёнными, а узнать об этом можно было
+ * только открыв «Финансы».
  *
- * Сумму берём из самой заявки, а не из аргументов: расходиться с тем, что
- * Варя увидит в «Финансах», это сообщение не должно.
+ * Сумму берём из самой заявки: расходиться с тем, что Варя увидит на
+ * экране, это сообщение не должно.
  */
-export async function composeCashDeclared(userId: string, origin: string): Promise<string | null> {
-  const c = await claimPending(userId);
-  if (!c) return null;
-  return [
-    `${c.who} заявил оплату: ${money(c.amount, c.currency)} за ${lessons(c.ids)}.`,
-    '',
-    `Подтвердить: ${origin}/admin/studio/debts`,
-  ].join('\n');
-}
-
 export async function cashDeclared(userId: string): Promise<void> {
   if (!isConfigured()) return;
-  const text = await composeCashDeclared(userId, await siteOrigin());
-  if (!text) return;
-  for (const s of await moneyStaff()) await tell(s.chat, text);
+  const claim = await claimPending(userId);
+  if (!claim) return;
+  const card = claimCard(claim, null);
+  for (const s of await moneyStaff()) {
+    try {
+      await send(Number(s.chat), card.text, card.keyboard);
+    } catch (err) {
+      console.error('notify: заявка не отправилась', err);
+    }
+  }
+}
+
+const WAY_NAME: Record<PayLetter, string> = {
+  c: 'наличными', t: 'переводом', b: 'Bit', p: 'PayBox',
+};
+
+/**
+ * Карточка заявки с кнопками: подтвердить оплату можно прямо в боте.
+ *
+ * Два касания, а не одно, и это не лишний шаг. Способ обязателен: у
+ * родителя «перевод» значит и банк, и биток, и пейбокс, а в чеке это три
+ * разные вещи, поэтому ничего не подставляем — так же, как на экране
+ * «Финансы». Наличные другое дело, их Варя берёт в руки, поэтому они
+ * стоят первыми. Чек по умолчанию не выписывается, как и галочка на сайте.
+ */
+export function claimCard(claim: Claim, chosen: PayLetter | null): View {
+  const head = `${claim.who} заявил оплату: ${money(claim.amount, claim.currency)} за ${
+    lessons(claim.ids)}.`;
+  const said = claim.way === 'cash' ? 'Заявил: наличными.'
+    : claim.way === 'transfer' ? 'Заявил: переводом. Чем именно, скажите сами.'
+    : 'Способ не назван: заявка старая.';
+  const id = packId(claim.id);
+
+  if (!chosen) {
+    const letters: PayLetter[] = claim.way === 'transfer'
+      ? ['t', 'b', 'p', 'c']
+      : ['c', 't', 'b', 'p'];
+    const keyboard: Keyboard = [];
+    for (let i = 0; i < letters.length; i += 2) {
+      keyboard.push(letters.slice(i, i + 2).map((l) => ({
+        text: WAY_NAME[l], callback_data: `pm${l}:${id}`,
+      })));
+    }
+    keyboard.push([{ text: 'Отклонить заявку', callback_data: `px:${id}` }]);
+    return { text: [head, '', said, '', 'Чем заплатили?'].join('\n'), keyboard };
+  }
+
+  // Чек — второй вопрос. Без iCount выписывать его некому, тогда и
+  // выбора нет: просто подтверждаем.
+  const keyboard: Keyboard = receiptsReady()
+    ? [[{ text: 'Без чека', callback_data: `pc${chosen}0:${id}` },
+        { text: 'С чеком', callback_data: `pc${chosen}1:${id}` }],
+       [{ text: 'Назад', callback_data: `pb:${id}` }]]
+    : [[{ text: 'Деньги получены', callback_data: `pc${chosen}0:${id}` }],
+       [{ text: 'Назад', callback_data: `pb:${id}` }]];
+
+  return {
+    text: [head, '', `Чем: ${WAY_NAME[chosen]}.`, '',
+           receiptsReady() ? 'Выписать чек в iCount?' : 'iCount не подключён, чека не будет.',
+    ].join('\n'),
+    keyboard,
+  };
+}
+
+/** Заявка по номеру платежа: нужна, чтобы перерисовать карточку. */
+export async function claimOf(paymentId: string): Promise<Claim | null> {
+  return claimById(paymentId);
 }
 
 /** Деньги зачли. Родитель об этом иначе не узнаёт вовсе. */

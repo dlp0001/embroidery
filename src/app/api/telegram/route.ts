@@ -1,6 +1,9 @@
+import { confirmCash, declineCash } from '@/lib/billing';
+import { cashConfirmed, cashDeclined, claimCard, claimOf } from '@/lib/notify';
 import {
-  answerCallback, applyTap, bindChat, chatUser, editMessage, eventViews, isTeacher, readTap,
-  secretOk, send, teacherDayView, viewAfterTap, weekView,
+  answerCallback, applyTap, bindChat, chatUser, editMessage, eventViews, isStudioAdmin,
+  isTeacher, readMoneyTap, readTap, secretOk, send, teacherDayView, viewAfterTap, weekView,
+  PAY_LETTER,
 } from '@/lib/telegram';
 
 export const runtime = 'nodejs';
@@ -92,6 +95,69 @@ async function onMessage(chatId: number, text: string, origin: string): Promise<
 }
 
 /**
+ * Нажатия на карточке заявки об оплате: способ, чек, подтверждение.
+ *
+ * Деньги проводит только админ. Проверяем это здесь, а не на кнопке:
+ * карточка могла уехать в чат месяц назад, и роли с тех пор могли
+ * поменяться.
+ */
+async function onMoney(
+  id: string, chatId: number, messageId: number, data: string,
+): Promise<boolean> {
+  const tap = readMoneyTap(data);
+  if (!tap) return false;
+
+  const user = await chatUser(chatId);
+  if (!user || !(await isStudioAdmin(user.id))) {
+    await answerCallback(id, 'Деньги проводит админ.');
+    return true;
+  }
+
+  const claim = await claimOf(tap.paymentId);
+  if (!claim) {
+    await answerCallback(id, 'Заявки больше нет.');
+    return true;
+  }
+  // Подтвердили или отклонили с другого устройства, пока карточка висела.
+  if (claim.status !== 'pending') {
+    await answerCallback(id, 'Эту заявку уже закрыли.');
+    await editMessage(chatId, messageId,
+      `${claim.who}: ${claim.status === 'paid' ? 'оплата зачтена' : 'заявка закрыта'}.`);
+    return true;
+  }
+
+  if (tap.kind === 'method' || tap.kind === 'back') {
+    const card = claimCard(claim, tap.kind === 'method' ? tap.letter : null);
+    await answerCallback(id);
+    await editMessage(chatId, messageId, card.text, card.keyboard);
+    return true;
+  }
+
+  if (tap.kind === 'decline') {
+    await cashDeclined(tap.paymentId);
+    await declineCash(tap.paymentId, user.id);
+    await answerCallback(id, 'Отклонили');
+    await editMessage(chatId, messageId, `${claim.who}: заявку отклонили. Родителю сказали.`);
+    return true;
+  }
+
+  await confirmCash(tap.paymentId, user.id, {
+    method: PAY_LETTER[tap.letter],
+    receipt: tap.receipt,
+  });
+  await cashConfirmed(tap.paymentId);
+  await answerCallback(id, 'Зачли');
+  await editMessage(chatId, messageId, [
+    `${claim.who}: оплата зачтена.`,
+    `${claim.amount} ${claim.currency}, ${PAY_LETTER[tap.letter]}${
+      tap.receipt ? ', чек выписан' : ', без чека'}.`,
+    '',
+    'Родителю сказали.',
+  ].join('\n'));
+  return true;
+}
+
+/**
  * Нажатие на кнопку под сообщением. Отвечать телеграму нужно обязательно
  * и быстро: пока ответа нет, кнопка у родителя крутится.
  */
@@ -139,7 +205,9 @@ export async function POST(req: Request): Promise<Response> {
 
   try {
     if (tap?.id && chatId && tap.message?.message_id) {
-      await onTap(tap.id, chatId, tap.message.message_id, tap.data ?? '', origin);
+      // Деньги идут своим путём: у них другие права и другая карточка.
+      const money = await onMoney(tap.id, chatId, tap.message.message_id, tap.data ?? '');
+      if (!money) await onTap(tap.id, chatId, tap.message.message_id, tap.data ?? '', origin);
     } else if (chatId) {
       const text = (update.message?.text ?? '').trim();
       // Апдейты бывают всякие: вступление в чат, правка сообщения, стикер.

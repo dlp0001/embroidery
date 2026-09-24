@@ -192,11 +192,11 @@ export async function chatOfUser(userId: string): Promise<number | null> {
  * текстом они занимают 72. Кладём их сырыми байтами в base64url — по 22
  * знака, и вместе с пометкой действия выходит 48.
  */
-function pack(id: string): string {
+export function packId(id: string): string {
   return Buffer.from(id.replace(/-/g, ''), 'hex').toString('base64url');
 }
 
-function unpack(s: string): string | null {
+export function unpackId(s: string): string | null {
   const b = Buffer.from(s, 'base64url');
   if (b.length !== 16) return null;
   const h = b.toString('hex');
@@ -218,8 +218,8 @@ export type Tap = {
 export function readTap(data: string): Tap | null {
   const m = /^([ba])([01]):([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{22})$/.exec(data);
   if (!m) return null;
-  const sessionId = unpack(m[3]);
-  const participantId = unpack(m[4]);
+  const sessionId = unpackId(m[3]);
+  const participantId = unpackId(m[4]);
   if (!sessionId || !participantId) return null;
   return {
     sessionId, participantId,
@@ -230,13 +230,50 @@ export function readTap(data: string): Tap | null {
 
 function tapData(row: SlotRow, book: boolean, from: TapFrom): string {
   return `${from === 'ask' ? 'a' : 'b'}${book ? '1' : '0'}`
-    + `:${pack(row.session_id)}.${pack(row.participant_id)}`;
+    + `:${packId(row.session_id)}.${packId(row.participant_id)}`;
 }
 
 /**
  * Участник из семьи этого взрослого? Проверка та же, что в кабинете:
  * в callback_data приезжает что угодно, и верить ей нельзя.
  */
+/** Способы оплаты, как их понимает iCount. Буква едет в кнопке. */
+export const PAY_LETTER = { c: 'cash', t: 'transfer', b: 'bit', p: 'paybox' } as const;
+export type PayLetter = keyof typeof PAY_LETTER;
+export type PayMethod = (typeof PAY_LETTER)[PayLetter];
+
+export type MoneyTap =
+  | { kind: 'method'; paymentId: string; letter: PayLetter }
+  | { kind: 'confirm'; paymentId: string; letter: PayLetter; receipt: boolean }
+  | { kind: 'decline'; paymentId: string }
+  | { kind: 'back'; paymentId: string };
+
+/**
+ * Нажатия на карточке заявки об оплате. Отдельно от записи на занятия:
+ * тут решаются деньги, и проверять права надо иначе — это дело админа, а
+ * не родителя.
+ */
+export function readMoneyTap(data: string): MoneyTap | null {
+  const m = /^p(m([ctbp])|c([ctbp])([01])|x|b):([A-Za-z0-9_-]{22})$/.exec(data);
+  if (!m) return null;
+  const paymentId = unpackId(m[5]);
+  if (!paymentId) return null;
+  if (m[2]) return { kind: 'method', paymentId, letter: m[2] as PayLetter };
+  if (m[3]) {
+    return { kind: 'confirm', paymentId, letter: m[3] as PayLetter, receipt: m[4] === '1' };
+  }
+  return m[1] === 'x'
+    ? { kind: 'decline', paymentId }
+    : { kind: 'back', paymentId };
+}
+
+/** Деньги подтверждает админ. Преподавателю без админства сюда нельзя. */
+export async function isStudioAdmin(userId: string): Promise<boolean> {
+  return Boolean(await one(
+    `select 1 from user_roles where user_id = $1 and role in ('admin', 'superadmin')`,
+    [userId]));
+}
+
 export async function ownsParticipant(userId: string, participantId: string): Promise<boolean> {
   const ok = await one(
     `select 1 from participants p
