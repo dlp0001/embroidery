@@ -1,10 +1,10 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { one, query, tx } from './db';
 import {
-  dayMonth, hhmm, money, packageFrom, plural, plusDays, todayISO, weekdayDayMonth,
+  dayMonth, hhmm, money, nowHM, packageFrom, plural, plusDays, todayISO, weekdayDayMonth,
 } from './format';
 import {
-  eventSlotsForUser, sessionIsPast, setBooking, slotsForUser,
+  eventSlotsForUser, sessionIsPast, setBooking, slotsForUser, teacherSessions,
   type GroupKind, type SlotRow,
 } from './studio';
 
@@ -141,7 +141,7 @@ export async function linkUrl(userId: string): Promise<string | null> {
   return `https://t.me/${bot.replace(/^@/, '')}?start=${raw}`;
 }
 
-export type Bound = { ok: true; name: string | null } | { ok: false };
+export type Bound = { ok: true; userId: string; name: string | null } | { ok: false };
 
 export async function bindChat(raw: string, chatId: number): Promise<Bound> {
   const link = await one<{ id: string; user_id: string }>(
@@ -161,7 +161,7 @@ export async function bindChat(raw: string, chatId: number): Promise<Bound> {
       'select name from users where id = $1', [link.user_id]);
     return rows[0]?.name ?? null;
   });
-  return { ok: true, name };
+  return { ok: true, userId: link.user_id, name };
 }
 
 export async function forgetChat(chatId: number): Promise<void> {
@@ -275,7 +275,12 @@ function shortDay(iso: string): string {
   return `${wd} ${d}`;
 }
 
-export type View = { text: string; keyboard: Keyboard };
+export type View = {
+  text: string;
+  keyboard: Keyboard;
+  /** Показывать нечего. Преподавателю такую неделю не присылаем. */
+  empty?: boolean;
+};
 
 /** Смена знает свою группу: по ней после нажатия находим, что перерисовать. */
 export type GroupView = View & { groupId: string };
@@ -374,6 +379,7 @@ export async function weekView(userId: string, origin: string): Promise<View> {
     return {
       text: `На ближайшую неделю занятий нет.\n\nРасписание целиком: ${origin}/account/calendar`,
       keyboard: [],
+      empty: true,
     };
   }
   const { lines, buttons } = renderSlots(rows, today, true);
@@ -469,6 +475,162 @@ export async function eventViews(userId: string, origin: string): Promise<GroupV
     });
   }
   return out;
+}
+
+// ── Экран преподавателя ───────────────────────────────────
+
+/**
+ * Преподавателю бот отвечает не тем же, что родителю.
+ *
+ * Только роль `teacher`, без админов: админ — это Дима, у него в студии
+ * свой ребёнок, и подменять ему родительскую неделю журналом незачем. Кто
+ * и преподаёт, и водит детей, получит оба сообщения.
+ */
+export async function isTeacher(userId: string): Promise<boolean> {
+  return Boolean(await one(
+    `select 1 from user_roles where user_id = $1 and role = 'teacher'`,
+    [userId]));
+}
+
+type RosterRow = { who: string; booking: string; preferred: boolean };
+
+/**
+ * Кого ждать на занятии. Состав тот же, что в журнале у Вари: все, кто
+ * подходит занятию по типу. Различаем три вещи, потому что они означают
+ * разное: записался, обычно ходит, но молчит, и прямо сказал «не придём».
+ */
+async function roster(sessionId: string): Promise<RosterRow[]> {
+  return query<RosterRow>(
+    `with ses as (
+       select s.id, g.audience, g.kind, extract(isodow from s.held_on)::int as dow
+         from studio_sessions s join studio_groups g on g.id = s.group_id
+        where s.id = $1
+     )
+     select coalesce(ch.name, u.name, 'Без имени') as who,
+            coalesce(b.status, '') as booking,
+            exists (select 1 from preferred_days pd cross join ses
+                     where pd.participant_id = p.id and pd.weekday = ses.dow
+                       and ses.kind = 'lesson') as preferred
+       from participants p
+       cross join ses
+       left join children ch on ch.id = p.child_id
+       left join users u on u.id = p.user_id
+       left join bookings b on b.session_id = ses.id and b.participant_id = p.id
+      where ch.archived_at is null
+        and ((ses.audience = 'adults' and p.user_id is not null
+              and (u.attends or (ses.kind <> 'lesson' and b.status = 'booked')))
+          or (ses.audience = 'kids' and p.child_id is not null))
+      order by who`,
+    [sessionId]);
+}
+
+function greeting(name: string): string {
+  const { hour } = nowHM();
+  const part = hour < 12 ? 'Доброе утро' : hour < 17 ? 'Добрый день' : 'Добрый вечер';
+  return `${part}, ${name}!`;
+}
+
+/**
+ * Как звать преподавателя. Преподаватель пока один и просил звать себя
+ * так, поэтому имя стоит в коде, а не в настройках: появится второй
+ * педагог — станет полем, а до тех часов это лишняя таблица.
+ */
+const PET: Record<string, string> = { Варя: 'Варюша' };
+
+/** Первое слово имени: «Варя Перлина» → «Варюша». */
+function firstName(name: string | null): string {
+  const first = (name ?? '').trim().split(/\s+/)[0] || 'Варя';
+  return PET[first] ?? first;
+}
+
+/**
+ * Одно занятие для преподавателя. Списки пишем только непустые: «сказали,
+ * что не придут: никого» — строка, которая ничего не сообщает, а место
+ * занимает.
+ */
+async function sessionLines(sessionId: string, title: string, at: string): Promise<string[]> {
+  const rows = await roster(sessionId);
+  const coming = rows.filter((r) => r.booking === 'booked').map((r) => r.who);
+  const refused = rows.filter((r) => r.booking === 'cancelled').map((r) => r.who);
+  const usual = rows
+    .filter((r) => r.preferred && r.booking === '')
+    .map((r) => r.who);
+
+  const lines = [`${hhmm(at)} · ${title}`];
+  lines.push(coming.length > 0
+    ? `Записались (${coming.length}): ${coming.join(', ')}`
+    : 'Записанных нет.');
+  if (usual.length > 0) lines.push(`Обычно ходят, но не отметились: ${usual.join(', ')}`);
+  // «Сказали, что не придут» было бы неправдой: такая же отменённая строка
+  // получается, когда родитель снял запись на сайте. Для Вари разницы нет —
+  // важно, что не придут, — а обещать боту чужие слова не надо.
+  if (refused.length > 0) lines.push(`Не придут: ${refused.join(', ')}`);
+  return lines;
+}
+
+export type Teacher = { id: string; name: string | null; chat_id: string };
+
+/** Преподаватели, до которых бот может дотянуться. */
+export async function teachersInBot(): Promise<Teacher[]> {
+  return query<Teacher>(
+    `select u.id, u.name, u.tg_chat_id::text as chat_id
+       from users u join user_roles r on r.user_id = u.id
+      where r.role = 'teacher' and u.tg_chat_id is not null`);
+}
+
+/** Сегодняшние занятия преподавателя — обёртка, чтобы роут не лез в studio. */
+export async function teacherToday(teacherId: string): Promise<
+  { session_id: string; group_title: string; starts_at: string }[]
+> {
+  return (await teacherSessions(teacherId)).map((s) => ({
+    session_id: s.session_id, group_title: s.group_title, starts_at: s.starts_at,
+  }));
+}
+
+/**
+ * Весь день сразу: утреннее письмо преподавателю. Оно же — ответ на любое
+ * сообщение боту, если пишет преподаватель: своей семьи у Вари в студии
+ * нет, и родительская неделя для неё пуста.
+ */
+export async function teacherDayView(
+  teacherId: string, name: string | null, origin: string,
+): Promise<View> {
+  const today = await teacherSessions(teacherId);
+  const hello = greeting(firstName(name));
+  if (today.length === 0) {
+    return { text: `${hello}\n\nСегодня занятий нет.`, keyboard: [] };
+  }
+
+  const blocks: string[][] = [];
+  for (const s of today) blocks.push(await sessionLines(s.session_id, s.group_title, s.starts_at));
+
+  return {
+    text: [hello, '', ...blocks.flatMap((b) => [...b, ''])
+      , `Журнал: ${origin}/admin/studio`].join('\n'),
+    keyboard: [],
+  };
+}
+
+/**
+ * Одно занятие за час до начала. Отдельно от утреннего письма: за день
+ * состав меняется, и к трём часам утренний список уже неправда.
+ */
+export async function teacherSessionView(
+  sessionId: string, name: string | null, origin: string,
+): Promise<View | null> {
+  const head = await one<{ title: string; at: string; kind: GroupKind }>(
+    `select g.title, coalesce(s.starts_at, g.starts_at)::text as at, g.kind
+       from studio_sessions s join studio_groups g on g.id = s.group_id
+      where s.id = $1 and s.status <> 'cancelled'`,
+    [sessionId]);
+  if (!head) return null;
+
+  const lines = await sessionLines(sessionId, head.title, head.at);
+  return {
+    text: [`${greeting(firstName(name))}`, '', `Через час:`, ...lines, '',
+           `Журнал: ${origin}/admin/studio`].join('\n'),
+    keyboard: [],
+  };
 }
 
 // ── Вечерний вопрос ───────────────────────────────────────

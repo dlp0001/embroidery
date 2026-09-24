@@ -1,6 +1,6 @@
 import {
-  answerCallback, applyTap, bindChat, chatUser, editMessage, eventViews, readTap, secretOk,
-  send, viewAfterTap, weekView,
+  answerCallback, applyTap, bindChat, chatUser, editMessage, eventViews, isTeacher, readTap,
+  secretOk, send, teacherDayView, viewAfterTap, weekView,
 } from '@/lib/telegram';
 
 export const runtime = 'nodejs';
@@ -53,10 +53,13 @@ async function onMessage(chatId: number, text: string, origin: string): Promise<
       return;
     }
     const hello = bound.name ? `Здравствуйте, ${bound.name}!` : 'Здравствуйте!';
+    const teaches = await isTeacher(bound.userId);
     await send(chatId, [
       `${hello} Теперь я вас узнаю.`,
       '',
-      'Напишите что угодно — покажу ближайшую неделю с кнопками записи.',
+      teaches
+        ? 'Напишите что угодно — покажу, кто записан на сегодня.'
+        : 'Напишите что угодно — покажу ближайшую неделю с кнопками записи.',
     ].join('\n'));
     return;
   }
@@ -69,8 +72,17 @@ async function onMessage(chatId: number, text: string, origin: string): Promise<
 
   // Команд пока нет: любое сообщение — просьба показать, что впереди.
   // Разбирать слова начнём тогда, когда боту будет что ещё ответить.
+  const teaches = await isTeacher(user.id);
+  if (teaches) {
+    const day = await teacherDayView(user.id, user.name, origin);
+    await send(chatId, day.text);
+  }
+
+  // Родительскую неделю преподавателю показываем только если она не
+  // пустая: у Вари своей семьи в студии нет, и «занятий нет» сразу после
+  // журнала выглядит поломкой, а не ответом.
   const week = await weekView(user.id, origin);
-  await send(chatId, week.text, week.keyboard);
+  if (!teaches || !week.empty) await send(chatId, week.text, week.keyboard);
 
   // Смена — отдельным сообщением, и только пока она есть: кончится лагерь,
   // кончатся и эти сообщения, ничего выключать не придётся.

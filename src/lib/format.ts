@@ -64,6 +64,14 @@ export function todayISO(): string {
   }).format(new Date());
 }
 
+/** Часы и минуты по времени студии: от них зависит, здороваться утром или днём. */
+export function nowHM(): { hour: number; hhmm: string } {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: STUDIO_TZ, hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date());
+  return { hour: Number(parts.slice(0, 2)), hhmm: parts };
+}
+
 /**
  * Ник в телеграме пишут как придётся: с «собакой», без неё, ссылкой
  * t.me или целым https. Приводим к одному виду — голому нику, «собаку»

@@ -1,0 +1,35 @@
+# Сообщения преподавателю: утренняя сводка и напоминание за час до занятия.
+#
+# Почему не расписанием Vercel: на тарифе Hobby задание запускается раз в
+# сутки и может сработать в любой момент своего часа. «За час до» так не
+# сделать — сообщение придёт после занятия. Здесь мы просто стучимся раз в
+# полчаса, а что именно пора отправлять, решает сам роут по часам студии;
+# от этого и переход на зимнее время ничего не ломает.
+#
+# Нужен секрет репозитория CRON_SECRET — тот же, что в Vercel.
+name: Бот преподавателю
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  # Кнопка «запустить» на вкладке Actions: удобно проверить руками.
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Разбудить роут
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET не задан в секретах репозитория"
+            exit 1
+          fi
+          out=$(mktemp)
+          code=$(curl -sS -o "$out" -w '%{http_code}' \
+            -H "authorization: Bearer $CRON_SECRET" \
+            https://www.re-create.art/api/cron/telegram-teacher)
+          echo "ответ $code: $(cat "$out")"
+          test "$code" = "200"

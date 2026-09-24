@@ -6,8 +6,10 @@ node_modules/
 .vercel
 
 .env*.local
-.next/
 next-env.d.ts
 tsconfig.tsbuildinfo
-.next-verify/
-.next-check/
+# Все каталоги сборки одним правилом: их разводится много
+# (.next, .next-verify, .next-check, .next-try, .next-trace), и
+# перечислять по одному значит рано или поздно закоммитить сборку.
+.next/
+.next-*/
