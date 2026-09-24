@@ -1,7 +1,7 @@
-import { one } from '@/lib/db';
 import { nowHM, todayISO } from '@/lib/format';
 import {
-  isConfigured, send, teacherDayView, teacherSessionView, teacherToday, teachersInBot,
+  claimSend, isConfigured, recordSent, releaseSend, send, sentAgoMin,
+  teacherDayView, teacherSessionView, teacherToday, teachersInBot,
 } from '@/lib/telegram';
 
 export const runtime = 'nodejs';
@@ -39,28 +39,6 @@ function minutes(hm: string): number {
   return h * 60 + m;
 }
 
-/** Сколько минут назад это уже отправляли. null — не отправляли вовсе. */
-async function sentAgo(campaign: string, chatId: string): Promise<number | null> {
-  const row = await one<{ ago: string }>(
-    `select (extract(epoch from (now() - sent_at)) / 60)::int::text as ago
-       from tg_log where campaign = $1 and chat_id = $2`,
-    [campaign, chatId]);
-  return row ? Number(row.ago) : null;
-}
-
-/** Занимаем место в журнале. false — уже занято, значит уже отправляли. */
-async function claim(campaign: string, chatId: string): Promise<boolean> {
-  return Boolean(await one(
-    `insert into tg_log (campaign, chat_id) values ($1, $2)
-     on conflict (campaign, chat_id) do nothing returning chat_id`,
-    [campaign, chatId]));
-}
-
-async function release(campaign: string, chatId: string): Promise<void> {
-  await one('delete from tg_log where campaign = $1 and chat_id = $2 returning chat_id',
-    [campaign, chatId]);
-}
-
 export async function GET(req: Request): Promise<Response> {
   if (!allowed(req)) {
     console.error('cron-teacher: вызов без секрета');
@@ -89,15 +67,16 @@ export async function GET(req: Request): Promise<Response> {
     // Пустой день пропускаем: «сегодня занятий нет» каждое утро — шум.
     // Руками спросили — отвечаем всё равно.
     if (dayDue && (sessions.length > 0 || force === 'day')) {
-      const fresh = force === 'day' || await claim(dayCampaign, teacher.chat_id);
+      const fresh = force === 'day' || await claimSend(dayCampaign, teacher.chat_id);
       if (fresh) {
         const view = await teacherDayView(teacher.id, teacher.name);
         tried++;
         if (await send(Number(teacher.chat_id), view.text)) {
+          await recordSent(dayCampaign, teacher.chat_id, view.text);
           done.push(`сводка → ${teacher.name}`);
         } else {
           failed++;
-          if (force !== 'day') await release(dayCampaign, teacher.chat_id);
+          if (force !== 'day') await releaseSend(dayCampaign, teacher.chat_id);
         }
       }
     }
@@ -116,18 +95,19 @@ export async function GET(req: Request): Promise<Response> {
       const campaign = `teach-ses:${s.session_id}`;
       if (force !== 'next') {
         // Сводка ушла только что и это занятие в ней уже было — хватит.
-        const ago = await sentAgo(dayCampaign, teacher.chat_id);
+        const ago = await sentAgoMin(dayCampaign, teacher.chat_id);
         if (ago !== null && ago < AFTER_DIGEST_QUIET) continue;
-        if (!(await claim(campaign, teacher.chat_id))) continue;
+        if (!(await claimSend(campaign, teacher.chat_id))) continue;
       }
       const view = await teacherSessionView(s.session_id, teacher.name);
       if (!view) continue;
       tried++;
       if (await send(Number(teacher.chat_id), view.text)) {
+        await recordSent(campaign, teacher.chat_id, view.text);
         done.push(`за час → ${teacher.name}, ${s.group_title}`);
       } else {
         failed++;
-        if (force !== 'next') await release(campaign, teacher.chat_id);
+        if (force !== 'next') await releaseSend(campaign, teacher.chat_id);
       }
     }
   }

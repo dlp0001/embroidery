@@ -1,5 +1,6 @@
-import { one } from '@/lib/db';
-import { askTargets, askView, isConfigured, send } from '@/lib/telegram';
+import {
+  askTargets, askView, claimSend, isConfigured, recordSent, releaseSend, send,
+} from '@/lib/telegram';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -41,13 +42,7 @@ export async function GET(req: Request): Promise<Response> {
     const campaign = `ask:${t.session_id}`;
     // Место в журнале занимаем до отправки: крон может сработать дважды,
     // и родитель получит один и тот же вопрос два раза.
-    const claimed = await one(
-      `insert into tg_log (campaign, chat_id) values ($1, $2)
-       on conflict (campaign, chat_id) do nothing
-       returning chat_id`,
-      [campaign, t.chat_id],
-    );
-    if (!claimed) { skipped++; continue; }
+    if (!(await claimSend(campaign, t.chat_id))) { skipped++; continue; }
 
     const view = await askView(t.user_id, t.session_id);
     // Занятие отменили или семья ему больше не подходит — спрашивать не о чем.
@@ -55,14 +50,14 @@ export async function GET(req: Request): Promise<Response> {
 
     const ok = await send(Number(t.chat_id), view.text, view.keyboard);
     if (ok) {
+      await recordSent(campaign, t.chat_id, view.text);
       sent++;
     } else {
       failed++;
       // Не ушло — снимаем отметку, чтобы следующий запуск попробовал ещё
       // раз. Заблокировавший бота сюда больше не попадёт: у него снята
       // привязка, и в списке его уже нет.
-      await one('delete from tg_log where campaign = $1 and chat_id = $2 returning chat_id',
-        [campaign, t.chat_id]);
+      await releaseSend(campaign, t.chat_id);
     }
     await pause();
   }

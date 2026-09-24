@@ -477,6 +477,45 @@ export async function eventViews(userId: string, origin: string): Promise<GroupV
   return out;
 }
 
+// ── Журнал отправленного ──────────────────────────────────
+
+/**
+ * Рассылки идут по журналу: отметку занимают до отправки, чтобы повторный
+ * запуск не прислал то же дважды. Обе рассылки пользуются одними
+ * функциями — иначе правила «что считать отправленным» разъедутся.
+ */
+export async function claimSend(campaign: string, chatId: string): Promise<boolean> {
+  return Boolean(await one(
+    `insert into tg_log (campaign, chat_id) values ($1, $2)
+     on conflict (campaign, chat_id) do nothing returning chat_id`,
+    [campaign, chatId]));
+}
+
+/** Не ушло — снимаем отметку, чтобы следующий запуск попробовал снова. */
+export async function releaseSend(campaign: string, chatId: string): Promise<void> {
+  await one('delete from tg_log where campaign = $1 and chat_id = $2 returning chat_id',
+    [campaign, chatId]);
+}
+
+/**
+ * Что именно ушло. Складываем текст целиком: пожелание выбирается
+ * случайно, а прочитать отправленное у Telegram нельзя, и без этого на
+ * вопрос «что получил человек» ответить нечем.
+ */
+export async function recordSent(campaign: string, chatId: string, text: string): Promise<void> {
+  await query('update tg_log set text = $3 where campaign = $1 and chat_id = $2',
+    [campaign, chatId, text]);
+}
+
+/** Сколько минут назад это отправляли. null — не отправляли вовсе. */
+export async function sentAgoMin(campaign: string, chatId: string): Promise<number | null> {
+  const row = await one<{ ago: string }>(
+    `select (extract(epoch from (now() - sent_at)) / 60)::int::text as ago
+       from tg_log where campaign = $1 and chat_id = $2`,
+    [campaign, chatId]);
+  return row ? Number(row.ago) : null;
+}
+
 // ── Экран преподавателя ───────────────────────────────────
 
 /**
