@@ -5,6 +5,7 @@ import {
 } from './format';
 import {
   eventSlotsForUser, markDeclined, sessionIsPast, setBooking, slotsForUser, teacherSessions,
+  unclosedBefore,
   type GroupKind, type SlotRow,
 } from './studio';
 
@@ -659,17 +660,34 @@ export async function teacherToday(teacherId: string): Promise<
  * нет, и родительская неделя для неё пуста.
  */
 export async function teacherDayView(teacherId: string, name: string | null): Promise<View> {
-  const today = await teacherSessions(teacherId);
+  const [today, unclosed] = await Promise.all([
+    teacherSessions(teacherId),
+    unclosedBefore(teacherId),
+  ]);
   const hello = greeting(firstName(name));
+
+  // Неотмеченное занятие это не забытая галочка, а непосчитанные деньги:
+  // пока журнал не закрыт, начислений по нему нет. Увидеть это можно
+  // только открыв сайт, поэтому напоминаем здесь.
+  const tail = unclosed.length === 0 ? [] : [
+    `Не отмечено за прошлые дни: ${unclosed.length}. Пока журнал не закрыт,`
+      + ' деньги за эти занятия не посчитаны.',
+    ...unclosed.map((s) => `   ${dayMonth(s.held_on)} · ${s.group_title}`),
+    '',
+  ];
+
   if (today.length === 0) {
-    return { text: `${hello}\n\nСегодня занятий нет. ${wish()}`, keyboard: [] };
+    return {
+      text: [hello, '', 'Сегодня занятий нет.', '', ...tail, wish()].join('\n'),
+      keyboard: [],
+    };
   }
 
   const blocks: string[][] = [];
   for (const s of today) blocks.push(await sessionLines(s.session_id, s.group_title, s.starts_at));
 
   return {
-    text: [hello, '', ...blocks.flatMap((b) => [...b, '']), wish()].join('\n'),
+    text: [hello, '', ...blocks.flatMap((b) => [...b, '']), ...tail, wish()].join('\n'),
     keyboard: [],
   };
 }

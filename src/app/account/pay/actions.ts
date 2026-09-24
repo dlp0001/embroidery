@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import {
   declareCash, declineCash, dropPayment, myPendingCash, startPayment, type Intent,
 } from '@/lib/billing';
+import { cashDeclared } from '@/lib/notify';
 import { isAdmin, onlyLooking, requireUser } from '@/lib/session';
 
 /** Адрес сайта берём из запроса, чтобы совпадал и на превью, и на проде. */
@@ -39,6 +40,9 @@ async function declare(form: FormData, way: 'cash' | 'transfer'): Promise<never>
   const user = await requireUser();
   const res = await declareCash(user, pickedCharges(form), way);
   if ('error' in res) redirect('/account/pay?error=' + encodeURIComponent(res.error));
+  // Пока заявку не подтвердили, деньги висят незачтёнными, а увидеть это
+  // можно только открыв «Финансы». Говорим Варе сразу.
+  await cashDeclared(user.id);
   redirect('/account/pay?cash=' + res.count);
 }
 

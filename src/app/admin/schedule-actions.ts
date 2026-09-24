@@ -2,11 +2,13 @@
 
 import { revalidatePath } from 'next/cache';
 import { confirmCash, declineCash } from '@/lib/billing';
+import { hhmm } from '@/lib/format';
+import { cashConfirmed, cashDeclined, sessionChanged } from '@/lib/notify';
 import type { SaveResult } from '@/components/AutoSave';
 import { isAdmin, requireUser } from '@/lib/session';
 import {
   addSession, createGroup, issuePass, resyncGroupSessions, saleOffers,
-  setBooking, setGroupActive, setSessionStatus, setSessionTime, updateGroup,
+  sessionNow, setBooking, setGroupActive, setSessionStatus, setSessionTime, updateGroup,
   type GroupInput, type GroupKind, type PassOffer,
 } from '@/lib/studio';
 
@@ -139,8 +141,16 @@ export async function setSessionStatusAction(form: FormData): Promise<void> {
   if (status !== 'planned' && status !== 'cancelled') throw new Error('BAD_STATUS');
   // Отказ возможен только у прошедшего занятия с отметками: кнопки для
   // него на экране нет, так что сюда доходят разве что старой вкладкой.
-  const done = await setSessionStatus(String(form.get('id')), status);
+  const id = String(form.get('id'));
+  const before = await sessionNow(id);
+  const done = await setSessionStatus(id, status);
   if (!done) throw new Error('PAST_WITH_ATTENDANCE');
+  // Записанным говорим сразу: приехать на отменённое занятие хуже, чем
+  // любое лишнее сообщение. Но только если состояние правда изменилось —
+  // «вернули в расписание» тому, у кого и так всё в силе, это шум.
+  if (before && before.status !== status) {
+    await sessionChanged(id, status === 'cancelled' ? 'cancelled' : 'restored');
+  }
   refresh();
 }
 
@@ -158,7 +168,14 @@ export async function setSessionTimeAction(form: FormData): Promise<void> {
     ? `${digits.slice(0, -2).padStart(2, '0')}:${digits.slice(-2)}`
     : '';
   if (!usual && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error('BAD_TIME');
-  await setSessionTime(String(form.get('id')), usual ? null : time);
+  const id = String(form.get('id'));
+  const before = await sessionNow(id);
+  await setSessionTime(id, usual ? null : time);
+  const after = await sessionNow(id);
+  // Нажали сохранить, не поменяв действующее время — рассылать нечего.
+  if (before && after && hhmm(before.at) !== hhmm(after.at)) {
+    await sessionChanged(id, 'moved');
+  }
   refresh();
 }
 
@@ -232,10 +249,13 @@ export async function confirmCashAction(form: FormData): Promise<void> {
   // Способ должен быть назван: от него зависит, каким блоком уйдёт чек.
   // Молча считать наличными нельзя — деньги могли прийти в банк.
   if (!(HOW as readonly string[]).includes(raw)) return;
-  await confirmCash(String(form.get('paymentId')), user.id, {
+  const paymentId = String(form.get('paymentId'));
+  await confirmCash(paymentId, user.id, {
     method: raw as (typeof HOW)[number],
     receipt: form.get('receipt') === 'on',
   });
+  // Родитель считает, что заплатил, и до сих пор не узнавал, зачли ли.
+  await cashConfirmed(paymentId);
   revalidatePath('/admin/studio/debts');
   revalidatePath('/admin/studio/ledger');
   revalidatePath('/account/pay');
@@ -243,7 +263,11 @@ export async function confirmCashAction(form: FormData): Promise<void> {
 
 export async function declineCashAction(form: FormData): Promise<void> {
   const user = await requireAdmin();
-  await declineCash(String(form.get('paymentId')), user.id);
+  const paymentId = String(form.get('paymentId'));
+  // Говорим до отказа: после него платежа с этим чатом уже не найти,
+  // если declineCash когда-нибудь начнёт чистить записи.
+  await cashDeclined(paymentId);
+  await declineCash(paymentId, user.id);
   revalidatePath('/admin/studio/debts');
   revalidatePath('/admin/studio/ledger');
   revalidatePath('/account/pay');

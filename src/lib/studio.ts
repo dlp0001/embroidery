@@ -1369,6 +1369,23 @@ export async function addSession(groupId: string, heldOn: string): Promise<void>
  * деньги, и «отменено» рядом с начисленным долгом — это не отмена, а
  * расхождение. Проверку держим здесь, в запросе, а не только на экране.
  */
+/**
+ * Время и состояние занятия до правки. Нужны, чтобы не рассылать
+ * «занятие перенесли» тем, у кого ничего не изменилось: Варя может
+ * нажать сохранить, ничего не поменяв.
+ */
+export async function sessionNow(
+  id: string,
+): Promise<{ at: string; status: string } | null> {
+  // Отдаём действующее время, а не переопределение: снять переопределение
+  // и попасть в обычное время группы значит не изменить ничего, и
+  // рассылать по такому поводу нечего.
+  return one<{ at: string; status: string }>(
+    `select coalesce(s.starts_at, g.starts_at)::text as at, s.status
+       from studio_sessions s join studio_groups g on g.id = s.group_id
+      where s.id = $1`, [id]);
+}
+
 export async function setSessionStatus(id: string, status: 'planned' | 'cancelled'): Promise<boolean> {
   const rows = await query(
     `update studio_sessions s set status = $2
