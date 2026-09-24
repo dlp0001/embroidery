@@ -1672,6 +1672,35 @@ export async function allActivePasses(): Promise<PassRow[]> {
   );
 }
 
+export type SpentPass = PassRow & { last_used: string | null };
+
+/**
+ * Абонементы, которые только что закончились: срок ещё не вышел, а
+ * занятия уже все. В списке действующих им не место, но и совсем
+ * прятать нельзя — иначе в журнале стоит «по абонементу», а абонемента
+ * нигде нет, и непонятно, приснился он или был.
+ */
+export async function spentPasses(days = 30): Promise<SpentPass[]> {
+  return query<SpentPass>(
+    `select p.id, u.name as owner_name, u.email as owner_email, p.lessons_total,
+            0 as left, p.valid_to::text,
+            (select g.title from studio_groups g where g.id = p.group_id) as group_title,
+            coalesce((select g.kind from studio_groups g where g.id = p.group_id), 'lesson') as kind,
+            (select pay.provider from payments pay where pay.id = p.payment_id) as paid,
+            (select max(s.held_on)::text from charges c
+               join studio_sessions s on s.id = c.session_id
+              where c.pass_id = p.id) as last_used
+       from passes p
+       join users u on u.id = p.owner_id
+      where p.lessons_total <= (select count(*) from charges c where c.pass_id = p.id)
+        and (select max(s.held_on) from charges c
+               join studio_sessions s on s.id = c.session_id
+              where c.pass_id = p.id) >= current_date - ($1 || ' days')::interval
+      order by last_used desc nulls last, coalesce(u.name, u.email)`,
+    [String(days)],
+  );
+}
+
 // ── Люди: семьи, дети, состав групп ───────────────────────
 
 export type FamilyChild = {

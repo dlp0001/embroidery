@@ -1,7 +1,7 @@
 import { isAdmin, requireTeacher } from '@/lib/session';
 import {
   PASS_WARN_DAYS, allActivePasses, debtors, lessonPrice, passOwners, saleOffers,
-  unbilledVisits,
+  spentPasses, unbilledVisits,
 } from '@/lib/studio';
 import { pendingCash } from '@/lib/billing';
 import { isConfigured as receiptsConfigured } from '@/lib/icount';
@@ -33,6 +33,7 @@ export default async function DebtsPage() {
     admin ? pendingCash() : [],
     saleOffers(),
   ]);
+  const spent = await spentPasses();
   const unbilled = await unbilledVisits();
   const receipts = receiptsConfigured();
   // Скоро сгорят: срок на исходе, а занятия ещё остались.
@@ -168,6 +169,25 @@ export default async function DebtsPage() {
             </div>
           </div>
         ))}
+
+        {/* Только что закончившиеся: в журнале по ним ещё стоит «по
+            абонементу», и без этой строки непонятно, чем оплачено. */}
+        {spent.length > 0 && (
+          <>
+            <div className="lbl">Закончились</div>
+            {spent.map((p) => (
+              <div className="card" key={p.id} style={{ opacity: 0.7 }}>
+                <div className="what">{p.owner_name ?? p.owner_email}</div>
+                <div className="sub">
+                  {p.group_title ? `${p.group_title}: ` : ''}
+                  все {p.lessons_total} использованы
+                  {p.last_used ? ` · последнее ${dayMonth(p.last_used)}` : ''}
+                  {p.paid ? ` · оплачен ${PAID[p.paid] ?? p.paid}` : ' · не оплачен'}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
 
         {admin && (
           <div className="card" style={{ borderStyle: 'dashed', marginTop: 16 }}>
