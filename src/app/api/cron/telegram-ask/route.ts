@@ -1,3 +1,4 @@
+import { cronRights } from '@/lib/cron-auth';
 import {
   askTargets, askView, claimSend, isConfigured, recordSent, releaseSend, send,
 } from '@/lib/telegram';
@@ -15,20 +16,14 @@ export const dynamic = 'force-dynamic';
  * секрета — не работаем вовсе, иначе рассылку сможет запустить кто
  * угодно и сколько угодно раз.
  */
-function allowed(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  return req.headers.get('authorization') === `Bearer ${secret}`;
-}
-
 /** Телеграм принимает около тридцати сообщений в секунду. Не частим. */
 function pause(): Promise<void> {
   return new Promise((r) => setTimeout(r, 120));
 }
 
 export async function GET(req: Request): Promise<Response> {
-  if (!allowed(req)) {
-    console.error('cron: вызов без секрета');
+  if (cronRights(req) === 'none') {
+    console.error('cron: вызов без ключа');
     return Response.json({ error: 'forbidden' }, { status: 401 });
   }
   if (!isConfigured()) return Response.json({ skipped: 'бот не настроен' });

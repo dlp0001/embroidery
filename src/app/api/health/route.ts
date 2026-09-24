@@ -47,6 +47,9 @@ export async function GET() {
       // Без него вечерний вопрос не рассылается: роут расписания
       // отвечает 401 всем, включая сам Vercel.
       cron: Boolean(process.env.CRON_SECRET),
+      // Второй ключ: им отправляют немедленно, мимо окон. Нет — значит
+      // принудительной отправки нет вовсе, и это не поломка, а выбор.
+      cronForce: Boolean(process.env.CRON_FORCE_SECRET),
       payplus: payplusReady(),
       payplusEnv: process.env.PAYPLUS_ENV === 'prod' ? 'prod' : 'test',
       icount: icountReady(),

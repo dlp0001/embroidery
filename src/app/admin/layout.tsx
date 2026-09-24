@@ -1,3 +1,4 @@
+import { after } from 'next/server';
 import { redirect } from 'next/navigation';
 import Tabs, { type Tab } from '@/components/Tabs';
 import SignOut from '@/components/SignOut';
@@ -5,6 +6,7 @@ import NotConfigured from '@/components/NotConfigured';
 import PeekBar from '@/components/PeekBar';
 import { actingAs, canTeach, currentUser, isAdmin, realUser } from '@/lib/session';
 import { cabinetOwners } from '@/lib/studio';
+import { tickOnTraffic } from '@/lib/tg-due';
 import { stopViewAction } from '@/app/admin/view-actions';
 
 const TABS: Tab[] = [
@@ -23,6 +25,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const user = await currentUser();
   if (!user) redirect('/login');
   if (!canTeach(user)) redirect('/account');
+
+  // Подстраховка триггера: журнал открывают в течение дня, и этого хватает,
+  // чтобы сводка уходила, даже когда внешнее расписание молчит. Работа идёт
+  // после ответа и себя ограничивает, поэтому страницу не задерживает.
+  after(tickOnTraffic());
 
   // Журнал тоже можно смотреть чужими глазами: у Вари он свой, и видеть
   // его таким, какой он у неё, полезнее, чем расспрашивать.

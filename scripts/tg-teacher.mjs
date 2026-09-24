@@ -4,11 +4,14 @@
 //   npm run tg:teacher -- next    напоминание про ближайшее занятие
 //   npm run tg:teacher -- day http://localhost:4321   на другом адресе
 //
-// Нужен CRON_SECRET в .env.production.local — тот же, что в Vercel.
+// Нужен CRON_FORCE_SECRET в .env.production.local и в Vercel. Это второй
+// ключ, отдельный от CRON_SECRET: тем, что отдан внешнему пингеру,
+// отправить немедленно нельзя — он умеет только спросить «что пора».
 
-const secret = process.env.CRON_SECRET;
+const secret = process.env.CRON_FORCE_SECRET;
 if (!secret) {
-  console.error('CRON_SECRET не задан. Положите его в .env.production.local — тот же, что в Vercel.');
+  console.error('CRON_FORCE_SECRET не задан. Положите его в .env.production.local и в Vercel:');
+  console.error('  node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'base64url\'))"');
   process.exit(1);
 }
 
