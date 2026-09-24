@@ -685,8 +685,17 @@ export async function teacherSessionView(
   if (!head) return null;
 
   const lines = await sessionLines(sessionId, head.title, head.at);
+  // «Через час» верно только когда правда через час. По расписанию так и
+  // есть, но это же сообщение можно попросить руками в любой момент, и
+  // тогда обещать час нельзя.
+  const mins = (t: string): number => {
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+  };
+  const left = mins(hhmm(head.at)) - mins(nowHM().hhmm);
+  const lead = left > 0 && left <= 90 ? 'Через час:' : 'Сегодня:';
   return {
-    text: [greeting(firstName(name)), '', 'Через час:', ...lines, '', wish()].join('\n'),
+    text: [greeting(firstName(name)), '', lead, ...lines, '', wish()].join('\n'),
     keyboard: [],
   };
 }
