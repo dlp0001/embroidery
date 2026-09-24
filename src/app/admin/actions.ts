@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { canTeach, isAdmin, requireUser } from '@/lib/session';
+import { canTeach, isAdmin, onlyLooking, requireUser } from '@/lib/session';
 import { issueReceipt } from '@/lib/billing';
 import { WAY, type PayMethod } from '@/lib/format';
 import {
@@ -18,6 +18,7 @@ const METHODS = Object.keys(WAY) as PayMethod[];
  * родителя привяжем потом в «Людях».
  */
 export async function addWalkInAction(formData: FormData): Promise<void> {
+  if (await onlyLooking()) return;
   const user = await requireUser();
   if (!canTeach(user)) throw new Error('FORBIDDEN');
 
@@ -37,6 +38,8 @@ export async function addWalkInAction(formData: FormData): Promise<void> {
 }
 
 export async function saveJournal(formData: FormData): Promise<void> {
+  // Из чужих глаз журнал не сохраняется: смотреть можно, вести — нет.
+  if (await onlyLooking()) return;
   const user = await requireUser();
   if (!canTeach(user)) throw new Error('FORBIDDEN');
 

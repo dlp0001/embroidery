@@ -3,13 +3,16 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { plural, telegramNick } from '@/lib/format';
-import { isAdmin, requireUser } from '@/lib/session';
+import { isAdmin, onlyLooking, requireUser } from '@/lib/session';
 import {
   addChildTo, createParent, hideChild, linkChild, mergeChildren, renameChildById,
   restoreChild, saveParent, setPreferredDay,
 } from '@/lib/studio';
 
 async function requireAdmin() {
+  // Чужой кабинет — только для чтения, и преподавательская часть тоже:
+  // из просмотра нельзя ни отметить занятие, ни тронуть деньги.
+  if (await onlyLooking()) throw new Error('ONLY_LOOKING');
   const user = await requireUser();
   if (!isAdmin(user)) throw new Error('FORBIDDEN');
   return user;

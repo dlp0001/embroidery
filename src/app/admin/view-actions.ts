@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { isSuperadmin, realUser, startActing, stopActing } from '@/lib/session';
+import { cabinetOwners } from '@/lib/studio';
 
 /**
  * Открыть чужой кабинет и вернуться к себе. Подмена живёт в куке и
@@ -15,7 +16,11 @@ export async function viewAsAction(formData: FormData): Promise<void> {
   const userId = String(formData.get('userId') ?? '');
   if (!userId) redirect('/admin/studio/admin?error=Не выбран человек');
   await startActing(userId);
-  redirect('/account');
+  // Меняя человека из журнала, в журнале и остаёмся — если новому там
+  // есть что показать. Родителя журнал всё равно отправит в кабинет.
+  const teaches = (await cabinetOwners()).find((o) => o.id === userId)?.teaches ?? false;
+  const back = String(formData.get('back') ?? '');
+  redirect(back === '/admin/studio' && teaches ? '/admin/studio' : '/account');
 }
 
 export async function stopViewAction(): Promise<void> {

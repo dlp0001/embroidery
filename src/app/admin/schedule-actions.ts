@@ -5,7 +5,7 @@ import { confirmCash, declineCash } from '@/lib/billing';
 import { hhmm } from '@/lib/format';
 import { cashConfirmed, cashDeclined, sessionChanged } from '@/lib/notify';
 import type { SaveResult } from '@/components/AutoSave';
-import { isAdmin, requireUser } from '@/lib/session';
+import { isAdmin, onlyLooking, requireUser } from '@/lib/session';
 import {
   addSession, createGroup, issuePass, resyncGroupSessions, saleOffers,
   sessionNow, setBooking, setGroupActive, setSessionStatus, setSessionTime, updateGroup,
@@ -14,6 +14,9 @@ import {
 
 /** Расписание правят админ и суперадмин. Преподавателю сюда нельзя. */
 async function requireAdmin() {
+  // Чужой кабинет — только для чтения, и преподавательская часть тоже:
+  // из просмотра нельзя ни отметить занятие, ни тронуть деньги.
+  if (await onlyLooking()) throw new Error('ONLY_LOOKING');
   const user = await requireUser();
   if (!isAdmin(user)) throw new Error('FORBIDDEN');
   return user;
@@ -188,6 +191,7 @@ export async function setSessionTimeAction(form: FormData): Promise<void> {
  * в том месте, где выбирали ребёнка.
  */
 export async function bookChildAction(form: FormData): Promise<SaveResult> {
+  if (await onlyLooking()) return { ok: false, error: 'Только смотрите: менять нельзя.' };
   await requireAdmin();
   const sessionId = String(form.get('sessionId') ?? '');
   const participantId = String(form.get('participantId') ?? '');
@@ -200,6 +204,7 @@ export async function bookChildAction(form: FormData): Promise<SaveResult> {
 
 /** Снять запись с занятия. Спрашивает подтверждение на экране, не здесь. */
 export async function unbookChildAction(form: FormData): Promise<SaveResult> {
+  if (await onlyLooking()) return { ok: false, error: 'Только смотрите: менять нельзя.' };
   await requireAdmin();
   const sessionId = String(form.get('sessionId') ?? '');
   const participantId = String(form.get('participantId') ?? '');

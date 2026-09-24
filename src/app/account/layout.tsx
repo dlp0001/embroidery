@@ -2,10 +2,10 @@ import { redirect } from 'next/navigation';
 import Tabs, { type Tab } from '@/components/Tabs';
 import SignOut from '@/components/SignOut';
 import NotConfigured from '@/components/NotConfigured';
-import PeekSwitch from '@/components/PeekSwitch';
+import PeekBar from '@/components/PeekBar';
 import { actingAs, canTeach, currentUser, realUser } from '@/lib/session';
 import { cabinetOwners } from '@/lib/studio';
-import { stopViewAction, viewAsAction } from '@/app/admin/view-actions';
+import { stopViewAction } from '@/app/admin/view-actions';
 
 const TABS: Tab[] = [
   { href: '/account', icon: 'week', label: 'Неделя' },
@@ -32,18 +32,13 @@ export default async function AccountLayout({ children }: { children: React.Reac
   return (
     <div className="app">
       {peek && (
-        <div className="peek">
-          <span>
-            Кабинет:{' '}
-            {owners.length > 1
-              ? <PeekSwitch action={viewAsAction} people={owners} current={peek.id} />
-              : <b style={{ color: 'var(--charcoal)' }}>{peek.name ?? peek.email}</b>}
-          </span>
-          <form action={stopViewAction}>
-            <button className="linky" type="submit">Вернуться к себе</button>
-          </form>
-          <span className="peek-note">только смотрите, менять ничего нельзя</span>
-        </div>
+        <PeekBar
+          peek={peek}
+          owners={owners}
+          cross={canTeach(peek)
+            ? { href: '/admin/studio', label: 'Журнал' }
+            : undefined}
+        />
       )}
       {children}
       {/* В чужом кабинете «Выйти» значило бы «выйти совсем»: вместо него
