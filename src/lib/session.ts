@@ -156,6 +156,18 @@ export async function requireUser(): Promise<CurrentUser> {
   return user;
 }
 
+/**
+ * Родительский кабинет. Тому, кто ведёт студию, он не нужен: свои дети
+ * видны ему в журнале, а имя и телеграм лежат в «Админе». Поэтому из
+ * кабинета такого человека сразу уводим в журнал — и когда он смотрит
+ * на кабинет чужими глазами, тоже.
+ */
+export async function requireParent(): Promise<CurrentUser> {
+  const user = await requireUser();
+  if (isAdmin(user)) redirect('/admin/studio');
+  return user;
+}
+
 export async function requireTeacher(): Promise<CurrentUser> {
   const user = await requireUser();
   if (!canTeach(user)) redirect('/account');

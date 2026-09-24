@@ -2,7 +2,7 @@ import Link from 'next/link';
 import BookingHint from '@/components/BookingHint';
 import EventSignup from '@/components/EventSignup';
 import SlotList from '@/components/SlotList';
-import { requireUser } from '@/lib/session';
+import { requireParent } from '@/lib/session';
 import {
   PASS_WARN_DAYS, eventSlotsForUser, passBalances, slotsForUser, unpaidCharges,
 } from '@/lib/studio';
@@ -11,7 +11,7 @@ import { dayMonth, daysUntil, money, plural, plusDays, todayISO, weekdayDayMonth
 export const dynamic = 'force-dynamic';
 
 export default async function WeekPage() {
-  const user = await requireUser();
+  const user = await requireParent();
   const today = todayISO();
   const [passes, unpaid, slots, events] = await Promise.all([
     passBalances(user.id),

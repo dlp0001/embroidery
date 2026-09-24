@@ -35,8 +35,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="app">
       {peek && (
-        <PeekBar peek={peek} owners={owners} back="/admin/studio"
-                 cross={{ href: '/account', label: 'Кабинет' }} />
+        <PeekBar peek={peek} owners={owners}
+                 cross={isAdmin(peek) ? undefined : { href: '/account', label: 'Кабинет' }} />
       )}
       {children}
       {/* В чужих глазах «Выйти» значило бы «выйти совсем»: вместо него
@@ -51,7 +51,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </form>
         </div>
       ) : (
-        <SignOut email={user.email} cross={{ href: '/account', label: 'Мой кабинет' }} />
+        <SignOut email={user.email} />
       )}
       <Tabs tabs={isAdmin(user) ? [...TABS, ADMIN_TAB] : TABS} />
     </div>

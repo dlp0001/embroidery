@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { requireUser } from '@/lib/session';
+import { requireParent } from '@/lib/session';
 import { slotsForUser } from '@/lib/studio';
 import { todayISO, weekdayDayMonth } from '@/lib/format';
 import BookingHint from '@/components/BookingHint';
@@ -39,7 +39,7 @@ export default async function CalendarPage({
 }: {
   searchParams: Promise<{ m?: string; d?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireParent();
   const params = await searchParams;
   const today = todayISO();
   const month = /^\d{4}-\d{2}$/.test(params.m ?? '') ? params.m! : today.slice(0, 7);

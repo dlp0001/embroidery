@@ -1,13 +1,10 @@
-import { requireUser } from '@/lib/session';
+import { requireParent } from '@/lib/session';
 import { archivedChildren, familyWithDays } from '@/lib/studio';
 import AutoSave from '@/components/AutoSave';
+import SelfCard from '@/components/SelfCard';
 import Toggles from '@/components/Toggles';
-import YesNo from '@/components/YesNo';
 import { chatOfUser } from '@/lib/telegram';
-import {
-  connectTelegram, createChild, disconnectTelegram, setMyAttendance, togglePreferredDay,
-  updateChild, updateMyProfile,
-} from '../actions';
+import { createChild, togglePreferredDay, updateChild } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +22,7 @@ const WEEK = [
 export default async function ProfilePage(
   { searchParams }: { searchParams: Promise<{ tg?: string }> },
 ) {
-  const user = await requireUser();
+  const user = await requireParent();
   const [family, hidden, chat, params] = await Promise.all([
     familyWithDays(user.id),
     archivedChildren(user.id),
@@ -48,103 +45,16 @@ export default async function ProfilePage(
       </div>
 
       <div className="body">
-        <div className="card">
-          <div className="what" style={{ marginBottom: 14 }}>Родитель</div>
-          <AutoSave
-            action={updateMyProfile}
-            hint="Ник не обязателен и нужен только для личных сообщений: бот пишет через «Подключить телеграм», а по нику Варя может написать вам сама."
-          >
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-              <div className="field" style={{ flex: '1 1 180px', marginBottom: 0, minWidth: 0 }}>
-                <label htmlFor="my-name">Имя и фамилия</label>
-                {/* Форма сохраняется сама и не отправляется, поэтому
-                    браузерная проверка required не сработала бы: пустое имя
-                    отклоняет действие, а AutoSave показывает это после
-                    ухода из поля. */}
-                <input
-                  id="my-name"
-                  name="name"
-                  defaultValue={user.name ?? ''}
-                  placeholder="Как вас зовут"
-                  maxLength={120}
-                  aria-required="true"
-                />
-              </div>
-              <div className="field" style={{ flex: '1 1 180px', marginBottom: 0, minWidth: 0 }}>
-                <label htmlFor="my-telegram">Ник в телеграме</label>
-                <input
-                  id="my-telegram"
-                  name="telegram"
-                  defaultValue={user.telegram ? `@${user.telegram}` : ''}
-                  placeholder="@мой_ник"
-                  maxLength={80}
-                  autoComplete="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                />
-              </div>
-            </div>
-          </AutoSave>
-          {/* Новичок попадает сюда сразу после входа, и поле у него пустое.
-              Молча ждать, пока он сам догадается, незачем. */}
-          {!user.name?.trim() && (
-            <p className="err" style={{ margin: '10px 0 0' }}>
-              Заполните имя и фамилию: по ним Варя понимает, кто записывает ребёнка.
-            </p>
-          )}
-          <div className="sub" style={{ marginTop: 10 }}>{user.email}</div>
-
-          <div className="lbl" style={{ margin: '18px 0 0' }}>Хожу на занятия сам</div>
-          <YesNo value={attends} action={setMyAttendance} />
-
-          {attends && me && (
-            <>
-              <div className="lbl" style={{ margin: '18px 0 0' }}>
-                Возможные дни моих посещений
-              </div>
-              <Toggles
-                items={WEEK.map((d) => ({ id: String(d.n), label: d.short }))}
-                active={me.days.map(String)}
-                action={togglePreferredDay}
-                fields={{ participantId: me.participant_id }}
-                itemField="weekday"
-              />
-              <div className="hint" style={{ marginTop: 10 }}>
-                Выбранные дни подсвечиваются в расписании. Записью это не является.
-              </div>
-            </>
-          )}
-        </div>
-
-        <div className="card">
-          <div className="what" style={{ marginBottom: 6 }}>Телеграм</div>
-          {chat ? (
-            <>
-              <p className="sub">
-                Подключён. Бот покажет ближайшую неделю, если ему написать.
-              </p>
-              <form action={disconnectTelegram} style={{ marginTop: 14 }}>
-                <button className="btn-quiet" type="submit">Отключить</button>
-              </form>
-            </>
-          ) : (
-            <>
-              <p className="sub">
-                Бот покажет ближайшую неделю: кто на какое занятие записан и
-                сколько осталось мест. Кнопка откроет телеграм — там нужно
-                нажать «Запустить».
-              </p>
-              <form action={connectTelegram} style={{ marginTop: 14 }}>
-                <button className="btn" type="submit">Подключить телеграм</button>
-              </form>
-              {params.tg === 'off' && (
-                <p className="hint" style={{ marginTop: 12 }}>
-                  Бот ещё не настроен. Попробуйте позже.
-                </p>
-              )}
-            </>
-          )}
-        </div>
+        <SelfCard
+          user={user}
+          chat={Boolean(chat)}
+          botOff={params.tg === 'off'}
+          attends={{
+            value: attends,
+            participantId: me?.participant_id ?? null,
+            days: me?.days ?? [],
+          }}
+        />
 
         {kids.map((m) => (
           <div className="card" key={m.participant_id}>

@@ -13,20 +13,17 @@ export default function PeekBar({
   peek,
   owners,
   cross,
-  back,
 }: {
   peek: CurrentUser;
   owners: CabinetOwner[];
   cross?: { href: string; label: string };
-  /** Где стоит полоса: в журнале переключение оставляет в журнале. */
-  back?: string;
 }) {
   return (
     <div className="peek">
       <span>
         Глазами:{' '}
         {owners.length > 1
-          ? <PeekSwitch action={viewAsAction} people={owners} current={peek.id} back={back} />
+          ? <PeekSwitch action={viewAsAction} people={owners} current={peek.id} />
           : <b style={{ color: 'var(--charcoal)' }}>{peek.name ?? peek.email}</b>}
       </span>
       <span style={{ display: 'flex', gap: 14, alignItems: 'baseline' }}>

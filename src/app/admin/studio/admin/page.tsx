@@ -1,6 +1,12 @@
 import { redirect } from 'next/navigation';
 import { currentUser, isAdmin, isSuperadmin } from '@/lib/session';
-import { cabinetOwners, mergeCandidates, type MergeCandidate } from '@/lib/studio';
+import { cabinetOwners, lessonPrice, mergeCandidates, type MergeCandidate } from '@/lib/studio';
+import SelfCard from '@/components/SelfCard';
+import { chatOfUser } from '@/lib/telegram';
+import { isConfigured as payConfigured } from '@/lib/payplus';
+import { lastTestPayment, TEST_AMOUNT } from '@/lib/billing';
+import { testPaymentAction } from '@/app/account/pay/actions';
+import { money } from '@/lib/format';
 import { mergeChildAction } from '@/app/admin/people-actions';
 import { viewAsAction } from '@/app/admin/view-actions';
 
@@ -25,10 +31,18 @@ export default async function AdminToolsPage({
 
   const { note, error } = await searchParams;
   const looker = isSuperadmin(user);
-  const [kids, all] = await Promise.all([
+  // Кабинета у Вари нет, поэтому своё имя, ник и телеграм она правит
+  // здесь же — и проверочный платёж отсюда же, это тоже не родительское
+  // дело.
+  const online = payConfigured();
+  const [kids, all, chat, lastTest, price] = await Promise.all([
     mergeCandidates(),
     looker ? cabinetOwners() : [],
+    chatOfUser(user.id),
+    online ? lastTestPayment(user.id) : Promise.resolve(null),
+    lessonPrice(),
   ]);
+  const mode = process.env.PAYPLUS_ENV === 'prod' ? 'боевая' : 'тестовая';
   // Себя в списке не показываем: свой кабинет открывается без подмены.
   const owners = all.filter((o) => o.id !== user.id);
 
@@ -43,6 +57,8 @@ export default async function AdminToolsPage({
       <div className="body">
         {note && <p className="note" style={{ marginBottom: 14 }}>{note}</p>}
         {error && <p className="err" style={{ marginBottom: 14 }}>{error}</p>}
+
+        <SelfCard user={user} chat={Boolean(chat)} title="Обо мне" />
 
         <div className="card">
           <div className="what" style={{ marginBottom: 6 }}>Объединить детей</div>
@@ -114,6 +130,33 @@ export default async function AdminToolsPage({
 
                 <button className="btn-wide" type="submit">Посмотреть</button>
               </form>
+            )}
+          </div>
+        )}
+
+        {online && (
+          <div className="card" style={{ borderStyle: 'dashed', marginTop: 16 }}>
+            <div className="what" style={{ marginBottom: 8 }}>Проверка оплаты</div>
+            <p className="hint" style={{ marginBottom: 16 }}>
+              Платёж на {TEST_AMOUNT}&nbsp;₪, который ничего не выдаёт. Нужен, чтобы
+              убедиться, что деньги доходят и подтверждение возвращается.
+              Среда сейчас <strong style={{ color: 'var(--charcoal)' }}>{mode}</strong>
+              {mode === 'боевая' ? ' — деньги настоящие, вернуть можно из кабинета PayPlus.' : '.'}
+            </p>
+            <form action={testPaymentAction}>
+              <button className="btn-quiet" type="submit" style={{ width: '100%' }}>
+                Провести проверочный платёж
+              </button>
+            </form>
+            {lastTest && (
+              <p className="hint" style={{ marginTop: 14 }}>
+                Последняя попытка: {money(lastTest.amount, price.currency)} ·{' '}
+                {lastTest.status === 'paid'
+                  ? 'подтверждение получено, цепочка работает'
+                  : lastTest.status === 'pending'
+                    ? 'ждём подтверждения от PayPlus'
+                    : 'не прошла'}
+              </p>
             )}
           </div>
         )}

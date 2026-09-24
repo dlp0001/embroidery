@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { isAdmin, requireUser } from '@/lib/session';
+import { requireParent } from '@/lib/session';
 import {
   PASS_WARN_DAYS, lessonPrice, passBalances, saleOffers, unpaidCharges,
   type PassBalance,
@@ -8,11 +8,11 @@ import { isConfigured } from '@/lib/payplus';
 import { dayMonth, daysUntil, money, plural, todayISO, WAY } from '@/lib/format';
 import { STUDIO_TZ } from '@/lib/time';
 import {
-  lastTestPayment, myPendingCash, paymentHistory, TEST_AMOUNT, unfinishedPayments, verifyPending,
+  myPendingCash, paymentHistory, unfinishedPayments, verifyPending,
 } from '@/lib/billing';
 import DebtPicker from './DebtPicker';
 import {
-  buyPassAction, cancelCashAction, dropPaymentAction, testPaymentAction,
+  buyPassAction, cancelCashAction, dropPaymentAction,
 } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -23,19 +23,16 @@ export default async function PayPage({
 }: {
   searchParams: Promise<{ error?: string; cash?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireParent();
   const { error, cash } = await searchParams;
   const online = isConfigured();
-  const admin = isAdmin(user);
-  const mode = process.env.PAYPLUS_ENV === 'prod' ? 'боевая' : 'тестовая';
   // Всё разом, а не по очереди. Дольше всех обычно проверка зависших
   // платежей: она спрашивает про каждый у PayPlus, по сети. Раньше страница
   // ждала сначала её, потом всё остальное, и складывала одно с другим.
-  const [check, lastTest, claim, history0, started0, unpaid0, passes0, price, offers] =
+  const [check, claim, history0, started0, unpaid0, passes0, price, offers] =
     await Promise.all([
     // Зависшие платежи доводим до конца сами, не дожидаясь обратного вызова.
     verifyPending(user.id),
-    admin ? lastTestPayment(user.id) : Promise.resolve(null),
     myPendingCash(user.id),
     paymentHistory(user.id),
     unfinishedPayments(user.id),
@@ -305,32 +302,6 @@ export default async function PayPage({
           </div>
         )}
 
-        {admin && online && (
-          <div className="card" style={{ borderStyle: 'dashed', marginTop: 24 }}>
-            <div className="what" style={{ marginBottom: 8 }}>Проверка оплаты</div>
-            <p className="hint" style={{ marginBottom: 16 }}>
-              Платёж на {TEST_AMOUNT}&nbsp;₪, который ничего не выдаёт. Нужен, чтобы
-              убедиться, что деньги доходят и подтверждение возвращается.
-              Среда сейчас <strong style={{ color: 'var(--charcoal)' }}>{mode}</strong>
-              {mode === 'боевая' ? ' — деньги настоящие, вернуть можно из кабинета PayPlus.' : '.'}
-            </p>
-            <form action={testPaymentAction}>
-              <button className="btn-quiet" type="submit" style={{ width: '100%' }}>
-                Провести проверочный платёж
-              </button>
-            </form>
-            {lastTest && (
-              <p className="hint" style={{ marginTop: 14 }}>
-                Последняя попытка: {money(lastTest.amount, price.currency)} ·{' '}
-                {lastTest.status === 'paid'
-                  ? 'подтверждение получено, цепочка работает'
-                  : lastTest.status === 'pending'
-                    ? 'ждём подтверждения от PayPlus'
-                    : 'не прошла'}
-              </p>
-            )}
-          </div>
-        )}
         {history.length > 0 && (
           <>
             <div className="lbl day-band">История платежей</div>

@@ -19,8 +19,8 @@ export async function viewAsAction(formData: FormData): Promise<void> {
   // Меняя человека из журнала, в журнале и остаёмся — если новому там
   // есть что показать. Родителя журнал всё равно отправит в кабинет.
   const teaches = (await cabinetOwners()).find((o) => o.id === userId)?.teaches ?? false;
-  const back = String(formData.get('back') ?? '');
-  redirect(back === '/admin/studio' && teaches ? '/admin/studio' : '/account');
+  // Кто ведёт занятия, того смотрим в журнале: кабинета у него нет.
+  redirect(teaches ? '/admin/studio' : '/account');
 }
 
 export async function stopViewAction(): Promise<void> {

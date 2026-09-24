@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { requireUser } from '@/lib/session';
+import { requireParent } from '@/lib/session';
 import { familyParticipants, visitHistory, type VisitRow } from '@/lib/studio';
 import { dayMonth, money, shortDate } from '@/lib/format';
 
@@ -56,7 +56,7 @@ export default async function HistoryPage({
 }: {
   searchParams: Promise<{ p?: string; due?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireParent();
   const { p: person, due } = await searchParams;
   const onlyDue = due === '1';
 

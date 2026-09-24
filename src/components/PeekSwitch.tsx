@@ -12,13 +12,10 @@ export default function PeekSwitch({
   action,
   people,
   current,
-  back,
 }: {
   action: (form: FormData) => void;
   people: CabinetOwner[];
   current: string;
-  /** Откуда переключают: из журнала возвращаемся в журнал. */
-  back?: string;
 }) {
   const form = useRef<HTMLFormElement>(null);
   const studio = people.filter((p) => p.teaches);
@@ -27,7 +24,6 @@ export default function PeekSwitch({
 
   return (
     <form action={action} ref={form} style={{ display: 'inline' }}>
-      {back && <input type="hidden" name="back" value={back} />}
       <select
         name="userId"
         defaultValue={current}
