@@ -682,6 +682,20 @@ export async function teachersInBot(): Promise<Teacher[]> {
       where r.role = 'teacher' and u.tg_chat_id is not null`);
 }
 
+/**
+ * Кому идёт копия утренней сводки. Суперадмин, а не всякий админ: админ —
+ * это Варя, ей сводка и так адресована, а копия нужна тому, кто смотрит за
+ * студией со стороны. Роль преподавателя для этого не годится: она
+ * подменила бы ему родительскую неделю журналом и прислала бы ещё и
+ * напоминания за час.
+ */
+export async function digestWatchers(): Promise<Teacher[]> {
+  return query<Teacher>(
+    `select u.id, u.name, u.tg_chat_id::text as chat_id
+       from users u join user_roles r on r.user_id = u.id
+      where r.role = 'superadmin' and u.tg_chat_id is not null`);
+}
+
 /** Сегодняшние занятия преподавателя — обёртка, чтобы роут не лез в studio. */
 export async function teacherToday(teacherId: string): Promise<
   { session_id: string; group_title: string; starts_at: string }[]

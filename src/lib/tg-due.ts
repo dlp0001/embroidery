@@ -1,7 +1,7 @@
 import { one, query } from './db';
 import { nowHM, todayISO } from './format';
 import {
-  claimSend, isConfigured, recordSent, releaseSend, send, sentAgoMin,
+  claimSend, digestWatchers, isConfigured, recordSent, releaseSend, send, sentAgoMin,
   teacherDayView, teacherSessionView, teacherToday, teachersInBot,
 } from './telegram';
 
@@ -45,6 +45,8 @@ export async function sendDue(force: Force): Promise<DueResult> {
   let failed = 0;
   if (!isConfigured()) return { at, tried, failed, sent };
 
+  const watchers = await digestWatchers();
+
   for (const teacher of await teachersInBot()) {
     const sessions = await teacherToday(teacher.id);
 
@@ -69,6 +71,23 @@ export async function sendDue(force: Force): Promise<DueResult> {
         } else {
           failed++;
           if (force !== 'day') await releaseSend(dayCampaign, teacher.chat_id);
+        }
+
+        // Копия тому, кто смотрит за студией со стороны. Отдельной строкой
+        // сверху: сводка обращается к Варе по имени, и без пометки копия
+        // читалась бы как письмо не по адресу.
+        const copy = `Копия сводки · ${teacher.name ?? 'преподаватель'}\n\n${view.text}`;
+        for (const w of watchers) {
+          if (w.chat_id === teacher.chat_id) continue;
+          if (force !== 'day' && !(await claimSend(dayCampaign, w.chat_id))) continue;
+          tried++;
+          if (await send(Number(w.chat_id), copy)) {
+            await recordSent(dayCampaign, w.chat_id, copy);
+            sent.push(`копия сводки → ${w.name}`);
+          } else {
+            failed++;
+            if (force !== 'day') await releaseSend(dayCampaign, w.chat_id);
+          }
         }
       }
     }
