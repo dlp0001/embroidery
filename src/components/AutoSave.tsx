@@ -58,7 +58,13 @@ export default function AutoSave({
   function save(quiet: boolean): void {
     if (!form.current) return;
     const now = snapshot();
-    if (now === saved.current) return;
+    // Вернули то же, что уже лежит в базе: сохранять нечего, и ошибка,
+    // если она висела, больше не про что. Иначе стереть имя и вписать
+    // его обратно оставляло ругань на экране до перезагрузки.
+    if (now === saved.current) {
+      setError(null);
+      return;
+    }
     const data = new FormData(form.current);
     startTransition(async () => {
       setState('saving');

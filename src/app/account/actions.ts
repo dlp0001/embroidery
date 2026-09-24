@@ -82,7 +82,7 @@ export async function setMyAttendance(formData: FormData): Promise<void> {
 
 /**
  * Свою карточку родитель правит сам: раньше её мог поменять только админ.
- * Ник в телеграме необязателен, но если уж написан — должен быть ником,
+ * Имя обязательно, ник нет — но если ник написан, он должен быть ником,
  * иначе по нему всё равно никто не напишет.
  *
  * Отвечает результатом, а не переходом на страницу: форма сохраняется сама,
@@ -92,6 +92,9 @@ export async function updateMyProfile(formData: FormData): Promise<SaveResult> {
   if (await onlyLooking()) return LOOKING;
   const user = await requireUser();
   const name = String(formData.get('name') ?? '').trim().slice(0, 120);
+  // Имя обязательно: по нему Варя понимает, кто записывает ребёнка и с
+  // кем говорить про деньги. Проверяем первым — оно нужнее ника.
+  if (!name) return { ok: false, error: 'Имя и фамилия не могут быть пустыми.' };
   const tg = telegramNick(String(formData.get('telegram') ?? '').slice(0, 80));
   if (!tg.ok) {
     return {

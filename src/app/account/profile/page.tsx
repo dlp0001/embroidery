@@ -52,17 +52,22 @@ export default async function ProfilePage(
           <div className="what" style={{ marginBottom: 14 }}>Родитель</div>
           <AutoSave
             action={updateMyProfile}
-            hint="Ник не обязателен. Он нужен только затем, чтобы Варя могла быстро написать, если занятие переносится."
+            hint="Ник не обязателен и нужен только для личных сообщений: бот пишет через «Подключить телеграм», а по нику Варя может написать вам сама."
           >
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
               <div className="field" style={{ flex: '1 1 180px', marginBottom: 0, minWidth: 0 }}>
                 <label htmlFor="my-name">Имя и фамилия</label>
+                {/* Форма сохраняется сама и не отправляется, поэтому
+                    браузерная проверка required не сработала бы: пустое имя
+                    отклоняет действие, а AutoSave показывает это после
+                    ухода из поля. */}
                 <input
                   id="my-name"
                   name="name"
                   defaultValue={user.name ?? ''}
                   placeholder="Как вас зовут"
                   maxLength={120}
+                  aria-required="true"
                 />
               </div>
               <div className="field" style={{ flex: '1 1 180px', marginBottom: 0, minWidth: 0 }}>
@@ -80,6 +85,13 @@ export default async function ProfilePage(
               </div>
             </div>
           </AutoSave>
+          {/* Новичок попадает сюда сразу после входа, и поле у него пустое.
+              Молча ждать, пока он сам догадается, незачем. */}
+          {!user.name?.trim() && (
+            <p className="err" style={{ margin: '10px 0 0' }}>
+              Заполните имя и фамилию: по ним Варя понимает, кто записывает ребёнка.
+            </p>
+          )}
           <div className="sub" style={{ marginTop: 10 }}>{user.email}</div>
 
           <div className="lbl" style={{ margin: '18px 0 0' }}>Хожу на занятия сам</div>
