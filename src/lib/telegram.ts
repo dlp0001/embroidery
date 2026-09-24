@@ -4,7 +4,7 @@ import {
   dayMonth, hhmm, money, nowHM, packageFrom, plural, plusDays, todayISO, weekdayDayMonth,
 } from './format';
 import {
-  eventSlotsForUser, sessionIsPast, setBooking, slotsForUser, teacherSessions,
+  eventSlotsForUser, markDeclined, sessionIsPast, setBooking, slotsForUser, teacherSessions,
   type GroupKind, type SlotRow,
 } from './studio';
 
@@ -492,7 +492,7 @@ export async function isTeacher(userId: string): Promise<boolean> {
     [userId]));
 }
 
-type RosterRow = { who: string; booking: string; preferred: boolean };
+type RosterRow = { who: string; booking: string; declined: boolean; preferred: boolean };
 
 /**
  * Кого ждать на занятии. Состав тот же, что в журнале у Вари: все, кто
@@ -508,6 +508,7 @@ async function roster(sessionId: string): Promise<RosterRow[]> {
      )
      select coalesce(ch.name, u.name, 'Без имени') as who,
             coalesce(b.status, '') as booking,
+            (b.declined_at is not null) as declined,
             exists (select 1 from preferred_days pd cross join ses
                      where pd.participant_id = p.id and pd.weekday = ses.dow
                        and ses.kind = 'lesson') as preferred
@@ -522,6 +523,28 @@ async function roster(sessionId: string): Promise<RosterRow[]> {
           or (ses.audience = 'kids' and p.child_id is not null))
       order by who`,
     [sessionId]);
+}
+
+/**
+ * Чем закончить сообщение. Каждый раз другое: одна и та же строчка каждое
+ * утро через неделю читается как подпись в подвале и перестаёт значить
+ * что-либо.
+ */
+const WISHES = [
+  'Отличного дня и очень классного занятия!',
+  'Хорошего дня и занятия в радость!',
+  'Пусть день будет лёгким, а занятие — самым тёплым.',
+  'Вдохновения на сегодня и спокойного дня!',
+  'Пусть всё пройдёт на одном дыхании.',
+  'Лёгкого дня и удовольствия от работы!',
+  'Замечательного дня и красивых работ на занятии!',
+  'Пусть день порадует, а дети — удивят.',
+  'Доброго дня и самого приятного занятия!',
+  'Пусть руки слушаются, а день будет добрым.',
+];
+
+function wish(): string {
+  return WISHES[Math.floor(Math.random() * WISHES.length)];
 }
 
 function greeting(name: string): string {
@@ -551,7 +574,7 @@ function firstName(name: string | null): string {
 async function sessionLines(sessionId: string, title: string, at: string): Promise<string[]> {
   const rows = await roster(sessionId);
   const coming = rows.filter((r) => r.booking === 'booked').map((r) => r.who);
-  const refused = rows.filter((r) => r.booking === 'cancelled').map((r) => r.who);
+  const refused = rows.filter((r) => r.declined).map((r) => r.who);
   const usual = rows
     .filter((r) => r.preferred && r.booking === '')
     .map((r) => r.who);
@@ -561,9 +584,9 @@ async function sessionLines(sessionId: string, title: string, at: string): Promi
     ? `Записались (${coming.length}): ${coming.join(', ')}`
     : 'Записанных нет.');
   if (usual.length > 0) lines.push(`Обычно ходят, но не отметились: ${usual.join(', ')}`);
-  // «Сказали, что не придут» было бы неправдой: такая же отменённая строка
-  // получается, когда родитель снял запись на сайте. Для Вари разницы нет —
-  // важно, что не придут, — а обещать боту чужие слова не надо.
+  // Только те, кто прямо ответил боту «не придёт». Снятая на сайте запись
+  // сюда не попадает: это отсутствие записи, а не обещание не прийти, и
+  // мешать их в одну строку значит врать Варе про чужие слова.
   if (refused.length > 0) lines.push(`Не придут: ${refused.join(', ')}`);
   return lines;
 }
@@ -592,21 +615,18 @@ export async function teacherToday(teacherId: string): Promise<
  * сообщение боту, если пишет преподаватель: своей семьи у Вари в студии
  * нет, и родительская неделя для неё пуста.
  */
-export async function teacherDayView(
-  teacherId: string, name: string | null, origin: string,
-): Promise<View> {
+export async function teacherDayView(teacherId: string, name: string | null): Promise<View> {
   const today = await teacherSessions(teacherId);
   const hello = greeting(firstName(name));
   if (today.length === 0) {
-    return { text: `${hello}\n\nСегодня занятий нет.`, keyboard: [] };
+    return { text: `${hello}\n\nСегодня занятий нет. ${wish()}`, keyboard: [] };
   }
 
   const blocks: string[][] = [];
   for (const s of today) blocks.push(await sessionLines(s.session_id, s.group_title, s.starts_at));
 
   return {
-    text: [hello, '', ...blocks.flatMap((b) => [...b, ''])
-      , `Журнал: ${origin}/admin/studio`].join('\n'),
+    text: [hello, '', ...blocks.flatMap((b) => [...b, '']), wish()].join('\n'),
     keyboard: [],
   };
 }
@@ -616,7 +636,7 @@ export async function teacherDayView(
  * состав меняется, и к трём часам утренний список уже неправда.
  */
 export async function teacherSessionView(
-  sessionId: string, name: string | null, origin: string,
+  sessionId: string, name: string | null,
 ): Promise<View | null> {
   const head = await one<{ title: string; at: string; kind: GroupKind }>(
     `select g.title, coalesce(s.starts_at, g.starts_at)::text as at, g.kind
@@ -627,8 +647,7 @@ export async function teacherSessionView(
 
   const lines = await sessionLines(sessionId, head.title, head.at);
   return {
-    text: [`${greeting(firstName(name))}`, '', `Через час:`, ...lines, '',
-           `Журнал: ${origin}/admin/studio`].join('\n'),
+    text: [greeting(firstName(name)), '', 'Через час:', ...lines, '', wish()].join('\n'),
     keyboard: [],
   };
 }
@@ -780,5 +799,9 @@ export async function applyTap(userId: string, tap: Tap): Promise<string> {
   if (tap.book && (await sessionIsPast(tap.sessionId))) return 'День уже прошёл.';
   const res = await setBooking(tap.sessionId, tap.participantId, tap.book);
   if (!res.ok) return res.reason ?? 'Не получилось.';
+  // «Не придёт» из вечернего вопроса — это ответ, и Варя увидит его
+  // отдельной строкой. Снятая запись в недельном списке ответом не
+  // считается: человек просто передумал, никому ничего не обещая.
+  if (!tap.book && tap.from === 'ask') await markDeclined(tap.sessionId, tap.participantId);
   return tap.book ? 'Записали' : 'Отменили';
 }

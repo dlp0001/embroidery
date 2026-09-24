@@ -669,7 +669,7 @@ export async function setBooking(
       await c.query(
         `insert into bookings (session_id, participant_id, status) values ($1, $2, 'booked')
          on conflict (session_id, participant_id)
-         do update set status = 'booked', updated_at = now()`,
+         do update set status = 'booked', updated_at = now(), declined_at = null`,
         [sessionId, participantId],
       );
       return true;
@@ -690,6 +690,21 @@ export async function setBooking(
     );
     return { ok: true };
   }
+}
+
+/**
+ * Родитель сказал «не придёт» — не просто снял запись, а ответил на
+ * вопрос. Отдельная отметка, потому что для преподавателя это разные
+ * вещи: отсутствие записи и обещание не прийти.
+ *
+ * Ставится только из вечернего вопроса. Снимается сама, когда человек
+ * записывается обратно, — этим занимается setBooking.
+ */
+export async function markDeclined(sessionId: string, participantId: string): Promise<void> {
+  await query(
+    `update bookings set declined_at = now()
+      where session_id = $1 and participant_id = $2 and status = 'cancelled'`,
+    [sessionId, participantId]);
 }
 
 // ── Экран преподавателя ───────────────────────────────────

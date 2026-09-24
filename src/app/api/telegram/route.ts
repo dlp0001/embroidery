@@ -74,7 +74,7 @@ async function onMessage(chatId: number, text: string, origin: string): Promise<
   // Разбирать слова начнём тогда, когда боту будет что ещё ответить.
   const teaches = await isTeacher(user.id);
   if (teaches) {
-    const day = await teacherDayView(user.id, user.name, origin);
+    const day = await teacherDayView(user.id, user.name);
     await send(chatId, day.text);
   }
 

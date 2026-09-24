@@ -69,7 +69,6 @@ export async function GET(req: Request): Promise<Response> {
   if (!isConfigured()) return Response.json({ skipped: 'бот не настроен' });
 
   const force = new URL(req.url).searchParams.get('force');
-  const origin = new URL(req.url).origin;
   const today = todayISO();
   const now = minutes(nowHM().hhmm);
   const done: string[] = [];
@@ -92,7 +91,7 @@ export async function GET(req: Request): Promise<Response> {
     if (dayDue && (sessions.length > 0 || force === 'day')) {
       const fresh = force === 'day' || await claim(dayCampaign, teacher.chat_id);
       if (fresh) {
-        const view = await teacherDayView(teacher.id, teacher.name, origin);
+        const view = await teacherDayView(teacher.id, teacher.name);
         tried++;
         if (await send(Number(teacher.chat_id), view.text)) {
           done.push(`сводка → ${teacher.name}`);
@@ -121,7 +120,7 @@ export async function GET(req: Request): Promise<Response> {
         if (ago !== null && ago < AFTER_DIGEST_QUIET) continue;
         if (!(await claim(campaign, teacher.chat_id))) continue;
       }
-      const view = await teacherSessionView(s.session_id, teacher.name, origin);
+      const view = await teacherSessionView(s.session_id, teacher.name);
       if (!view) continue;
       tried++;
       if (await send(Number(teacher.chat_id), view.text)) {
