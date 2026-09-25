@@ -203,7 +203,7 @@ export default async function PeoplePage({
                 {/* Скрытый ребёнок остаётся на своём месте, только тускнеет:
                     так видно, что он в семье есть, но на занятия не ходит. */}
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <form action={renameChildAction} style={{ display: 'flex', gap: 8, alignItems: 'center', flex: '1 1 260px', minWidth: 0 }}>
+                  <form action={renameChildAction} style={{ display: 'flex', gap: 8, alignItems: 'center', flex: '1 1 300px', minWidth: 200 }}>
                     <input type="hidden" name="childId" value={ch.child_id} />
                     <input name="name" defaultValue={ch.name} aria-label="Имя ребёнка"
                            style={{
@@ -212,34 +212,35 @@ export default async function PeoplePage({
                            }} />
                     <button className="btn-quiet" type="submit">Переименовать</button>
                   </form>
-                  <form action={ch.archived ? restoreChildAction : hideChildAction}>
-                    <input type="hidden" name="childId" value={ch.child_id} />
-                    <button
-                      className="btn-quiet"
-                      type="submit"
-                      aria-label={`${ch.archived ? 'Вернуть' : 'Скрыть'} ${ch.name}`}
-                    >
-                      {ch.archived ? 'Вернуть' : 'Скрыть'}
-                    </button>
-                  </form>
-                </div>
-
-                {/* Второй родитель — обычно след от склейки двух записей
-                    одного ребёнка. Здесь его видно и отсюда же убирают. */}
-                {ch.parents.length > 0 && (
-                  <div className="row" style={{ marginTop: 6, alignItems: 'baseline' }}>
-                    <div className="sub">
-                      ещё {plural(ch.parents.length, 'родитель', 'родителя', 'родителей')}:{' '}
-                      {ch.parents.map((x) => x.name).join(', ')}
-                    </div>
+                  <div style={{ display: 'flex', gap: 8, flex: '0 0 auto' }}>
+                    <form action={ch.archived ? restoreChildAction : hideChildAction}>
+                      <input type="hidden" name="childId" value={ch.child_id} />
+                      <button
+                        className="btn-quiet"
+                        type="submit"
+                        aria-label={`${ch.archived ? 'Вернуть' : 'Скрыть'} ${ch.name}`}
+                      >
+                        {ch.archived ? 'Вернуть' : 'Скрыть'}
+                      </button>
+                    </form>
                     <form action={unlinkChildAction}>
                       <input type="hidden" name="childId" value={ch.child_id} />
                       <input type="hidden" name="userId" value={f.user_id} />
-                      <button className="linky" type="submit"
+                      <button className="btn-quiet" type="submit"
                               aria-label={`Отвязать ${ch.name} от этой семьи`}>
-                        отвязать отсюда
+                        Отвязать
                       </button>
                     </form>
+                  </div>
+                </div>
+
+                {/* Второй родитель — обычно след от склейки двух записей
+                    одного ребёнка. Здесь его видно, а «Отвязать» убирает
+                    именно эту семью, не ту. */}
+                {ch.parents.length > 0 && (
+                  <div className="sub" style={{ marginTop: 6 }}>
+                    ещё {plural(ch.parents.length, 'родитель', 'родителя', 'родителей')}:{' '}
+                    {ch.parents.map((x) => x.name).join(', ')}
                   </div>
                 )}
 
@@ -279,6 +280,15 @@ export default async function PeoplePage({
           необязательный, поэтому чаще его приходится дописывать здесь. Можно
           вставить хоть ссылку t.me — сохранится один ник. Имя, квитанция и ник
           сохраняются одной кнопкой «Сохранить».
+        </p>
+
+        <p className="hint" style={{ marginTop: 18 }}>
+          «Отвязать» убирает ребёнка из этой семьи. Прошлые занятия остаются за
+          тем, за кем записаны: кто платил или должен, тот и остаётся должен.
+          Если родителей у ребёнка двое — так бывает после склейки, — под именем
+          написано, кто второй, и «Отвязать» уберёт именно эту семью. Если
+          родитель был один, ребёнок окажется наверху, в «Детях без родителя»,
+          и его можно привязать к другому взрослому.
         </p>
 
         <p className="hint" style={{ marginTop: 18 }}>
