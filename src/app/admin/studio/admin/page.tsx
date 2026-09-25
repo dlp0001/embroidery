@@ -1,8 +1,6 @@
 import { redirect } from 'next/navigation';
 import { currentUser, isAdmin, isSuperadmin, isTeacher } from '@/lib/session';
-import {
-  cabinetOwners, familyWithDays, lessonPrice, mergeCandidates, type MergeCandidate,
-} from '@/lib/studio';
+import { cabinetOwners, lessonPrice, mergeCandidates, type MergeCandidate } from '@/lib/studio';
 import SelfCard from '@/components/SelfCard';
 import { chatOfUser } from '@/lib/telegram';
 import { isConfigured as payConfigured } from '@/lib/payplus';
@@ -38,17 +36,13 @@ export default async function AdminToolsPage({
   // дело.
   const online = payConfigured();
   const teaches = isTeacher(user);
-  const [kids, all, chat, lastTest, price, family] = await Promise.all([
+  const [kids, all, chat, lastTest, price] = await Promise.all([
     mergeCandidates(),
     looker ? cabinetOwners() : [],
     chatOfUser(user.id),
     online ? lastTestPayment(user.id) : Promise.resolve(null),
     lessonPrice(),
-    teaches ? familyWithDays(user.id) : Promise.resolve([]),
   ]);
-  // Варя тоже может ходить на взрослое занятие как участник: переключатель
-  // жил в кабинете, и без него она не может сказать об этом никак.
-  const me = family.find((m) => m.is_adult) ?? null;
   const mode = process.env.PAYPLUS_ENV === 'prod' ? 'боевая' : 'тестовая';
   // Себя в списке не показываем: свой кабинет открывается без подмены.
   const owners = all.filter((o) => o.id !== user.id);
@@ -67,18 +61,9 @@ export default async function AdminToolsPage({
 
         {/* У кого кабинет остался, тот правит своё имя там: две одинаковые
             карточки на одного человека только путают. */}
-        {teaches && (
-          <SelfCard
-            user={user}
-            chat={Boolean(chat)}
-            title="Обо мне"
-            attends={{
-              value: me?.attends ?? false,
-              participantId: me?.participant_id ?? null,
-              days: me?.days ?? [],
-            }}
-          />
-        )}
+        {/* Дни своих посещений сюда не выносим: тот, кто занятия ведёт,
+            на них не записывается. Видно этот флаг в «Людях». */}
+        {teaches && <SelfCard user={user} chat={Boolean(chat)} title="Обо мне" />}
 
         <div className="card">
           <div className="what" style={{ marginBottom: 6 }}>Объединить детей</div>
