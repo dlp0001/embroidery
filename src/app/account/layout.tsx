@@ -3,7 +3,7 @@ import Tabs, { type Tab } from '@/components/Tabs';
 import SignOut from '@/components/SignOut';
 import NotConfigured from '@/components/NotConfigured';
 import PeekBar from '@/components/PeekBar';
-import { actingAs, canTeach, currentUser, isAdmin, realUser } from '@/lib/session';
+import { actingAs, canTeach, currentUser, isTeacher, realUser } from '@/lib/session';
 import { cabinetOwners } from '@/lib/studio';
 import { stopViewAction } from '@/app/admin/view-actions';
 
@@ -58,9 +58,9 @@ export default async function AccountLayout({ children }: { children: React.Reac
           cross={canTeach(user) ? { href: '/admin/studio', label: 'Журнал преподавателя' } : undefined}
         />
       )}
-      {/* У того, кто ведёт студию, кабинета нет: закладки ему показывать
+      {/* У того, кто ведёт занятия, кабинета нет: закладки ему показывать
           нечего. Сюда он попадает разве что со страницы возврата из кассы. */}
-      {!isAdmin(user) && <Tabs tabs={TABS} />}
+      {!isTeacher(user) && <Tabs tabs={TABS} />}
     </div>
   );
 }

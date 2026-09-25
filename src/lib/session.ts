@@ -157,14 +157,15 @@ export async function requireUser(): Promise<CurrentUser> {
 }
 
 /**
- * Родительский кабинет. Тому, кто ведёт студию, он не нужен: свои дети
+ * Родительский кабинет. Тому, кто ведёт занятия, он не нужен: свои дети
  * видны ему в журнале, а имя и телеграм лежат в «Админе». Поэтому из
  * кабинета такого человека сразу уводим в журнал — и когда он смотрит
- * на кабинет чужими глазами, тоже.
+ * на кабинет чужими глазами, тоже. Админ без занятий — обычный родитель:
+ * у него кабинет остаётся.
  */
 export async function requireParent(): Promise<CurrentUser> {
   const user = await requireUser();
-  if (isAdmin(user)) redirect('/admin/studio');
+  if (isTeacher(user)) redirect('/admin/studio');
   return user;
 }
 
@@ -176,6 +177,14 @@ export async function requireTeacher(): Promise<CurrentUser> {
 
 export function canTeach(user: CurrentUser): boolean {
   return user.roles.some((r) => r === 'teacher' || r === 'admin' || r === 'superadmin');
+}
+
+/**
+ * Ведёт занятия. Не то же самое, что админ: Дима распоряжается студией,
+ * но в журнале не стоит, и кабинет родителя ему нужен как всем.
+ */
+export function isTeacher(user: CurrentUser): boolean {
+  return user.roles.includes('teacher');
 }
 
 export function isAdmin(user: CurrentUser): boolean {

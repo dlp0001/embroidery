@@ -4,7 +4,7 @@ import Tabs, { type Tab } from '@/components/Tabs';
 import SignOut from '@/components/SignOut';
 import NotConfigured from '@/components/NotConfigured';
 import PeekBar from '@/components/PeekBar';
-import { actingAs, canTeach, currentUser, isAdmin, realUser } from '@/lib/session';
+import { actingAs, canTeach, currentUser, isAdmin, isTeacher, realUser } from '@/lib/session';
 import { cabinetOwners } from '@/lib/studio';
 import { tickOnTraffic } from '@/lib/tg-due';
 import { stopViewAction } from '@/app/admin/view-actions';
@@ -43,7 +43,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     <div className="app">
       {peek && (
         <PeekBar peek={peek} owners={owners}
-                 cross={isAdmin(peek) ? undefined : { href: '/account', label: 'Кабинет' }} />
+                 cross={isTeacher(peek) ? undefined : { href: '/account', label: 'Кабинет' }} />
       )}
       {children}
       {/* В чужих глазах «Выйти» значило бы «выйти совсем»: вместо него
@@ -58,7 +58,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </form>
         </div>
       ) : (
-        <SignOut email={user.email} />
+        <SignOut
+          email={user.email}
+          cross={isTeacher(user) ? undefined : { href: '/account', label: 'Мой кабинет' }}
+        />
       )}
       <Tabs tabs={isAdmin(user) ? [...TABS, ADMIN_TAB] : TABS} />
     </div>

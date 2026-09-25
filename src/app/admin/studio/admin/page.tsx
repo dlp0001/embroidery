@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { currentUser, isAdmin, isSuperadmin } from '@/lib/session';
+import { currentUser, isAdmin, isSuperadmin, isTeacher } from '@/lib/session';
 import { cabinetOwners, lessonPrice, mergeCandidates, type MergeCandidate } from '@/lib/studio';
 import SelfCard from '@/components/SelfCard';
 import { chatOfUser } from '@/lib/telegram';
@@ -58,7 +58,9 @@ export default async function AdminToolsPage({
         {note && <p className="note" style={{ marginBottom: 14 }}>{note}</p>}
         {error && <p className="err" style={{ marginBottom: 14 }}>{error}</p>}
 
-        <SelfCard user={user} chat={Boolean(chat)} title="Обо мне" />
+        {/* У кого кабинет остался, тот правит своё имя там: две одинаковые
+            карточки на одного человека только путают. */}
+        {isTeacher(user) && <SelfCard user={user} chat={Boolean(chat)} title="Обо мне" />}
 
         <div className="card">
           <div className="what" style={{ marginBottom: 6 }}>Объединить детей</div>

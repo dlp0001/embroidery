@@ -1459,7 +1459,7 @@ export type CabinetOwner = {
   id: string;
   name: string | null;
   email: string;
-  /** Варя и админы: у них кабинет тоже есть, и смотреть его тоже нужно. */
+  /** Ведёт занятия: кабинета родителя у такого человека нет, есть журнал. */
   teaches: boolean;
 };
 
@@ -1472,8 +1472,7 @@ export async function cabinetOwners(): Promise<CabinetOwner[]> {
   return query<CabinetOwner>(
     `select u.id, u.name, u.email,
             exists (select 1 from user_roles r
-                     where r.user_id = u.id
-                       and r.role in ('teacher', 'admin', 'superadmin')) as teaches
+                     where r.user_id = u.id and r.role = 'teacher') as teaches
        from users u
       where exists (select 1 from guardians g where g.user_id = u.id)
          or exists (select 1 from user_roles r where r.user_id = u.id)
