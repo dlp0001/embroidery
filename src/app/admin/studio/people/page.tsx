@@ -1,6 +1,7 @@
 import { isAdmin, requireTeacher } from '@/lib/session';
 import { families, orphanChildren, peopleCount } from '@/lib/studio';
 import { dayMonth, plural } from '@/lib/format';
+import FamilyCard from '@/components/FamilyCard';
 import Toggles from '@/components/Toggles';
 import {
   addChildAction, createParentAction, hideChildAction, linkChildAction,
@@ -157,7 +158,12 @@ export default async function PeoplePage({
         )}
 
         {list.map((f) => (
-          <div className="card" key={f.user_id}>
+          <FamilyCard
+            key={f.user_id}
+            name={f.name ?? f.email}
+            kids={f.children.filter((c) => !c.archived).map((c) => c.name)}
+            hidden={f.children.filter((c) => c.archived).length}
+          >
             <form action={renameUserAction}>
               <input type="hidden" name="userId" value={f.user_id} />
               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -264,7 +270,7 @@ export default async function PeoplePage({
               </div>
               <button className="btn-quiet" type="submit">Добавить</button>
             </form>
-          </div>
+          </FamilyCard>
         ))}
 
         {list.length === 0 && <p className="hint" style={{ marginTop: 20 }}>Пока никого нет.</p>}

@@ -201,6 +201,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Суперадмин смотрит чужой кабинет. Полоса висит над всем содержимым:
    забыть, что ты не у себя, дороже одной строки на экране. */
+/* Свёрнутая карточка: вся строка — кнопка, но выглядит как текст. */
+.fold {
+  display: flex; align-items: flex-start; gap: 10px; width: 100%;
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font: inherit; color: inherit; text-align: left;
+}
+.fold:hover .what { color: var(--rose-dark); }
+
 .peek {
   display: grid; grid-template-columns: 1fr auto; align-items: baseline;
   gap: 2px 12px; padding: 10px 20px; background: var(--linen);
