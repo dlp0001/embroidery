@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 import { confirmCash, declineCash } from '@/lib/billing';
 import { hhmm } from '@/lib/format';
 import { cashConfirmed, cashDeclined, sessionChanged } from '@/lib/notify';
@@ -151,8 +152,12 @@ export async function setSessionStatusAction(form: FormData): Promise<void> {
   // Записанным говорим сразу: приехать на отменённое занятие хуже, чем
   // любое лишнее сообщение. Но только если состояние правда изменилось —
   // «вернули в расписание» тому, у кого и так всё в силе, это шум.
+  //
+  // Отправка идёт после ответа: сообщений столько, сколько записанных
+  // семей, каждое — запрос к телеграму, и держать из-за них кнопку нельзя.
+  // Показать Варе успех мы всё равно не показываем, это только в логах.
   if (before && before.status !== status) {
-    await sessionChanged(id, status === 'cancelled' ? 'cancelled' : 'restored', actor.name);
+    after(sessionChanged(id, status === 'cancelled' ? 'cancelled' : 'restored', actor.name));
   }
   refresh();
 }
@@ -174,10 +179,10 @@ export async function setSessionTimeAction(form: FormData): Promise<void> {
   const id = String(form.get('id'));
   const before = await sessionNow(id);
   await setSessionTime(id, usual ? null : time);
-  const after = await sessionNow(id);
+  const now = await sessionNow(id);
   // Нажали сохранить, не поменяв действующее время — рассылать нечего.
-  if (before && after && hhmm(before.at) !== hhmm(after.at)) {
-    await sessionChanged(id, 'moved', actor.name);
+  if (before && now && hhmm(before.at) !== hhmm(now.at)) {
+    after(sessionChanged(id, 'moved', actor.name));
   }
   refresh();
 }
@@ -260,7 +265,7 @@ export async function confirmCashAction(form: FormData): Promise<void> {
     receipt: form.get('receipt') === 'on',
   });
   // Родитель считает, что заплатил, и до сих пор не узнавал, зачли ли.
-  await cashConfirmed(paymentId);
+  after(cashConfirmed(paymentId));
   revalidatePath('/admin/studio/debts');
   revalidatePath('/admin/studio/ledger');
   revalidatePath('/account/pay');
@@ -269,10 +274,10 @@ export async function confirmCashAction(form: FormData): Promise<void> {
 export async function declineCashAction(form: FormData): Promise<void> {
   const user = await requireAdmin();
   const paymentId = String(form.get('paymentId'));
-  // Говорим до отказа: после него платежа с этим чатом уже не найти,
-  // если declineCash когда-нибудь начнёт чистить записи.
-  await cashDeclined(paymentId);
   await declineCash(paymentId, user.id);
+  // После отказа платёж остаётся на месте, меняется только статус, так
+  // что сумму и чат для письма родителю есть где взять.
+  after(cashDeclined(paymentId));
   revalidatePath('/admin/studio/debts');
   revalidatePath('/admin/studio/ledger');
   revalidatePath('/account/pay');

@@ -1,6 +1,7 @@
 'use server';
 
 import { headers } from 'next/headers';
+import { after } from 'next/server';
 import { redirect } from 'next/navigation';
 import {
   declareCash, declineCash, dropPayment, myPendingCash, startPayment, type Intent,
@@ -41,8 +42,9 @@ async function declare(form: FormData, way: 'cash' | 'transfer'): Promise<never>
   const res = await declareCash(user, pickedCharges(form), way);
   if ('error' in res) redirect('/account/pay?error=' + encodeURIComponent(res.error));
   // Пока заявку не подтвердили, деньги висят незачтёнными, а увидеть это
-  // можно только открыв «Финансы». Говорим Варе сразу.
-  await cashDeclared(user.id);
+  // можно только открыв «Финансы». Говорим Варе сразу, но уже после
+  // ответа: родителю незачем ждать, пока письмо дойдёт.
+  after(cashDeclared(user.id));
   redirect('/account/pay?cash=' + res.count);
 }
 
