@@ -139,7 +139,7 @@ export async function addSessionAction(form: FormData): Promise<void> {
 }
 
 export async function setSessionStatusAction(form: FormData): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const status = String(form.get('status'));
   if (status !== 'planned' && status !== 'cancelled') throw new Error('BAD_STATUS');
   // Отказ возможен только у прошедшего занятия с отметками: кнопки для
@@ -152,7 +152,7 @@ export async function setSessionStatusAction(form: FormData): Promise<void> {
   // любое лишнее сообщение. Но только если состояние правда изменилось —
   // «вернули в расписание» тому, у кого и так всё в силе, это шум.
   if (before && before.status !== status) {
-    await sessionChanged(id, status === 'cancelled' ? 'cancelled' : 'restored');
+    await sessionChanged(id, status === 'cancelled' ? 'cancelled' : 'restored', actor.name);
   }
   refresh();
 }
@@ -162,7 +162,7 @@ export async function setSessionStatusAction(form: FormData): Promise<void> {
  * обычное время группы.
  */
 export async function setSessionTimeAction(form: FormData): Promise<void> {
-  await requireAdmin();
+  const actor = await requireAdmin();
   const usual = String(form.get('usual') ?? '') === '1';
   // Набирают по-разному: «9:00», «09:00», «0900». Приводим к одному виду,
   // прежде чем проверять, — отказывать из-за пропущенного нуля незачем.
@@ -177,7 +177,7 @@ export async function setSessionTimeAction(form: FormData): Promise<void> {
   const after = await sessionNow(id);
   // Нажали сохранить, не поменяв действующее время — рассылать нечего.
   if (before && after && hhmm(before.at) !== hhmm(after.at)) {
-    await sessionChanged(id, 'moved');
+    await sessionChanged(id, 'moved', actor.name);
   }
   refresh();
 }

@@ -59,14 +59,75 @@ async function bookedFamilies(sessionId: string): Promise<Row[]> {
  * Занятие отменили, перенесли или вернули. Пишем только записанным: тем,
  * кто не собирался, эта новость не нужна.
  */
-export async function sessionChanged(sessionId: string, change: Change): Promise<number> {
+export async function sessionChanged(
+  sessionId: string, change: Change, actor?: string | null,
+): Promise<number> {
   if (!isConfigured()) return 0;
+  const origin = await siteOrigin();
   let sent = 0;
-  for (const m of await composeSessionChanged(sessionId, change, await siteOrigin())) {
+
+  const family = await composeSessionChanged(sessionId, change, origin);
+  for (const m of family) {
     if (await tell(m.chat, m.text)) sent++;
   }
+
+  // Админам — своё сообщение: им нужен весь состав занятия, а не одна
+  // семья. Того, кто нажал, не исключаем: пусть у обоих будет одна
+  // картина происходящего. А вот дважды одному чату не пишем — админ
+  // может оказаться и родителем записанного.
+  const already = new Set(family.map((m) => m.chat));
+  const staff = await composeStaffSessionChanged(sessionId, change, actor);
+  if (staff) {
+    for (const a of await adminChats()) {
+      if (already.has(a.chat)) continue;
+      if (await tell(a.chat, staff)) sent++;
+    }
+  }
+
   console.log(`notify: занятие ${change}, отправлено ${sent}`);
   return sent;
+}
+
+/**
+ * То же событие для студии. Отличается составом: перечисляем всех
+ * записанных, а не только чью-то семью, и называем, кто нажал, — иначе
+ * своё действие не отличить от чужого.
+ */
+export async function composeStaffSessionChanged(
+  sessionId: string, change: Change, actor?: string | null,
+): Promise<string | null> {
+  const head = (await query<{
+    title: string; held_on: string; at: string; booked: number;
+  }>(
+    `select g.title, s.held_on::text, coalesce(s.starts_at, g.starts_at)::text as at,
+            (select count(*)::int from bookings b
+              where b.session_id = s.id and b.status = 'booked') as booked
+       from studio_sessions s join studio_groups g on g.id = s.group_id
+      where s.id = $1`,
+    [sessionId]))[0];
+  if (!head) return null;
+
+  const names = (await query<{ who: string }>(
+    `select coalesce(ch.name, u.name, 'участник') as who
+       from bookings b
+       join participants p on p.id = b.participant_id
+       left join children ch on ch.id = p.child_id
+       left join users u on u.id = p.user_id
+      where b.session_id = $1 and b.status = 'booked'
+      order by who`,
+    [sessionId])).map((r) => r.who);
+
+  const when = `${weekdayDayMonth(head.held_on)}, ${hhmm(head.at)}`;
+  const what = change === 'cancelled' ? 'Занятие отменили'
+    : change === 'moved' ? 'Занятие перенесли'
+    : 'Занятие вернули в расписание';
+
+  return [
+    `${what}: ${when}, ${head.title}.`,
+    '',
+    names.length > 0 ? `Записаны: ${names.join(', ')}.` : 'Записанных не было.',
+    ...(actor ? ['', `Кто нажал: ${actor}.`] : []),
+  ].join('\n');
 }
 
 export type Letter = { chat: string; text: string };
@@ -105,8 +166,8 @@ export async function composeSessionChanged(
   return out;
 }
 
-/** Кому из студии идут служебные сообщения про деньги. */
-async function moneyStaff(): Promise<{ chat: string }[]> {
+/** Админы, до которых бот может дотянуться: им идёт служебное. */
+async function adminChats(): Promise<{ chat: string }[]> {
   return query<{ chat: string }>(
     `select distinct u.tg_chat_id::text as chat
        from users u join user_roles r on r.user_id = u.id
@@ -163,7 +224,7 @@ export async function cashDeclared(userId: string): Promise<void> {
   const claim = await claimPending(userId);
   if (!claim) return;
   const card = claimCard(claim, null);
-  for (const s of await moneyStaff()) {
+  for (const s of await adminChats()) {
     try {
       await send(Number(s.chat), card.text, card.keyboard);
     } catch (err) {
