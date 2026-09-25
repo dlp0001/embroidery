@@ -5,6 +5,7 @@ import Toggles from '@/components/Toggles';
 import {
   addChildAction, createParentAction, hideChildAction, linkChildAction,
   renameChildAction, renameUserAction, restoreChildAction, toggleDayAction,
+  unlinkChildAction,
 } from '@/app/admin/people-actions';
 
 export const dynamic = 'force-dynamic';
@@ -222,6 +223,25 @@ export default async function PeoplePage({
                     </button>
                   </form>
                 </div>
+
+                {/* Второй родитель — обычно след от склейки двух записей
+                    одного ребёнка. Здесь его видно и отсюда же убирают. */}
+                {ch.parents.length > 0 && (
+                  <div className="row" style={{ marginTop: 6, alignItems: 'baseline' }}>
+                    <div className="sub">
+                      ещё {plural(ch.parents.length, 'родитель', 'родителя', 'родителей')}:{' '}
+                      {ch.parents.map((x) => x.name).join(', ')}
+                    </div>
+                    <form action={unlinkChildAction}>
+                      <input type="hidden" name="childId" value={ch.child_id} />
+                      <input type="hidden" name="userId" value={f.user_id} />
+                      <button className="linky" type="submit"
+                              aria-label={`Отвязать ${ch.name} от этой семьи`}>
+                        отвязать отсюда
+                      </button>
+                    </form>
+                  </div>
+                )}
 
                 {ch.archived ? (
                   <div className="sub" style={{ marginTop: 6 }}>

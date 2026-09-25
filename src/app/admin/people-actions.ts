@@ -6,7 +6,7 @@ import { plural, telegramNick } from '@/lib/format';
 import { isAdmin, onlyLooking, requireUser } from '@/lib/session';
 import {
   addChildTo, createParent, hideChild, linkChild, mergeChildren, renameChildById,
-  restoreChild, saveParent, setPreferredDay,
+  restoreChild, saveParent, setPreferredDay, unlinkChild,
 } from '@/lib/studio';
 
 async function requireAdmin() {
@@ -110,6 +110,23 @@ export async function linkChildAction(form: FormData): Promise<void> {
       ? `Привязали. ${total} ${plural(total, 'занятие', 'занятия', 'занятий')} записано на этого родителя${
           res.counted > 0 ? `, из них ${res.counted} посчитано впервые` : ''}. Абонемент не тронут: если занятие шло по нему, поставьте это в журнале.`
       : 'Привязали. Прошлых занятий не было.'));
+}
+
+/**
+ * Убирает одного из родителей у ребёнка. После склейки двух записей
+ * родители оказываются оба: лишнего убирают отсюда.
+ */
+export async function unlinkChildAction(form: FormData): Promise<void> {
+  await requireAdmin();
+  const res = await unlinkChild(String(form.get('childId')), String(form.get('userId')));
+  refresh();
+  revalidatePath('/admin/studio/debts');
+  if (!res.name) redirect('/admin/studio/people');
+  // Имя в кавычках: склонять его мы не умеем, а «у Линда» читать больно.
+  redirect('/admin/studio/people?note=' + encodeURIComponent(
+    res.left > 0
+      ? `Отвязали «${res.name}». Родителей осталось: ${res.left}. Прошлые занятия остались за тем, за кем были записаны.`
+      : `Отвязали «${res.name}». Родителя больше нет: запись ждёт наверху, в «Детях без родителя».`));
 }
 
 /**

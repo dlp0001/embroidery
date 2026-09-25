@@ -1708,6 +1708,8 @@ export type FamilyChild = {
   name: string;
   days: number[];
   archived: boolean;
+  /** Другие взрослые, к которым привязан этот же ребёнок. */
+  parents: { id: string; name: string }[];
 };
 
 export type Family = {
@@ -1809,7 +1811,17 @@ export async function families(): Promise<Family[]> {
                        'archived', ch.archived_at is not null,
                        'days', coalesce((select array_agg(pd.weekday order by pd.weekday)
                                            from preferred_days pd
-                                          where pd.participant_id = p.id), '{}')
+                                          where pd.participant_id = p.id), '{}'),
+                       /* Чаще всего родитель один. Двое бывают после склейки
+                          двух записей одного ребёнка — и тогда лишнего видно. */
+                       'parents', coalesce((select json_agg(json_build_object(
+                                                     'id', gu.id,
+                                                     'name', coalesce(gu.name, gu.email))
+                                                   order by coalesce(gu.name, gu.email))
+                                              from guardians g2
+                                              join users gu on gu.id = g2.user_id
+                                             where g2.child_id = ch.id and g2.user_id <> u.id),
+                                           '[]'::json)
                      ) order by ch.archived_at nulls first, ch.name)
                 from guardians g
                 join children ch on ch.id = g.child_id
@@ -2113,6 +2125,28 @@ export async function linkChild(
     }
 
     return { moved: rows.length, counted: missed.length };
+  });
+}
+
+/**
+ * Отвязывает ребёнка от взрослого. Нужен после склейки: у оставшейся
+ * записи оказываются родители обеих, а настоящий — один. Прошлое не
+ * трогаем: за кем занятие записано, тот за него и платит. Меняется
+ * только то, кто видит ребёнка у себя и на кого пойдут будущие занятия.
+ */
+export async function unlinkChild(
+  childId: string, userId: string,
+): Promise<{ name: string | null; left: number }> {
+  return tx(async (c) => {
+    const { rows } = await c.query<{ name: string }>(
+      `delete from guardians g using children ch
+        where g.child_id = $1 and g.user_id = $2 and ch.id = g.child_id
+        returning ch.name`,
+      [childId, userId]);
+    if (rows.length === 0) return { name: null, left: 0 };
+    const { rows: rest } = await c.query<{ n: number }>(
+      'select count(*)::int as n from guardians where child_id = $1', [childId]);
+    return { name: rows[0].name, left: rest[0]?.n ?? 0 };
   });
 }
 
