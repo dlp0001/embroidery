@@ -40,6 +40,13 @@ export function money(amount: string | number, currency = 'ILS'): string {
 }
 
 /** Сколько дней осталось до даты. Отрицательное — дата уже прошла. */
+/** «23 сентября в 08:19» — для событий, у которых важен и час. */
+export function dayAtTime(iso: string): string {
+  return new Intl.DateTimeFormat('ru-RU', {
+    timeZone: STUDIO_TZ, day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+  }).format(new Date(iso)).replace(', ', ' в ');
+}
+
 export function daysUntil(iso: string, from: string): number {
   const [ay, am, ad] = iso.split('-').map(Number);
   const [by, bm, bd] = from.split('-').map(Number);

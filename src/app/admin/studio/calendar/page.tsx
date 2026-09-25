@@ -7,6 +7,7 @@ import {
 import { hhmm, todayISO, weekdayDayMonth } from '@/lib/format';
 import BookChild from '@/components/BookChild';
 import BookedList from '@/components/BookedList';
+import DroppedList from '@/components/DroppedList';
 import SessionTime from '@/components/SessionTime';
 import {
   addSessionAction, bookChildAction, setSessionStatusAction, setSessionTimeAction,
@@ -171,11 +172,20 @@ export default async function AdminCalendarPage({
                 {/* Имена записанных: видно, кого ждём, и можно снять запись,
                     если родитель отменил её голосом. */}
                 {admin && s.status !== 'cancelled' && (
-                  <BookedList
-                    sessionId={s.session_id}
-                    booked={booked.filter((b) => b.session_id === s.session_id)}
-                    action={unbookChildAction}
-                  />
+                  <>
+                    <BookedList
+                      sessionId={s.session_id}
+                      booked={booked.filter(
+                        (b) => b.session_id === s.session_id && b.status === 'booked')}
+                      action={unbookChildAction}
+                    />
+                    {/* Кто записывался и снялся: на вопрос «кто отменил»
+                        должен отвечать экран, а не память. */}
+                    <DroppedList
+                      dropped={booked.filter(
+                        (b) => b.session_id === s.session_id && b.status === 'cancelled')}
+                    />
+                  </>
                 )}
               </div>
               {s.status !== 'cancelled' && (

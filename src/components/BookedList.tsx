@@ -2,7 +2,20 @@
 
 import { useState, useTransition } from 'react';
 import type { SaveResult } from '@/components/AutoSave';
+import { dayAtTime } from '@/lib/format';
 import type { BookedChild } from '@/lib/studio';
+
+/** «записала Евгения Кочнова из кабинета, 23 сентября в 08:19». */
+const WHERE: Record<string, string> = {
+  cabinet: 'из кабинета', journal: 'из расписания', bot: 'в боте',
+};
+
+function trace(b: BookedChild): string {
+  const what = b.status === 'booked' ? 'записал' : 'снял';
+  const who = b.changed_by ? `${what}(а) ${b.changed_by}` : what + '(а) неизвестно кто';
+  const where = b.changed_via ? ` ${WHERE[b.changed_via] ?? ''}` : '';
+  return `${who}${where}, ${dayAtTime(b.changed_at)}`;
+}
 
 /**
  * Кто записан на занятие. Имена — ссылки: нажатие снимает запись, но
@@ -65,7 +78,7 @@ export default function BookedList({
                                   gap: 12, flexWrap: 'wrap', marginTop: 6 }}>
       {booked.map((b) => (
         <button key={b.participant_id} type="button" className="linky linky-soft"
-                onClick={() => setAsking(b)}>
+                title={trace(b)} onClick={() => setAsking(b)}>
           {b.who}
         </button>
       ))}

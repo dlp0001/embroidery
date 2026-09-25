@@ -926,7 +926,8 @@ export async function viewAfterTap(
 export async function applyTap(userId: string, tap: Tap): Promise<string> {
   if (!(await ownsParticipant(userId, tap.participantId))) return 'Это не ваш участник.';
   if (tap.book && (await sessionIsPast(tap.sessionId))) return 'День уже прошёл.';
-  const res = await setBooking(tap.sessionId, tap.participantId, tap.book);
+  const res = await setBooking(tap.sessionId, tap.participantId, tap.book,
+    { userId, via: 'bot' });
   if (!res.ok) return res.reason ?? 'Не получилось.';
   // «Не придёт» из вечернего вопроса — это ответ, и Варя увидит его
   // отдельной строкой. Снятая запись в недельном списке ответом не

@@ -47,7 +47,7 @@ export async function toggleBooking(formData: FormData): Promise<void> {
     refresh();
     return;
   }
-  await setBooking(sessionId, participantId, booked);
+  await setBooking(sessionId, participantId, booked, { userId: user.id, via: 'cabinet' });
   refresh();
 }
 

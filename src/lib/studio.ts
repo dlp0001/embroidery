@@ -645,10 +645,19 @@ export async function sessionIsPast(sessionId: string): Promise<boolean> {
   return row?.past ?? false;
 }
 
+/** Откуда пришло изменение записи: кабинет, журнал или бот. */
+export type BookingVia = 'cabinet' | 'journal' | 'bot';
+export type BookingBy = { userId: string | null; via: BookingVia };
+
+/**
+ * Кто и откуда менял запись — запоминаем: «кто снял запись» спрашивают
+ * через неделю, когда никто уже не помнит.
+ */
 export async function setBooking(
   sessionId: string,
   participantId: string,
   booked: boolean,
+  by: BookingBy,
 ): Promise<{ ok: boolean; reason?: string }> {
   if (booked) {
     const done = await tx(async (c) => {
@@ -667,10 +676,12 @@ export async function setBooking(
       if (!row) return false;
       if (row.capacity !== null && row.taken >= row.capacity) return false;
       await c.query(
-        `insert into bookings (session_id, participant_id, status) values ($1, $2, 'booked')
+        `insert into bookings (session_id, participant_id, status, changed_by, changed_via)
+         values ($1, $2, 'booked', $3, $4)
          on conflict (session_id, participant_id)
-         do update set status = 'booked', updated_at = now(), declined_at = null`,
-        [sessionId, participantId],
+         do update set status = 'booked', updated_at = now(), declined_at = null,
+                       changed_by = $3, changed_via = $4`,
+        [sessionId, participantId, by.userId, by.via],
       );
       return true;
     });
@@ -683,10 +694,12 @@ export async function setBooking(
     // сказавшего «нет» от промолчавшего. Отменённая строка нигде не
     // считается: и места, и журнал смотрят только на 'booked'.
     await query(
-      `insert into bookings (session_id, participant_id, status) values ($1, $2, 'cancelled')
+      `insert into bookings (session_id, participant_id, status, changed_by, changed_via)
+       values ($1, $2, 'cancelled', $3, $4)
        on conflict (session_id, participant_id)
-       do update set status = 'cancelled', updated_at = now()`,
-      [sessionId, participantId],
+       do update set status = 'cancelled', updated_at = now(),
+                     changed_by = $3, changed_via = $4`,
+      [sessionId, participantId, by.userId, by.via],
     );
     return { ok: true };
   }
@@ -1734,21 +1747,36 @@ export type Family = {
   children: FamilyChild[];
 };
 
-export type BookedChild = { session_id: string; participant_id: string; who: string };
+export type BookedChild = {
+  session_id: string;
+  participant_id: string;
+  who: string;
+  status: 'booked' | 'cancelled';
+  /** Когда запись в последний раз меняли. */
+  changed_at: string;
+  /** Кто менял. Пусто у записей, сделанных до того, как мы это запомнили. */
+  changed_by: string | null;
+  changed_via: BookingVia | null;
+};
 
 /**
- * Кто записан на эти занятия. Нужно в расписании: Варя видит не только
- * сколько человек записано, но и кого именно, и может снять запись.
+ * Кто записан на эти занятия и кто записался, да передумал. Нужно в
+ * расписании: Варя видит не только сколько человек записано, но и кого
+ * именно, может снять запись — и увидеть, кто снял её до неё.
  */
 export async function bookedInSessions(sessionIds: string[]): Promise<BookedChild[]> {
   if (sessionIds.length === 0) return [];
   return query<BookedChild>(
-    `select b.session_id, b.participant_id, coalesce(ch.name, u.name, 'Я') as who
+    `select b.session_id, b.participant_id, b.status,
+            coalesce(ch.name, u.name, 'Я') as who,
+            b.updated_at::text as changed_at, b.changed_via,
+            (select coalesce(au.name, au.email) from users au where au.id = b.changed_by)
+              as changed_by
        from bookings b
        join participants p on p.id = b.participant_id
        left join children ch on ch.id = p.child_id
        left join users u on u.id = p.user_id
-      where b.session_id = any($1::uuid[]) and b.status = 'booked'
+      where b.session_id = any($1::uuid[])
       order by who`,
     [sessionIds],
   );
