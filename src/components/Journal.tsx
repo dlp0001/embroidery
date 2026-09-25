@@ -119,7 +119,11 @@ export default function Journal({
     .slice()
     .sort((a, b) => Number(b.booked) - Number(a.booked));
   const rest = roster.filter((r) => !expected(r));
-  const split = likely.length > 0 && rest.length > 0;
+  // Заголовки нужны всегда, когда есть кого сворачивать. Раньше они
+  // появлялись только вместе с «ждём», и в день, когда не ждут никого,
+  // список валился на экран без единой надписи — будто «Остальные»
+  // куда-то делись.
+  const split = rest.length > 0;
   // В день лагеря в «Остальных» оказывается вся студия: ждут-то немногих,
   // а прийти может любой. Такой список закрывает собой журнал, поэтому
   // держим его свёрнутым — но только пока в нём никого не отметили.
@@ -298,11 +302,16 @@ export default function Journal({
       <input type="hidden" name="sessionId" value={sessionId} />
 
       {/* Заголовки нужны, только когда список действительно разделён */}
-      {likely.length > 0 && (
+      {likely.length > 0 ? (
         <>
           {split && <div className="lbl" style={{ marginTop: 6 }}>Ждём</div>}
           {likely.map(line)}
         </>
+      ) : (
+        <p className="hint" style={{ margin: '10px 0 2px' }}>
+          Никого не ждём: на это занятие никто не записан и ни у кого не
+          отмечен этот день. Кто придёт — найдётся ниже.
+        </p>
       )}
 
       {rest.length > 0 && (
