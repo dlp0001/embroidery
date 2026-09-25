@@ -720,6 +720,8 @@ export type TeacherSession = {
   kind: GroupKind;
   /** Цена этого дня: у лагеря своя, у обычного занятия общая студийная. */
   price: string | null;
+  /** Занятие идёт не в обычное время группы. */
+  moved: boolean;
   people: number;
   marked: number;
 };
@@ -730,6 +732,8 @@ export async function teacherSessions(teacherId: string | null): Promise<Teacher
     `select s.id as session_id, g.id as group_id, g.title as group_title,
             s.held_on::text, coalesce(s.starts_at, g.starts_at)::text as starts_at,
             s.status, g.audience, g.kind,
+            (s.starts_at is distinct from null
+             and s.starts_at is distinct from g.starts_at) as moved,
             coalesce(g.price::text,
                      (select value from settings where key = 'studio_lesson_price')) as price,
             (select count(*)::int
@@ -767,6 +771,8 @@ export async function nextSessions(teacherId: string | null): Promise<TeacherSes
      select s.id as session_id, g.id as group_id, g.title as group_title,
             s.held_on::text, coalesce(s.starts_at, g.starts_at)::text as starts_at,
             s.status, g.audience, g.kind,
+            (s.starts_at is distinct from null
+             and s.starts_at is distinct from g.starts_at) as moved,
             coalesce(g.price::text,
                      (select value from settings where key = 'studio_lesson_price')) as price,
             (select count(*)::int from participants p
@@ -994,7 +1000,8 @@ export type SlotRow = {
 function slotsQuery(extra: string): string {
   return `select s.id as session_id, s.held_on::text,
             coalesce(s.starts_at, g.starts_at)::text as starts_at,
-            (s.starts_at is not null) as moved,
+            (s.starts_at is distinct from null
+             and s.starts_at is distinct from g.starts_at) as moved,
             g.id as group_id, g.title as group_title,
             g.audience, g.kind, g.weekday, g.capacity, g.duration_min, g.pass_offers,
             coalesce(g.price::text,
@@ -1319,6 +1326,8 @@ export async function sessionsInRange(from: string, to: string): Promise<Calenda
             s.held_on::text, coalesce(s.starts_at, g.starts_at)::text as starts_at,
             (s.starts_at is not null) as moved,
             s.status, g.audience, g.kind,
+            (s.starts_at is distinct from null
+             and s.starts_at is distinct from g.starts_at) as moved,
             (select count(*)::int from attendance a where a.session_id = s.id) as marked,
             (select count(*)::int from attendance a
               where a.session_id = s.id and a.status = 'present') as came,

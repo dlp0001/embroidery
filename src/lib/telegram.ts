@@ -652,7 +652,9 @@ function firstName(name: string | null): string {
  * что не придут: никого» — строка, которая ничего не сообщает, а место
  * занимает.
  */
-async function sessionLines(sessionId: string, title: string, at: string): Promise<string[]> {
+async function sessionLines(
+  sessionId: string, title: string, at: string, moved: boolean,
+): Promise<string[]> {
   const rows = await roster(sessionId);
   const coming = rows.filter((r) => r.booking === 'booked').map((r) => r.who);
   const refused = rows.filter((r) => r.declined).map((r) => r.who);
@@ -660,7 +662,9 @@ async function sessionLines(sessionId: string, title: string, at: string): Promi
     .filter((r) => r.preferred && r.booking === '')
     .map((r) => r.who);
 
-  const lines = [`${hhmm(at)} · ${title}`];
+  // Перенос ставим сразу за временем: на эту строку и смотрят, решая,
+  // когда быть в студии.
+  const lines = [`${hhmm(at)}${moved ? ' · перенесено' : ''} · ${title}`];
   lines.push(coming.length > 0
     ? `Записались (${coming.length}): ${coming.join(', ')}`
     : 'Записанных нет.');
@@ -698,10 +702,10 @@ export async function digestWatchers(): Promise<Teacher[]> {
 
 /** Сегодняшние занятия преподавателя — обёртка, чтобы роут не лез в studio. */
 export async function teacherToday(teacherId: string): Promise<
-  { session_id: string; group_title: string; starts_at: string }[]
+  { session_id: string; group_title: string; starts_at: string; moved: boolean }[]
 > {
   return (await teacherSessions(teacherId)).map((s) => ({
-    session_id: s.session_id, group_title: s.group_title, starts_at: s.starts_at,
+    session_id: s.session_id, group_title: s.group_title, starts_at: s.starts_at, moved: s.moved,
   }));
 }
 
@@ -735,7 +739,9 @@ export async function teacherDayView(teacherId: string, name: string | null): Pr
   }
 
   const blocks: string[][] = [];
-  for (const s of today) blocks.push(await sessionLines(s.session_id, s.group_title, s.starts_at));
+  for (const s of today) {
+    blocks.push(await sessionLines(s.session_id, s.group_title, s.starts_at, s.moved));
+  }
 
   return {
     text: [hello, '', ...blocks.flatMap((b) => [...b, '']), ...tail, wish()].join('\n'),
@@ -750,14 +756,16 @@ export async function teacherDayView(teacherId: string, name: string | null): Pr
 export async function teacherSessionView(
   sessionId: string, name: string | null,
 ): Promise<View | null> {
-  const head = await one<{ title: string; at: string; kind: GroupKind }>(
-    `select g.title, coalesce(s.starts_at, g.starts_at)::text as at, g.kind
+  const head = await one<{ title: string; at: string; kind: GroupKind; moved: boolean }>(
+    `select g.title, coalesce(s.starts_at, g.starts_at)::text as at, g.kind,
+            (s.starts_at is distinct from null
+             and s.starts_at is distinct from g.starts_at) as moved
        from studio_sessions s join studio_groups g on g.id = s.group_id
       where s.id = $1 and s.status <> 'cancelled'`,
     [sessionId]);
   if (!head) return null;
 
-  const lines = await sessionLines(sessionId, head.title, head.at);
+  const lines = await sessionLines(sessionId, head.title, head.at, head.moved);
   // «Через час» верно только когда правда через час. По расписанию так и
   // есть, но это же сообщение можно попросить руками в любой момент, и
   // тогда обещать час нельзя.
