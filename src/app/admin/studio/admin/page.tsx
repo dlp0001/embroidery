@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser, isAdmin, isSuperadmin, isTeacher } from '@/lib/session';
 import { cabinetOwners, lessonPrice, mergeCandidates, type MergeCandidate } from '@/lib/studio';
@@ -58,6 +59,18 @@ export default async function AdminToolsPage({
       <div className="body">
         {note && <p className="note" style={{ marginBottom: 14 }}>{note}</p>}
         {error && <p className="err" style={{ marginBottom: 14 }}>{error}</p>}
+
+        {/* Группы заводят раз в сезон, а закладку внизу они занимали
+            каждый день. Теперь вход к ним отсюда. */}
+        <div className="card">
+          <div className="row">
+            <div>
+              <div className="what">Группы</div>
+              <div className="sub">Дни, время, цены и пакеты</div>
+            </div>
+            <Link className="btn-quiet" href="/admin/studio/groups">Открыть</Link>
+          </div>
+        </div>
 
         {/* У кого кабинет остался, тот правит своё имя там: две одинаковые
             карточки на одного человека только путают. */}
