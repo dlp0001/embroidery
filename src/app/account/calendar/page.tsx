@@ -9,14 +9,27 @@ export const dynamic = 'force-dynamic';
 
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 
-function monthBounds(month: string): { first: string; last: string; days: number; lead: number } {
+/**
+ * Сетка месяца целыми неделями: по краям стоят живые дни соседних
+ * месяцев, а не пустые клетки. Занятия про границу месяца ничего не
+ * знают, и неделя, которая через неё проходит, должна быть видна целиком.
+ *
+ * Неделя начинается с воскресенья: так живёт Израиль, и так же выложена
+ * сетка дней лагеря на «Неделе».
+ */
+function monthGrid(month: string): { days: string[]; first: string; last: string } {
   const [y, m] = month.split('-').map(Number);
-  const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  // Неделя начинается с воскресенья: так живёт Израиль, и так же
-  // выложена сетка дней лагеря на «Неделе».
-  const lead = new Date(Date.UTC(y, m - 1, 1)).getUTCDay(); // 0 = вс
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return { first: `${y}-${pad(m)}-01`, last: `${y}-${pad(m)}-${pad(days)}`, days, lead };
+  const total = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const from = new Date(Date.UTC(y, m - 1, 1));
+  from.setUTCDate(from.getUTCDate() - from.getUTCDay());
+  const to = new Date(Date.UTC(y, m - 1, total));
+  to.setUTCDate(to.getUTCDate() + (6 - to.getUTCDay()));
+
+  const days: string[] = [];
+  for (let d = new Date(from); d <= to; d.setUTCDate(d.getUTCDate() + 1)) {
+    days.push(d.toISOString().slice(0, 10));
+  }
+  return { days, first: days[0], last: days[days.length - 1] };
 }
 
 function shift(month: string, by: number): string {
@@ -43,7 +56,7 @@ export default async function CalendarPage({
   const params = await searchParams;
   const today = todayISO();
   const month = /^\d{4}-\d{2}$/.test(params.m ?? '') ? params.m! : today.slice(0, 7);
-  const { first, last, days, lead } = monthBounds(month);
+  const { days, first, last } = monthGrid(month);
 
   const rows = await slotsForUser(user.id, first, last);
   // Точек под числом столько, сколько занятий в этот день: в дни лагеря
@@ -63,7 +76,6 @@ export default async function CalendarPage({
     : [...withSessions].sort().find((d) => d >= today) ?? [...withSessions].sort().pop() ?? null;
   const dayRows = rows.filter((r) => r.held_on === selected);
 
-  const pad = (n: number) => String(n).padStart(2, '0');
 
   return (
     <>
@@ -86,20 +98,21 @@ export default async function CalendarPage({
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 2 }}>
-          {Array.from({ length: lead }, (_, i) => <div key={`lead-${i}`} />)}
-          {Array.from({ length: days }, (_, i) => {
-            const iso = `${month}-${pad(i + 1)}`;
+          {days.map((iso) => {
             const kinds = [...(byDay.get(iso)?.values() ?? [])].slice(0, 3);
             const has = kinds.length > 0;
             const isSel = iso === selected;
+            // Соседний месяц бледнее: по нему видно, где кончается этот.
+            const own = iso.slice(0, 7) === month;
             const cell = (
               <div style={{
                 aspectRatio: '1', display: 'flex', flexDirection: 'column',
                 alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 14,
                 background: isSel ? 'var(--rose)' : 'transparent',
+                opacity: own ? 1 : 0.4,
                 color: isSel ? '#fff' : has ? 'var(--charcoal)' : 'rgba(26,26,46,0.35)',
               }}>
-                {i + 1}
+                {Number(iso.slice(8))}
                 <div style={{ display: 'flex', gap: 2 }}>
                   {kinds.map((isEvent, k) => (
                     <div key={k} style={{ width: 4, height: 4, borderRadius: '50%',
@@ -109,7 +122,7 @@ export default async function CalendarPage({
               </div>
             );
             return has
-              ? <Link key={iso} href={`/account/calendar?m=${month}&d=${iso}`}>{cell}</Link>
+              ? <Link key={iso} href={`/account/calendar?m=${iso.slice(0, 7)}&d=${iso}`}>{cell}</Link>
               : <div key={iso}>{cell}</div>;
           })}
         </div>

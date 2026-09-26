@@ -19,13 +19,28 @@ export const dynamic = 'force-dynamic';
 const MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 const pad = (n: number) => String(n).padStart(2, '0');
 
-function bounds(month: string) {
+/**
+ * Сетка месяца целыми неделями: пустые клетки по краям заменены живыми
+ * днями соседних месяцев. Конец месяца и начало следующего чаще всего
+ * и нужны вместе — смена, которая идёт через первое число, перестала
+ * рваться пополам.
+ *
+ * Неделя с воскресенья: так живёт Израиль и так же выложен календарь
+ * в кабинете у родителей.
+ */
+function grid(month: string): { days: string[]; first: string; last: string } {
   const [y, m] = month.split('-').map(Number);
-  const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  // Неделя с воскресенья: так живёт Израиль и так же выложен календарь
-  // в кабинете у родителей.
-  const lead = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
-  return { first: `${month}-01`, last: `${month}-${pad(days)}`, days, lead };
+  const total = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const from = new Date(Date.UTC(y, m - 1, 1));
+  from.setUTCDate(from.getUTCDate() - from.getUTCDay());
+  const to = new Date(Date.UTC(y, m - 1, total));
+  to.setUTCDate(to.getUTCDate() + (6 - to.getUTCDay()));
+
+  const days: string[] = [];
+  for (let d = new Date(from); d <= to; d.setUTCDate(d.getUTCDate() + 1)) {
+    days.push(d.toISOString().slice(0, 10));
+  }
+  return { days, first: days[0], last: days[days.length - 1] };
 }
 
 /**
@@ -85,7 +100,7 @@ export default async function AdminCalendarPage({
 
   const today = todayISO();
   const month = /^\d{4}-\d{2}$/.test(params.m ?? '') ? params.m! : today.slice(0, 7);
-  const { first, last, days, lead } = bounds(month);
+  const { days, first, last } = grid(month);
 
   const [sessions, groups, kids] = await Promise.all([
     sessionsInRange(first, last), allGroups(), admin ? bookableChildren() : Promise.resolve([]),
@@ -101,7 +116,6 @@ export default async function AdminCalendarPage({
     byDay.set(s.held_on, [...(byDay.get(s.held_on) ?? []), s.kind !== 'lesson']);
   }
 
-  const href = (d: string) => `/admin/studio/calendar?m=${month}&d=${d}`;
 
   return (
     <>
@@ -124,22 +138,24 @@ export default async function AdminCalendarPage({
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 2 }}>
-          {Array.from({ length: lead }, (_, i) => <div key={`lead-${i}`} />)}
-          {Array.from({ length: days }, (_, i) => {
-            const iso = `${month}-${pad(i + 1)}`;
+          {days.map((iso) => {
             const kinds = (byDay.get(iso) ?? []).slice(0, 3);
             const count = kinds.length;
             const sel = iso === selected;
+            // Чужой месяц в сетке живой: по нему можно ходить, но он
+            // бледнее — иначе непонятно, где кончается текущий.
+            const own = iso.slice(0, 7) === month;
             return (
-              <Link key={iso} href={href(iso)}>
+              <Link key={iso} href={`/admin/studio/calendar?m=${iso.slice(0, 7)}&d=${iso}`}>
                 <div style={{
                   aspectRatio: '1', display: 'flex', flexDirection: 'column',
                   alignItems: 'center', justifyContent: 'center', gap: 3, fontSize: 14,
                   background: sel ? 'var(--rose)' : 'transparent',
+                  opacity: own ? 1 : 0.4,
                   color: sel ? '#fff' : count ? 'var(--charcoal)' : 'rgba(26,26,46,0.35)',
                   border: iso === today && !sel ? '1px solid var(--rose-light)' : '1px solid transparent',
                 }}>
-                  {i + 1}
+                  {Number(iso.slice(8))}
                   <div style={{ display: 'flex', gap: 2 }}>
                     {kinds.map((isEvent, k) => (
                       <div key={k} style={{ width: 4, height: 4, borderRadius: '50%',
