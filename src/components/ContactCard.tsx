@@ -42,7 +42,7 @@ export default function ContactCard({ chat }: { chat: boolean }) {
 
       <p className="hint" style={{ marginTop: 14 }}>
         Или письмом: <a href="mailto:info@re-create.art">info@re-create.art</a>.
-        Отвечаем не мгновенно — занятие идёт, телефон лежит в сумке.
+        Постараемся ответить в течение дня.
       </p>
     </div>
   );
