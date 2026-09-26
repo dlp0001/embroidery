@@ -237,6 +237,11 @@ const WAY_NAME: Record<PayLetter, string> = {
   c: 'наличными', t: 'переводом', b: 'Bit', p: 'PayBox',
 };
 
+/** Как назвать способ в строке, а не на кнопке. */
+const WAY_PLAIN: Record<PayLetter, string> = {
+  c: 'наличные', t: 'перевод', b: 'Bit', p: 'PayBox',
+};
+
 /**
  * Карточка заявки с кнопками: подтвердить оплату можно прямо в боте.
  *
@@ -247,11 +252,14 @@ const WAY_NAME: Record<PayLetter, string> = {
  * стоят первыми. Чек по умолчанию не выписывается, как и галочка на сайте.
  */
 export function claimCard(claim: Claim, chosen: PayLetter | null): View {
-  const head = `${claim.who} заявил оплату: ${money(claim.amount, claim.currency)} за ${
+  // Без глаголов в прошедшем времени: имя мы склонять не умеем, и
+  // «Мария Дашевская заявил» читалось как небрежность.
+  const head = `Заявка на оплату: ${claim.who}, ${money(claim.amount, claim.currency)} за ${
     lessons(claim.ids)}.`;
-  const said = claim.way === 'cash' ? 'Заявил: наличными.'
-    : claim.way === 'transfer' ? 'Заявил: переводом. Чем именно, скажите сами.'
-    : 'Способ не назван: заявка старая.';
+  const said = `Метод оплаты: ${
+    claim.way === 'cash' ? 'наличные'
+      : claim.way === 'transfer' ? 'перевод'
+      : 'не указан'}`;
   const id = packId(claim.id);
 
   if (!chosen) {
@@ -265,7 +273,7 @@ export function claimCard(claim: Claim, chosen: PayLetter | null): View {
       })));
     }
     keyboard.push([{ text: 'Отклонить заявку', callback_data: `px:${id}` }]);
-    return { text: [head, '', said, '', 'Чем заплатили?'].join('\n'), keyboard };
+    return { text: [head, said, '', 'Подтверждаю оплату:'].join('\n'), keyboard };
   }
 
   // Чек — второй вопрос. Без iCount выписывать его некому, тогда и
@@ -278,7 +286,7 @@ export function claimCard(claim: Claim, chosen: PayLetter | null): View {
        [{ text: 'Назад', callback_data: `pb:${id}` }]];
 
   return {
-    text: [head, '', `Чем: ${WAY_NAME[chosen]}.`, '',
+    text: [head, `Засчитываем как: ${WAY_PLAIN[chosen]}`, '',
            receiptsReady() ? 'Выписать чек в iCount?' : 'iCount не подключён, чека не будет.',
     ].join('\n'),
     keyboard,
