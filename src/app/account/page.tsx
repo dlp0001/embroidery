@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import BookingHint from '@/components/BookingHint';
+import ContactCard from '@/components/ContactCard';
 import EventSignup from '@/components/EventSignup';
 import SlotList from '@/components/SlotList';
 import { requireParent } from '@/lib/session';
 import {
   PASS_WARN_DAYS, eventSlotsForUser, passBalances, slotsForUser, unpaidCharges,
 } from '@/lib/studio';
+import { chatOfUser } from '@/lib/telegram';
 import { dayMonth, daysUntil, money, plural, plusDays, todayISO, weekdayDayMonth } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -13,11 +15,12 @@ export const dynamic = 'force-dynamic';
 export default async function WeekPage() {
   const user = await requireParent();
   const today = todayISO();
-  const [passes, unpaid, slots, events] = await Promise.all([
+  const [passes, unpaid, slots, events, chat] = await Promise.all([
     passBalances(user.id),
     unpaidCharges(user.id),
     slotsForUser(user.id, today, plusDays(today, 7)),
     eventSlotsForUser(user.id),
+    chatOfUser(user.id),
   ]);
 
   // Пакет лагеря лежит рядом с обычным абонементом: показываем оба.
@@ -113,6 +116,10 @@ export default async function WeekPage() {
             </section>
           ))
         )}
+
+        {/* Внизу «Недели»: сюда доходят, когда что-то понадобилось, а
+            куда писать — до сих пор в кабинете не было сказано нигде. */}
+        <ContactCard chat={Boolean(chat)} />
       </div>
     </>
   );

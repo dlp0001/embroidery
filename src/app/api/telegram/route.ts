@@ -2,8 +2,8 @@ import { confirmCash, declineCash } from '@/lib/billing';
 import { cashConfirmed, cashDeclined, claimCard, claimOf } from '@/lib/notify';
 import {
   answerCallback, applyTap, bindChat, chatUser, editMessage, eventViews, isStudioAdmin,
-  isTeacher, readMoneyTap, readTap, secretOk, send, teacherDayView, viewAfterTap, weekView,
-  PAY_LETTER,
+  isTeacher, readMoneyTap, readTap, relayAnswer, relayFromParent, secretOk, send,
+  teacherDayView, viewAfterTap, weekView, PAY_LETTER,
 } from '@/lib/telegram';
 
 export const runtime = 'nodejs';
@@ -22,6 +22,8 @@ type Update = {
   message?: {
     chat?: { id?: number };
     text?: string;
+    /** Ответ на сообщение: так студия отвечает родителю. */
+    reply_to_message?: { message_id?: number };
   };
   callback_query?: {
     id?: string;
@@ -41,7 +43,9 @@ function stranger(origin: string): string {
   ].join('\n');
 }
 
-async function onMessage(chatId: number, text: string, origin: string): Promise<void> {
+async function onMessage(
+  chatId: number, text: string, origin: string, replyTo: number | null,
+): Promise<void> {
   const start = /^\/start(?:\s+(\S+))?$/.exec(text);
 
   if (start?.[1]) {
@@ -62,7 +66,7 @@ async function onMessage(chatId: number, text: string, origin: string): Promise<
       '',
       teaches
         ? 'Напишите что угодно — покажу, кто записан на сегодня.'
-        : 'Напишите что угодно — покажу ближайшую неделю с кнопками записи.',
+        : 'Напишите, если что-то нужно сказать студии, — передам. Расписание с кнопками записи — командой /week.',
     ].join('\n'));
     return;
   }
@@ -73,9 +77,28 @@ async function onMessage(chatId: number, text: string, origin: string): Promise<
     return;
   }
 
-  // Команд пока нет: любое сообщение — просьба показать, что впереди.
-  // Разбирать слова начнём тогда, когда боту будет что ещё ответить.
+  // Ответ на пересланное сообщение: возвращаем его родителю.
+  if (replyTo !== null) {
+    const who = await relayAnswer(chatId, replyTo, text);
+    if (who) {
+      await send(chatId, `Передали: ${who}.`);
+      return;
+    }
+  }
+
   const teaches = await isTeacher(user.id);
+
+  // Родитель пишет боту не затем, чтобы увидеть расписание: расписание он
+  // и так получает вечером. Он пишет в студию — и до сих пор бот отвечал
+  // ему расписанием, а сообщение выбрасывал. Теперь передаём.
+  if (!teaches && text !== '/week' && text !== '/start') {
+    const ok = await relayFromParent(user, text);
+    await send(chatId, ok
+      ? 'Передали в студию. Ответ придёт сюда же.\n\nРасписание — командой /week.'
+      : 'Не получилось передать сообщение. Напишите на info@re-create.art.');
+    return;
+  }
+
   if (teaches) {
     const day = await teacherDayView(user.id, user.name);
     await send(chatId, day.text);
@@ -212,7 +235,8 @@ export async function POST(req: Request): Promise<Response> {
       const text = (update.message?.text ?? '').trim();
       // Апдейты бывают всякие: вступление в чат, правка сообщения, стикер.
       // Всё, что не текст в личке, нас пока не касается.
-      if (text) await onMessage(chatId, text, origin);
+      const replyTo = update.message?.reply_to_message?.message_id ?? null;
+      if (text) await onMessage(chatId, text, origin, replyTo);
     }
   } catch (err) {
     console.error('telegram: апдейт не обработан', err);

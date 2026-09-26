@@ -68,20 +68,27 @@ export type Button = { text: string; callback_data: string };
 export type Keyboard = Button[][];
 
 export async function send(chatId: number, text: string, keyboard?: Keyboard): Promise<boolean> {
+  return (await sendAndGetId(chatId, text, keyboard)) !== null;
+}
+
+/** То же, но отдаёт номер сообщения: на него потом отвечают. */
+export async function sendAndGetId(
+  chatId: number, text: string, keyboard?: Keyboard,
+): Promise<number | null> {
   const res = await call<{ message_id: number }>('sendMessage', {
     chat_id: chatId,
     text,
     link_preview_options: { is_disabled: true },
     ...(keyboard?.length ? { reply_markup: { inline_keyboard: keyboard } } : {}),
   });
-  if (res.ok) return true;
+  if (res.ok) return res.result?.message_id ?? null;
   if (res.code === 403) {
     await forgetChat(chatId);
     console.log('telegram: бот заблокирован, привязка снята');
-    return false;
+    return null;
   }
   console.error('telegram: сообщение не ушло', res.code, res.why);
-  return false;
+  return null;
 }
 
 /**
@@ -272,6 +279,75 @@ export async function isStudioAdmin(userId: string): Promise<boolean> {
   return Boolean(await one(
     `select 1 from user_roles where user_id = $1 and role in ('admin', 'superadmin')`,
     [userId]));
+}
+
+// ── Переписка через бота ──────────────────────────────────
+
+/** Кому идут сообщения родителей. Пока только тем, кто отвечает за всё. */
+async function relayChats(): Promise<number[]> {
+  const rows = await query<{ chat: string }>(
+    `select distinct u.tg_chat_id::text as chat
+       from users u join user_roles r on r.user_id = u.id
+      where r.role = 'superadmin' and u.tg_chat_id is not null`,
+  );
+  return rows.map((r) => Number(r.chat));
+}
+
+/**
+ * Родитель написал боту. Передаём сообщение в студию и запоминаем, чьё
+ * оно: ответят на эту же карточку — ответом в телеграме, и он должен
+ * вернуться тому, кто спрашивал.
+ *
+ * Пересылаем не forward, а своим текстом: forward показал бы имя и ник
+ * родителя из его профиля, а нам нужно имя, под которым он в студии.
+ */
+export async function relayFromParent(
+  user: { id: string; name: string | null }, text: string,
+): Promise<boolean> {
+  const chats = await relayChats();
+  if (chats.length === 0) return false;
+
+  const who = user.name ?? 'Без имени';
+  const card = [`Сообщение от ${who}:`, '', text.slice(0, 1500), '', 'Ответьте на это сообщение — передам.'].join('\n');
+
+  let sent = 0;
+  for (const chat of chats) {
+    const id = await sendAndGetId(chat, card);
+    if (id === null) continue;
+    await query(
+      `insert into tg_relay (chat_id, message_id, user_id) values ($1, $2, $3)
+       on conflict (chat_id, message_id) do update set user_id = excluded.user_id`,
+      [chat, id, user.id],
+    );
+    sent++;
+  }
+  return sent > 0;
+}
+
+/**
+ * Ответ студии на пересланное сообщение. Возвращает имя родителя, если
+ * ответ ушёл: по нему подтверждаем отправку тому, кто отвечал.
+ */
+export async function relayAnswer(
+  chatId: number, replyTo: number, text: string,
+): Promise<string | null> {
+  const row = await one<{ user_id: string; chat: string | null; name: string | null }>(
+    `select r.user_id, u.tg_chat_id::text as chat, u.name
+       from tg_relay r join users u on u.id = r.user_id
+      where r.chat_id = $1 and r.message_id = $2`,
+    [chatId, replyTo],
+  );
+  if (!row?.chat) return null;
+  const ok = await send(Number(row.chat), [
+    'Ответ из студии:', '', text.slice(0, 3000),
+  ].join('\n'));
+  return ok ? (row.name ?? 'родителю') : null;
+}
+
+/** Старые связки не нужны: ответить на прошлогоднее сообщение никто не придёт. */
+export async function forgetOldRelays(days = 60): Promise<void> {
+  await query(`delete from tg_relay where created_at < now() - ($1 || ' days')::interval`,
+    [String(days)]);
 }
 
 export async function ownsParticipant(userId: string, participantId: string): Promise<boolean> {
