@@ -341,6 +341,15 @@ export async function cashDeclined(paymentId: string, why?: string): Promise<voi
 
 // ── Записи на смену ───────────────────────────────────────
 
+/**
+ * Откуда пришла запись. Важнее всего «в журнале»: так помечено то, что
+ * Варя внесла сама, и без пометки она получала бы уведомление о
+ * собственном действии, неотличимое от родительского.
+ */
+const VIA: Record<string, string> = {
+  cabinet: 'кабинет', bot: 'бот', journal: 'журнал',
+};
+
 /** «27, 28 сентября» — месяц один раз, если он у всех общий. */
 function daysList(days: string[]): string {
   const months = new Set(days.map((d) => d.slice(0, 7)));
@@ -352,6 +361,7 @@ function daysList(days: string[]): string {
 
 type CampChange = {
   who: string; title: string; day: string; status: string; total: number;
+  via: 'cabinet' | 'journal' | 'bot' | null;
 };
 
 /**
@@ -385,7 +395,7 @@ export async function campReport(): Promise<string | null> {
 
   const rows = await query<CampChange>(
     `select coalesce(ch.name, u.name, 'участник') as who, g.title,
-            s.held_on::text as day, b.status,
+            s.held_on::text as day, b.status, b.changed_via as via,
             (select count(*)::int from bookings b2
                join studio_sessions s2 on s2.id = b2.session_id
               where s2.group_id = g.id and b2.participant_id = p.id
@@ -417,8 +427,10 @@ export async function campReport(): Promise<string | null> {
         gave.length > 0 ? `− ${daysList(gave)}` : null,
       ].filter(Boolean);
       const total = mine[0].total;
+      const from = [...new Set(mine.map((c) => c.via).filter(Boolean))]
+        .map((v) => VIA[v as string] ?? v).join(', ');
       out.push(`${who} · ${parts.join(' · ')} · всего ${total} ${
-        plural(total, 'день', 'дня', 'дней')}`);
+        plural(total, 'день', 'дня', 'дней')}${from ? ` · ${from}` : ''}`);
     }
   }
   return out.join('\n');
