@@ -301,7 +301,7 @@ function Day({
   const past = day.held_on < todayISO();
 
   return (
-    <div className="prog-row">
+    <div className={past ? 'prog-row is-past' : 'prog-row'}>
       <div>
         <span className="prog-dow">{dowName(day.held_on)}</span>
         <span className="prog-day">{dayMonth(day.held_on)}</span>
@@ -311,19 +311,23 @@ function Day({
         {text ?? <span className="prog-soon">Тему этого дня допишем</span>}
       </div>
 
+      {/* В прошедшем дне нечего ни занимать, ни отменять: ни мест, ни
+          кнопок, только пометка, что он уже был. */}
       <div className="prog-act">
-        {free !== null && (
+        {past && <span className="prog-past">прошёл</span>}
+
+        {!past && free !== null && (
           <span className="prog-seats">{free > 0 ? `мест: ${free}` : 'мест нет'}</span>
         )}
 
-        {!signedIn && <a className="prog-cta" href="/login">Кабинет</a>}
+        {!past && !signedIn && <a className="prog-cta" href="/login">Кабинет</a>}
 
-        {signedIn && slots.length === 0 && (
+        {!past && signedIn && slots.length === 0 && (
           <a className="prog-cta" href="/account/profile">Кабинет</a>
         )}
 
-        {slots.map((s) => {
-          const full = (free === 0 && !s.booked) || (past && !s.booked);
+        {!past && slots.map((s) => {
+          const full = free === 0 && !s.booked;
           return (
             <form action={toggleBooking} key={s.participant_id}>
               <input type="hidden" name="sessionId" value={s.session_id} />
@@ -332,9 +336,7 @@ function Day({
               <button type="submit" className={s.booked ? 'kid kid-on' : 'kid'}
                       disabled={full} aria-pressed={s.booked}
                       aria-label={`${s.who}, ${dayMonth(day.held_on)}: ${
-                        past && !s.booked ? 'день прошёл'
-                          : full ? 'мест нет'
-                          : s.booked ? 'отменить запись' : 'записать'}`}>
+                        full ? 'мест нет' : s.booked ? 'отменить запись' : 'записать'}`}>
                 {s.who}
               </button>
             </form>

@@ -56,6 +56,10 @@ export const CAMP_CSS = `
   /* Программа по дням */
   .lp .prog { margin-top: 40px; border-top: 1px solid var(--line); }
   .lp .prog-row { display: grid; grid-template-columns: 150px 1fr auto; gap: 24px; align-items: center; padding: 20px 0; border-bottom: 1px solid var(--line); }
+  /* Прошедший день смены остаётся в программе, но гаснет: записываться
+     в него уже некуда, и мест в нём никаких. */
+  .lp .prog-row.is-past { opacity: 0.45; }
+  .lp .prog-past { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--warm-gray); white-space: nowrap; }
   .lp .prog-day { font-family: 'Cormorant Garamond', serif; font-size: 23px; font-variant-numeric: lining-nums; }
   .lp .prog-dow { display: block; font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--warm-gray); margin-bottom: 2px; }
   .lp .prog-what { font-size: 14px; color: var(--warm-gray); line-height: 1.75; }
