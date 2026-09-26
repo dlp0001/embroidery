@@ -1,4 +1,5 @@
 import { one, query } from './db';
+import { tellCampChanges } from './notify';
 import { nowHM, todayISO } from './format';
 import {
   claimSend, digestWatchers, isConfigured, recordSent, releaseSend, send, sentAgoMin,
@@ -121,6 +122,13 @@ export async function sendDue(force: Force): Promise<DueResult> {
         if (force !== 'next') await releaseSend(campaign, teacher.chat_id);
       }
     }
+  }
+
+  // Записи на смену — тем же тиком, но только по расписанию: руками
+  // просят сводку на день или напоминание, а не отчёт по лагерю.
+  if (!force) {
+    const camp = await tellCampChanges();
+    if (camp > 0) sent.push(`смена → ${camp} админ(ам)`);
   }
 
   console.log(`tg-due: ${at}, попыток ${tried}, отправлено ${sent.length}`, sent);

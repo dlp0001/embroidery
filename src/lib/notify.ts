@@ -1,5 +1,5 @@
 import { query } from './db';
-import { hhmm, money, plural, weekdayDayMonth } from './format';
+import { dayMonth, hhmm, money, plural, weekdayDayMonth } from './format';
 import { siteOrigin } from './site';
 import { isConfigured as receiptsReady } from './icount';
 import {
@@ -337,4 +337,101 @@ export async function cashDeclined(paymentId: string, why?: string): Promise<voi
   if (!isConfigured()) return;
   const letter = await composeCashDeclined(paymentId, await siteOrigin(), why);
   if (letter) await tell(letter.chat, letter.text);
+}
+
+// ── Записи на смену ───────────────────────────────────────
+
+/** «27, 28 сентября» — месяц один раз, если он у всех общий. */
+function daysList(days: string[]): string {
+  const months = new Set(days.map((d) => d.slice(0, 7)));
+  if (months.size > 1) return days.map(dayMonth).join(', ');
+  const nums = days.map((d) => Number(d.slice(8)));
+  const month = dayMonth(days[0]).split(' ')[1];
+  return `${nums.join(', ')} ${month}`;
+}
+
+type CampChange = {
+  who: string; title: string; day: string; status: string; total: number;
+};
+
+/**
+ * Записи на лагерь и мастер-классы — сводкой, а не по одной.
+ *
+ * Родитель отмечает дни подряд, отдельными нажатиями: за полторы минуты
+ * набирается десять. Сообщение на каждое превратило бы телефон в
+ * барабан, поэтому собираем всё, что изменилось с прошлого раза, и
+ * отправляем разом. Окно берём из `settings.camp_report_at`, а заодно им
+ * же и занимаем: два тика подряд не отчитаются об одном и том же.
+ *
+ * Первый запуск ничего не шлёт, только ставит отметку: иначе в первый же
+ * раз приехал бы весь архив смены.
+ */
+export async function campReport(): Promise<string | null> {
+  if (!isConfigured()) return null;
+
+  const claimed = (await query<{ was: string; now: string }>(
+    `with prev as (select value as was from settings where key = 'camp_report_at')
+     update settings set value = now()::text
+      where key = 'camp_report_at' and value = (select was from prev)
+      returning (select was from prev) as was, value as now`))[0];
+
+  if (!claimed) {
+    // Отметки не было вовсе — ставим и молчим до следующего раза.
+    await query(
+      `insert into settings (key, value) values ('camp_report_at', now()::text)
+       on conflict (key) do nothing`);
+    return null;
+  }
+
+  const rows = await query<CampChange>(
+    `select coalesce(ch.name, u.name, 'участник') as who, g.title,
+            s.held_on::text as day, b.status,
+            (select count(*)::int from bookings b2
+               join studio_sessions s2 on s2.id = b2.session_id
+              where s2.group_id = g.id and b2.participant_id = p.id
+                and b2.status = 'booked') as total
+       from bookings b
+       join studio_sessions s on s.id = b.session_id
+       join studio_groups g on g.id = s.group_id and g.kind <> 'lesson'
+       join participants p on p.id = b.participant_id
+       left join children ch on ch.id = p.child_id
+       left join users u on u.id = p.user_id
+      where b.updated_at > $1::timestamptz and b.updated_at <= $2::timestamptz
+      order by g.title, who, s.held_on`,
+    [claimed.was, claimed.now]);
+  if (rows.length === 0) return null;
+
+  const byGroup = new Map<string, CampChange[]>();
+  for (const r of rows) byGroup.set(r.title, [...(byGroup.get(r.title) ?? []), r]);
+
+  const out: string[] = [];
+  for (const [title, changes] of byGroup) {
+    out.push(out.length ? `\n${title}` : title, '');
+    const byWho = new Map<string, CampChange[]>();
+    for (const c of changes) byWho.set(c.who, [...(byWho.get(c.who) ?? []), c]);
+    for (const [who, mine] of byWho) {
+      const took = mine.filter((c) => c.status === 'booked').map((c) => c.day);
+      const gave = mine.filter((c) => c.status !== 'booked').map((c) => c.day);
+      const parts = [
+        took.length > 0 ? `+ ${daysList(took)}` : null,
+        gave.length > 0 ? `− ${daysList(gave)}` : null,
+      ].filter(Boolean);
+      const total = mine[0].total;
+      out.push(`${who} · ${parts.join(' · ')} · всего ${total} ${
+        plural(total, 'день', 'дня', 'дней')}`);
+    }
+  }
+  return out.join('\n');
+}
+
+/** Сводка по записям на смену — админам. */
+export async function tellCampChanges(): Promise<number> {
+  const text = await campReport();
+  if (!text) return 0;
+  let sent = 0;
+  for (const a of await adminChats()) {
+    if (await tell(a.chat, text)) sent++;
+  }
+  console.log(`notify: сводка по смене, отправлено ${sent}`);
+  return sent;
 }
