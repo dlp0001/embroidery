@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg';
 import { one, query, tx } from './db';
-import { plural, WAY, type PayMethod } from './format';
+import { plural, providerOf, WAY, type PayMethod } from './format';
 import { logMoneyIn } from './ledger';
 
 export type AttendanceStatus = 'present' | 'absent' | 'sick' | 'trial';
@@ -1550,7 +1550,9 @@ export type IssuePassInput = {
   ownerId: string;
   lessons: number;
   months: number;
-  paid: 'cash' | 'transfer' | 'unpaid';
+  paid: PayMethod | 'unpaid';
+  /** Нужен ли чек: за деньги в руки его выписывают только по просьбе. */
+  receipt: boolean;
   coverDebt: boolean;
   /** Пакет лагеря принадлежит своей группе и тратится только в ней. */
   groupId?: string | null;
@@ -1615,7 +1617,9 @@ export async function saleOffers(): Promise<SaleOffer[]> {
  * платёж. Если попросили, гасит уже накопленные неоплаченные занятия:
  * самые старые вперёд, пока хватает занятий в пакете.
  */
-export async function issuePass(input: IssuePassInput, byUser: string): Promise<{ covered: number }> {
+export async function issuePass(
+  input: IssuePassInput, byUser: string,
+): Promise<{ covered: number; paymentId: string | null }> {
   const { amount, currency } = await lessonPrice();
   // Абонемент стоит своих денег; если пакет нестандартный, считаем по занятиям.
   const type = (await passTypes()).find((t) => t.lessons === input.lessons);
@@ -1634,10 +1638,14 @@ export async function issuePass(input: IssuePassInput, byUser: string): Promise<
       const pay = await c.query<{ id: string }>(
         `insert into payments (provider, user_id, amount, currency, status, purpose, raw)
          values ($1, $2, $3, $4, 'paid', 'studio_pass', $5) returning id`,
-        [input.paid, input.ownerId, total, currency,
+        [providerOf(input.paid), input.ownerId, total, currency,
          JSON.stringify({
            issued_by: byUser, lessons: input.lessons,
            group_id: groupId, group_title: groupTitle,
+           // Способ нужен чеку: наличные, перевод и приложения —
+           // в отчётности разные места.
+           pay_method: input.paid,
+           receipt_wanted: input.receipt ? 'yes' : 'no',
          })],
       );
       paymentId = pay.rows[0].id;
@@ -1656,9 +1664,7 @@ export async function issuePass(input: IssuePassInput, byUser: string): Promise<
     await logMoneyIn(c, {
       kind: 'pass_issued', actorId: byUser, ownerId: input.ownerId,
       passId, paymentId, amount: total, currency,
-      note: `${what}, ${
-        input.paid === 'cash' ? 'наличными' : input.paid === 'transfer' ? 'переводом' : 'не оплачен'
-      }`,
+      note: `${what}, ${input.paid === 'unpaid' ? 'не оплачен' : WAY[input.paid]}`,
       details: { lessons: input.lessons, months: input.months, paid: input.paid, group_id: groupId },
     });
 
@@ -1686,7 +1692,7 @@ export async function issuePass(input: IssuePassInput, byUser: string): Promise<
         covered++;
       }
     }
-    return { covered };
+    return { covered, paymentId };
   });
 }
 
@@ -1747,8 +1753,8 @@ export async function extendPass(
     passId: string;
     days: number;
     price: number;
-    paid: 'cash' | 'transfer' | 'unpaid';
-    /** Нужен ли чек: за наличные его выписывают только по просьбе. */
+    paid: PayMethod | 'unpaid';
+    /** Нужен ли чек: за деньги в руки его выписывают только по просьбе. */
     receipt: boolean;
   },
   byUser: string | null,
@@ -1792,7 +1798,7 @@ export async function extendPass(
       const pay = await c.query<{ id: string }>(
         `insert into payments (provider, user_id, amount, currency, status, purpose, raw)
          values ($1, $2, $3, $4, 'paid', 'studio_pass', $5) returning id`,
-        [input.paid, pass.owner_id, sum, currency,
+        [providerOf(input.paid), pass.owner_id, sum, currency,
          JSON.stringify({
            extends_pass: pass.id, days: input.days, issued_by: byUser,
            // Способ нужен чеку: наличные, перевод и приложения —
@@ -1828,6 +1834,8 @@ export type PassRow = {
   paid: string | null;
   group_title: string | null;
   kind: GroupKind;
+  /** Чем именно заплатили: наличные, перевод, биток, пейбокс. */
+  paid_how: string | null;
   /** Цена докупаемого дня, если этот пакет можно нарастить. */
   extra_price: number | null;
   /** Сколько дней ещё можно докупить: дальше конца смены смысла нет. */
@@ -1854,7 +1862,9 @@ export async function allActivePasses(): Promise<PassRow[]> {
                          and s.held_on >= current_date), 0)
                      - (p.lessons_total - (select count(*)::int from charges ch
                                             where ch.pass_id = p.id)), 0) as max_days,
-            (select pay.provider from payments pay where pay.id = p.payment_id) as paid
+            (select pay.provider from payments pay where pay.id = p.payment_id) as paid,
+            (select pay.raw ->> 'pay_method' from payments pay
+              where pay.id = p.payment_id) as paid_how
        from passes p
        join users u on u.id = p.owner_id
       where (p.valid_to is null or p.valid_to >= current_date)
@@ -1892,6 +1902,8 @@ export async function spentPasses(days = 30): Promise<SpentPass[]> {
                        where s.group_id = p.group_id and s.status <> 'cancelled'
                          and s.held_on >= current_date), 0) as max_days,
             (select pay.provider from payments pay where pay.id = p.payment_id) as paid,
+            (select pay.raw ->> 'pay_method' from payments pay
+              where pay.id = p.payment_id) as paid_how,
             (select max(s.held_on)::text from charges c
                join studio_sessions s on s.id = c.session_id
               where c.pass_id = p.id) as last_used

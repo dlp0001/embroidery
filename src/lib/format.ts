@@ -136,3 +136,11 @@ export type PayMethod = 'cash' | 'transfer' | 'bit' | 'paybox';
 export const WAY: Record<PayMethod, string> = {
   cash: 'наличными', transfer: 'переводом', bit: 'Bit', paybox: 'PayBox',
 };
+
+/** Порядок в списках: сначала то, чем платят чаще. */
+export const WAYS: PayMethod[] = ['cash', 'transfer', 'bit', 'paybox'];
+
+/** Пришли деньги в руки или на счёт. Битом и пейбоксом — на счёт. */
+export function providerOf(way: PayMethod): 'cash' | 'transfer' {
+  return way === 'cash' ? 'cash' : 'transfer';
+}

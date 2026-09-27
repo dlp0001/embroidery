@@ -6,7 +6,9 @@ import {
 import type { PassRow } from '@/lib/studio';
 import { pendingCash } from '@/lib/billing';
 import { isConfigured as receiptsConfigured } from '@/lib/icount';
-import { dayMonth, daysUntil, money, plural, todayISO, WAY } from '@/lib/format';
+import {
+  dayMonth, daysUntil, money, plural, todayISO, WAY, WAYS, type PayMethod,
+} from '@/lib/format';
 import Link from 'next/link';
 import {
   confirmCashAction, declineCashAction, extendPassAction, issuePassAction,
@@ -14,7 +16,15 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-const PAID: Record<string, string> = { cash: 'наличными', transfer: 'переводом' };
+/** Чем оплачен абонемент: способ помнит платёж, провайдер знает грубее. */
+function paidWith(p: PassRow): string {
+  if (!p.paid) return 'не оплачен';
+  // «Наличными» и «переводом» — как деньги отдали, «через Bit» — чем.
+  const how = p.paid_how as PayMethod | null;
+  if (how === 'bit' || how === 'paybox') return `оплачен через ${WAY[how]}`;
+  if (how) return `оплачен ${WAY[how]}`;
+  return `оплачен ${p.paid === 'cash' ? 'наличными' : p.paid === 'transfer' ? 'переводом' : 'картой'}`;
+}
 const field: React.CSSProperties = {
   width: '100%', padding: '11px 0', border: 0,
   borderBottom: '1.5px solid rgba(180,160,140,0.4)', background: 'transparent',
@@ -51,8 +61,7 @@ function ExtendForm(
       <div className="field" style={{ marginBottom: 0, width: 150 }}>
         <label htmlFor={`extpaid-${p.id}`}>Оплата</label>
         <select id={`extpaid-${p.id}`} name="paid" defaultValue="cash">
-          <option value="cash">наличными</option>
-          <option value="transfer">переводом</option>
+          {WAYS.map((w) => <option key={w} value={w}>{WAY[w]}</option>)}
           <option value="unpaid">пока не оплачено</option>
         </select>
       </div>
@@ -150,10 +159,7 @@ export default async function DebtsPage() {
                     <select id={`how-${cl.id}`} name="payMethod" required
                             defaultValue={cl.declared_way === 'transfer' ? '' : 'cash'}>
                       <option value="" disabled>— чем именно —</option>
-                      <option value="cash">наличными</option>
-                      <option value="transfer">банковским переводом</option>
-                      <option value="bit">Bit</option>
-                      <option value="paybox">PayBox</option>
+                      {WAYS.map((w) => <option key={w} value={w}>{WAY[w]}</option>)}
                     </select>
                   </div>
 
@@ -210,7 +216,7 @@ export default async function DebtsPage() {
                   {p.group_title ? `${p.group_title}: ` : ''}
                   осталось {p.left} из {p.lessons_total}
                   {p.valid_to ? ` · до ${dayMonth(p.valid_to)}` : ''}
-                  {p.paid ? ` · оплачен ${PAID[p.paid] ?? p.paid}` : ' · не оплачен'}
+                  {` · ${paidWith(p)}`}
                 </div>
               </div>
             </div>
@@ -231,7 +237,7 @@ export default async function DebtsPage() {
                   {p.group_title ? `${p.group_title}: ` : ''}
                   все {p.lessons_total} использованы
                   {p.last_used ? ` · последнее ${dayMonth(p.last_used)}` : ''}
-                  {p.paid ? ` · оплачен ${PAID[p.paid] ?? p.paid}` : ' · не оплачен'}
+                  {` · ${paidWith(p)}`}
                 </div>
                 {admin && <ExtendForm pass={p} currency={currency} receipts={receipts} />}
               </div>
@@ -278,11 +284,17 @@ export default async function DebtsPage() {
               <div>
                 <label style={label} htmlFor="paid">Оплата</label>
                 <select style={field} id="paid" name="paid" defaultValue="cash">
-                  <option value="cash">наличными</option>
-                  <option value="transfer">переводом</option>
+                  {WAYS.map((w) => <option key={w} value={w}>{WAY[w]}</option>)}
                   <option value="unpaid">пока не оплачен</option>
                 </select>
               </div>
+
+              <label style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: 'pointer' }}>
+                <input type="checkbox" name="receipt" style={{ width: 20, height: 20 }} />
+                <span className="hint">
+                  Выписать чек в iCount{receipts ? '' : ' — сейчас не подключён'}
+                </span>
+              </label>
 
               <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
                 <input type="checkbox" name="coverDebt" style={{ width: 20, height: 20, marginTop: 2 }} />

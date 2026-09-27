@@ -318,14 +318,16 @@ type ToBill = {
 
 /** Чем закрыт платёж с точки зрения квитанции. */
 function receiptMethod(p: ToBill): { method: Method; app: PayApp | null } {
-  // Проданное с рук помнит способ в провайдере: наличные или перевод.
-  // Перевод — это банк, а не касса и не карта: в отчётности это разные
-  // места, и iCount просит для него номер счёта.
-  if (p.provider === 'transfer') return { method: 'transfer', app: null };
-  if (p.provider !== 'cash') return { method: 'cc', app: null };
+  // Способ спрашивают там, где деньги принимают руками, и он точнее
+  // провайдера: биток и пейбокс приходят на счёт, но это не перевод.
   const how = p.raw?.pay_method;
   if (how === 'bit' || how === 'paybox') return { method: 'app', app: how };
   if (how === 'transfer') return { method: 'transfer', app: null };
+  if (how === 'cash') return { method: 'cash', app: null };
+  // Способа нет — остаётся провайдер. Перевод живёт в банке, а не в
+  // кассе и не на карте: iCount просит для него номер счёта.
+  if (p.provider === 'transfer') return { method: 'transfer', app: null };
+  if (p.provider !== 'cash') return { method: 'cc', app: null };
   return { method: 'cash', app: null };
 }
 

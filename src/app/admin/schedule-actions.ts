@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
 import { confirmCash, declineCash, issueReceipt } from '@/lib/billing';
-import { hhmm } from '@/lib/format';
+import { hhmm, WAYS, type PayMethod } from '@/lib/format';
 import { cashConfirmed, cashDeclined, sessionChanged } from '@/lib/notify';
 import type { SaveResult } from '@/components/AutoSave';
 import { isAdmin, onlyLooking, requireUser } from '@/lib/session';
@@ -220,25 +220,35 @@ export async function unbookChildAction(form: FormData): Promise<SaveResult> {
   return { ok: true };
 }
 
+/** Способ оплаты с формы: наличные, перевод, биток, пейбокс или никак. */
+function howPaid(form: FormData): PayMethod | 'unpaid' {
+  const raw = String(form.get('paid') ?? '');
+  if (raw === 'unpaid') return 'unpaid';
+  const way = WAYS.find((w) => w === raw);
+  if (!way) throw new Error('BAD_PAID');
+  return way;
+}
+
 export async function issuePassAction(form: FormData): Promise<void> {
   const user = await requireAdmin();
   // Форма присылает один ключ вида «id группы:дней»: так пакет лагеря
   // не перепутать со студийным абонементом на то же число занятий.
   const [groupKey, lessonsKey] = String(form.get('offer') ?? '').split(':');
   const lessons = Number(lessonsKey);
-  const paid = String(form.get('paid'));
+  const paid = howPaid(form);
+  const receipt = form.get('receipt') === 'on';
   const offer = (await saleOffers()).find(
     (o) => (o.groupId ?? '') === groupKey && o.lessons === lessons,
   );
   if (!offer) throw new Error('BAD_LESSONS');
-  if (paid !== 'cash' && paid !== 'transfer' && paid !== 'unpaid') throw new Error('BAD_PAID');
 
-  await issuePass(
+  const sold = await issuePass(
     {
       ownerId: String(form.get('ownerId')),
       lessons: offer.lessons,
       months: offer.months,
       paid,
+      receipt,
       coverDebt: form.get('coverDebt') === 'on',
       groupId: offer.groupId,
       price: offer.price,
@@ -246,6 +256,8 @@ export async function issuePassAction(form: FormData): Promise<void> {
     },
     user.id,
   );
+  // Чек выписываем сразу: Варя просит его, когда родитель стоит рядом.
+  if (receipt && sold.paymentId) await issueReceipt(sold.paymentId);
   revalidatePath('/admin/studio/debts');
   revalidatePath('/admin/studio');
   revalidatePath('/account');
@@ -257,9 +269,7 @@ export async function extendPassAction(form: FormData): Promise<void> {
   const user = await requireAdmin();
   const passId = String(form.get('passId') ?? '');
   const days = Number(form.get('days'));
-  const paid = String(form.get('paid'));
-  if (paid !== 'cash' && paid !== 'transfer' && paid !== 'unpaid') throw new Error('BAD_PAID');
-
+  const paid = howPaid(form);
   const receipt = form.get('receipt') === 'on';
 
   const offer = await extendOffer(passId);

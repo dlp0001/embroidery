@@ -92,10 +92,14 @@ export async function monthStats(month: string): Promise<MonthStats> {
 
   const lessons = await one<LessonAgg>(
     `select
-       count(*) filter (where pay.provider = 'cash')::int as cash_n,
-       coalesce(sum(ch.amount) filter (where pay.provider = 'cash'), 0)::text as cash_sum,
-       count(*) filter (where pay.provider is not null and pay.provider <> 'cash')::int as card_n,
-       coalesce(sum(ch.amount) filter (where pay.provider is not null and pay.provider <> 'cash'), 0)::text as card_sum,
+       /* «Нал / перевод» — всё, что Варя приняла сама: наличные, перевод,
+          биток, пейбокс. Картой считается только то, что прошло кассу. */
+       count(*) filter (where pay.provider in ('cash', 'transfer'))::int as cash_n,
+       coalesce(sum(ch.amount) filter (where pay.provider in ('cash', 'transfer')), 0)::text as cash_sum,
+       count(*) filter (where pay.provider is not null
+                          and pay.provider not in ('cash', 'transfer'))::int as card_n,
+       coalesce(sum(ch.amount) filter (where pay.provider is not null
+                          and pay.provider not in ('cash', 'transfer')), 0)::text as card_sum,
        count(*) filter (where ch.payment_id is null and ch.pass_id is null)::int as due_n,
        coalesce(sum(ch.amount) filter (where ch.payment_id is null and ch.pass_id is null), 0)::text as due_sum,
        count(*) filter (where ch.pass_id is not null)::int as pass_n
