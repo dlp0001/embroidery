@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useState } from 'react';
 import { addWalkInAction, saveJournal } from '@/app/admin/actions';
 import { plural, type PayMethod } from '@/lib/format';
 import type { PayWay, RosterRow } from '@/lib/studio';
@@ -111,6 +111,16 @@ export default function Journal({
     },
     0,
   );
+
+  // Кнопка крутится молча, сколько бы ни шёл ответ, и на медленной связи
+  // это выглядит как «всё пропало». Отметки к этому времени уже записаны:
+  // они ложатся раньше ответа, отдельной транзакцией.
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (!pending) { setSlow(false); return; }
+    const t = setTimeout(() => setSlow(true), 12_000);
+    return () => clearTimeout(t);
+  }, [pending]);
 
   const present = roster.filter((r) => rowFor(r).present).length;
   // Записавшиеся — первыми: их ждут наверняка, остальных по привычке.
@@ -344,6 +354,12 @@ export default function Journal({
           ? 'Сохраняю…'
           : `${saved ? 'Пересохранить' : 'Сохранить'} · отмечено ${present}`}
       </button>
+      {pending && slow && (
+        <p className="hint" style={{ marginTop: 12 }}>
+          Отвечает дольше обычного. Отметки, скорее всего, уже записаны:
+          обновите страницу и посмотрите, прежде чем нажимать ещё раз.
+        </p>
+      )}
       {savedAt > 0 && !pending && (
         <p className="hint" style={{ marginTop: 12 }}>Сохранено.</p>
       )}
