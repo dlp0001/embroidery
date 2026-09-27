@@ -5,8 +5,8 @@ import {
   weekdayDayMonth,
 } from './format';
 import {
-  eventSlotsForUser, markDeclined, sessionIsPast, setBooking, slotsForUser, teacherSessions,
-  unclosedBefore,
+  debtors, eventSlotsForUser, markDeclined, passBalances, sessionIsPast, setBooking,
+  slotsForUser, teacherSessions, unclosedBefore, unpaidCharges,
   type GroupKind, type SlotRow,
 } from './studio';
 
@@ -861,6 +861,68 @@ export async function teacherSessionView(
     text: [greeting(firstName(name)), '', lead, ...lines, '', wish()].join('\n'),
     keyboard: [],
   };
+}
+
+// ── Деньги ────────────────────────────────────────────────
+
+/**
+ * Свои долги и абонементы. Оплатить отсюда нельзя нарочно: выбрать, за
+ * какие занятия платить, объявить наличные или взять абонемент можно
+ * только в кабинете, и половина этого в боте превратилась бы в лабиринт.
+ */
+export async function payView(userId: string, origin: string): Promise<string> {
+  const [unpaid, passes] = await Promise.all([
+    unpaidCharges(userId),
+    passBalances(userId),
+  ]);
+
+  const lines: string[] = [];
+  const mine = passes.filter((p) => p.left > 0);
+  for (const p of mine) {
+    const what = p.group_id
+      ? plural(p.left, 'день', 'дня', 'дней')
+      : plural(p.left, 'занятие', 'занятия', 'занятий');
+    lines.push(`${p.group_title ?? 'Абонемент'}: осталось ${p.left} ${what} из ${p.lessons_total}`
+      + (p.valid_to ? `, до ${dayMonth(p.valid_to)}` : ''));
+  }
+  if (lines.length > 0) lines.push('');
+
+  if (unpaid.length === 0) {
+    lines.push('Неоплаченных занятий нет.');
+    return lines.join('\n');
+  }
+
+  const total = unpaid.reduce((sum, c) => sum + Number(c.amount), 0);
+  lines.push(`Не оплачено ${unpaid.length} ${
+    plural(unpaid.length, 'занятие', 'занятия', 'занятий')} на ${
+    money(total, unpaid[0].currency)}`, '');
+  for (const c of unpaid) {
+    // «Заявлено» значит, что родитель уже сказал «заплатил наличными», и
+    // ждёт подтверждения. Без пометки он решил бы, что его не услышали.
+    lines.push(`${dayMonth(c.held_on)} · ${c.who} · ${c.group_title} · ${
+      money(c.amount, c.currency)}${c.declared ? ' · заявлено' : ''}`);
+  }
+  lines.push('', `Оплатить: ${origin}/account/pay`);
+  return lines.join('\n');
+}
+
+/** Должники студии. То же, что на экране «Финансы», только короче. */
+export async function debtorsView(origin: string): Promise<string> {
+  const rows = await debtors();
+  if (rows.length === 0) return 'Долгов нет.';
+
+  const total = rows.reduce((sum, d) => sum + Number(d.amount), 0);
+  const lines = [
+    `Должников ${rows.length}, всего ${money(total, rows[0].currency)}`,
+    '',
+  ];
+  for (const d of rows) {
+    lines.push(`${d.name ?? d.email} · ${d.lessons} ${
+      plural(d.lessons, 'занятие', 'занятия', 'занятий')} · ${
+      money(d.amount, d.currency)} · с ${dayMonth(d.since)}`);
+  }
+  lines.push('', `Финансы: ${origin}/admin/studio/debts`);
+  return lines.join('\n');
 }
 
 // ── Вечерний вопрос ───────────────────────────────────────

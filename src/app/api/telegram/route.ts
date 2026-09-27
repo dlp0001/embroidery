@@ -2,8 +2,8 @@ import { confirmCash, declineCash } from '@/lib/billing';
 import { cashConfirmed, cashDeclined, claimCard, claimOf } from '@/lib/notify';
 import {
   answerCallback, applyTap, bindChat, chatUser, editMessage, eventViews, isStudioAdmin,
-  isTeacher, readMoneyTap, readTap, relayAnswer, relayFromParent, secretOk, send,
-  teacherDayView, viewAfterTap, weekView, PAY_LETTER,
+  debtorsView, isTeacher, payView, readMoneyTap, readTap, relayAnswer, relayFromParent,
+  secretOk, send, teacherDayView, viewAfterTap, weekView, PAY_LETTER,
 } from '@/lib/telegram';
 
 export const runtime = 'nodejs';
@@ -92,6 +92,15 @@ async function onMessage(
   // были перечислены руками, и список бы рос.
   const cmd = text.startsWith('/') ? text.split(/\s+/)[0].toLowerCase() : null;
 
+  if (cmd === '/pay') {
+    // Долги студии это вопрос админа, а не преподавателя: у Вари обе роли,
+    // а суперадмину показывать его собственные начисления вместо студийных
+    // бессмысленно. Родителю, само собой, свои.
+    const studio = await isStudioAdmin(user.id);
+    await send(chatId, studio ? await debtorsView(origin) : await payView(user.id, origin));
+    return;
+  }
+
   if (cmd === '/help' || (cmd !== null && cmd !== '/week' && cmd !== '/today')) {
     await send(chatId, help(teaches, origin));
     return;
@@ -133,6 +142,7 @@ function help(teaches: boolean, origin: string): string {
       'Что я умею',
       '',
       '/today — кто записан на сегодня.',
+      '/pay — кто сколько должен студии.',
       '/week — ваша неделя как родителя.',
       '/help — это сообщение.',
       '',
@@ -146,6 +156,7 @@ function help(teaches: boolean, origin: string): string {
       '',
       '/week — ближайшая неделя. Записаться и отменить можно прямо там,',
       'одним нажатием.',
+      '/pay — неоплаченные занятия и абонемент.',
       '/help — это сообщение.',
       '',
       `Оплата, история и всё остальное: ${origin}/account`,

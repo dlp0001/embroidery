@@ -70,6 +70,7 @@ if (origin) {
   await api('setMyCommands', {
     commands: [
       { command: 'week', description: 'Расписание и запись' },
+      { command: 'pay', description: 'Оплата и задолженность' },
       { command: 'help', description: 'Что умеет бот' },
     ],
     scope: { type: 'all_private_chats' },
