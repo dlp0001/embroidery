@@ -281,24 +281,32 @@ function lessonOf(kind: string): string {
 }
 
 /**
- * Пакет дней в чеке. Русскому родителю — с названием смены целиком, чтобы
- * было видно, за что платил. Ивритской половине название не подставить:
- * оно у нас русское, а читать её будет бухгалтерия.
+ * Сколько дней на иврите. Докупают чаще всего один день, а «1 ימים» —
+ * ошибка, которую в чеке прочтёт бухгалтерия.
  */
+function daysHe(days: number): string {
+  return days === 1 ? 'יום אחד' : `${days} ימים`;
+}
+
 /** Докупленные дни: пакет тот же, в чеке — только добавка к нему. */
 function extraDaysLine(kind: string, title: string | null, days: number): string {
   const he = kind === 'event' ? 'סדנה' : 'קייטנה';
   return line(
     `Дополнительные дни${title ? `: ${title}` : ''}, ${days} ${plural(days, 'день', 'дня', 'дней')}`,
-    `ימים נוספים ל${he}: ${days} ימים`,
+    `ימים נוספים ל${he}: ${daysHe(days)}`,
   );
 }
 
+/**
+ * Пакет дней в чеке. Русскому родителю — с названием смены целиком, чтобы
+ * было видно, за что платил. Ивритской половине название не подставить:
+ * оно у нас русское, а читать её будет бухгалтерия.
+ */
 function packageLine(kind: string, title: string, days: number): string {
   const he = kind === 'event' ? 'סדנה' : 'קייטנה';
   return line(
     `Пакет занятий: ${title}, ${days} ${plural(days, 'день', 'дня', 'дней')}`,
-    `חבילה ל${he}: ${days} ימים`,
+    `חבילה ל${he}: ${daysHe(days)}`,
   );
 }
 
@@ -310,6 +318,10 @@ type ToBill = {
 
 /** Чем закрыт платёж с точки зрения квитанции. */
 function receiptMethod(p: ToBill): { method: Method; app: PayApp | null } {
+  // Проданное с рук помнит способ в провайдере: наличные или перевод.
+  // Перевод — это банк, а не касса и не карта: в отчётности это разные
+  // места, и iCount просит для него номер счёта.
+  if (p.provider === 'transfer') return { method: 'transfer', app: null };
   if (p.provider !== 'cash') return { method: 'cc', app: null };
   const how = p.raw?.pay_method;
   if (how === 'bit' || how === 'paybox') return { method: 'app', app: how };
