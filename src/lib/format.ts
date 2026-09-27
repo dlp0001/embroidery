@@ -116,6 +116,24 @@ export function telegramNick(raw: string): { ok: boolean; nick: string | null } 
   return { ok: true, nick: bare };
 }
 
+/**
+ * Телефон в профиле. Поле необязательное, поэтому пусто это не ошибка.
+ * Формат не навязываем: у студии израильские номера, но пишут их и с
+ * +972, и с нуля, и с дефисами, и с пробелами. Смотрим только на то,
+ * похоже ли это вообще на номер, иначе вместо помощи получится придирка.
+ *
+ * ok = false — написано что-то, но на номер не похоже, и молча стирать
+ * это нельзя.
+ */
+export function phoneNumber(raw: string): { ok: boolean; phone: string | null } {
+  const value = raw.trim().replace(/\s+/g, ' ');
+  if (!value) return { ok: true, phone: null };
+  if (/[^\d+()\-. ]/.test(value)) return { ok: false, phone: null };
+  const digits = value.replace(/\D/g, '');
+  if (digits.length < 7 || digits.length > 15) return { ok: false, phone: null };
+  return { ok: true, phone: value };
+}
+
 /** Русские склонения: plural(2, 'занятие', 'занятия', 'занятий'). */
 export function plural(n: number, one: string, few: string, many: string): string {
   const mod10 = n % 10;

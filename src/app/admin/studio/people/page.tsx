@@ -180,6 +180,13 @@ export default async function PeoplePage({
                        style={{ ...inline, font: 'inherit', color: 'inherit' }} />
               </div>
               <div className="sub" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                <label htmlFor={`tel-${f.user_id}`}>Телефон:</label>
+                <input id={`tel-${f.user_id}`} name="phone" maxLength={40} type="tel"
+                       defaultValue={f.phone ?? ''} placeholder="не задан"
+                       style={{ ...inline, font: 'inherit', color: 'inherit' }} />
+                {f.phone && <a href={`tel:${f.phone.replace(/[^\d+]/g, '')}`}>позвонить</a>}
+              </div>
+              <div className="sub" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
                 <label htmlFor={`tg-${f.user_id}`}>Телеграм:</label>
                 <input id={`tg-${f.user_id}`} name="telegram" maxLength={80}
                        defaultValue={f.telegram ? `@${f.telegram}` : ''} placeholder="не задан"

@@ -22,7 +22,7 @@ export default function SelfCard({
   title = 'Родитель',
   attends = null,
 }: {
-  user: { name: string | null; email: string; telegram: string | null };
+  user: { name: string | null; email: string; telegram: string | null; phone: string | null };
   /** Телеграм подключён: бот знает, кому писать. */
   chat: boolean;
   botOff?: boolean;
@@ -36,7 +36,7 @@ export default function SelfCard({
         <div className="what" style={{ marginBottom: 14 }}>{title}</div>
         <AutoSave
           action={updateMyProfile}
-          hint="Ник не обязателен и нужен только для личных сообщений: бот пишет через «Подключить телеграм», а по нику Варя может написать вам сама."
+          hint="Телефон и ник не обязательны. Телефон нужен, чтобы дозвониться, если что-то срочное; по нику Варя пишет в телеграме."
         >
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div className="field" style={{ flex: '1 1 180px', marginBottom: 0, minWidth: 0 }}>
@@ -52,6 +52,20 @@ export default function SelfCard({
                 placeholder="Как вас зовут"
                 maxLength={120}
                 aria-required="true"
+              />
+            </div>
+            <div className="field" style={{ flex: '1 1 180px', marginBottom: 0, minWidth: 0 }}>
+              <label htmlFor="my-phone">Телефон</label>
+              {/* Необязателен, но нужен: телеграм не у всех, а дозвониться
+                  иногда надо срочно. */}
+              <input
+                id="my-phone"
+                name="phone"
+                type="tel"
+                defaultValue={user.phone ?? ''}
+                placeholder="050-123-45-67"
+                maxLength={40}
+                autoComplete="tel"
               />
             </div>
             <div className="field" style={{ flex: '1 1 180px', marginBottom: 0, minWidth: 0 }}>

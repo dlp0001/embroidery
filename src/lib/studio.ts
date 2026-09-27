@@ -1969,6 +1969,7 @@ export type Family = {
   name: string | null;
   billing_name: string | null;
   telegram: string | null;
+  phone: string | null;
   email: string;
   roles: string[];
   attends: boolean;
@@ -2061,7 +2062,7 @@ export async function bookableChildren(): Promise<BookableChild[]> {
 /** Все взрослые с детьми и составом групп. */
 export async function families(): Promise<Family[]> {
   const rows = await query<Family>(
-    `select u.id as user_id, u.name, u.billing_name, u.telegram, u.email, u.attends,
+    `select u.id as user_id, u.name, u.billing_name, u.telegram, u.phone, u.email, u.attends,
             (select p.id from participants p where p.user_id = u.id) as participant_id,
             coalesce((select array_agg(r.role order by r.role) from user_roles r
                        where r.user_id = u.id), '{}') as roles,
@@ -2139,11 +2140,11 @@ export async function setAttends(userId: string, attends: boolean): Promise<void
 
 /** Своя карточка: имя и ник в телеграме родитель правит сам. Ник приходит уже разобранным. */
 export async function saveProfile(
-  userId: string, name: string, telegram: string | null,
+  userId: string, name: string, telegram: string | null, phone: string | null,
 ): Promise<void> {
   await query(
-    'update users set name = $2, telegram = $3 where id = $1',
-    [userId, name.trim() || null, telegram],
+    'update users set name = $2, telegram = $3, phone = $4 where id = $1',
+    [userId, name.trim() || null, telegram, phone],
   );
 }
 
@@ -2152,11 +2153,12 @@ export async function saveProfile(
  * в квитанции, и ник в телеграме. Ник приходит уже разобранным.
  */
 export async function saveParent(
-  userId: string, name: string, billingName: string, telegram: string | null,
+  userId: string, name: string, billingName: string,
+  telegram: string | null, phone: string | null,
 ): Promise<void> {
   await query(
-    'update users set name = $2, billing_name = $3, telegram = $4 where id = $1',
-    [userId, name.trim() || null, billingName.trim() || null, telegram],
+    'update users set name = $2, billing_name = $3, telegram = $4, phone = $5 where id = $1',
+    [userId, name.trim() || null, billingName.trim() || null, telegram, phone],
   );
 }
 

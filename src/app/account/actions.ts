@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type { SaveResult } from '@/components/AutoSave';
 import { one } from '@/lib/db';
-import { telegramNick } from '@/lib/format';
+import { phoneNumber, telegramNick } from '@/lib/format';
 import { onlyLooking, requireUser } from '@/lib/session';
 import { linkUrl, unlinkUser } from '@/lib/telegram';
 import {
@@ -102,7 +102,11 @@ export async function updateMyProfile(formData: FormData): Promise<SaveResult> {
       error: 'Ник в телеграме — латиница, цифры и подчёркивание, от пяти знаков. Например @my_nick',
     };
   }
-  await saveProfile(user.id, name, tg.nick);
+  const tel = phoneNumber(String(formData.get('phone') ?? '').slice(0, 40));
+  if (!tel.ok) {
+    return { ok: false, error: 'Телефон — цифры, плюс и дефисы. Например 050-123-45-67' };
+  }
+  await saveProfile(user.id, name, tg.nick, tel.phone);
   refresh();
   return { ok: true };
 }

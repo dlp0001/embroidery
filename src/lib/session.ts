@@ -16,6 +16,7 @@ export type CurrentUser = {
   email: string;
   name: string | null;
   telegram: string | null;
+  phone: string | null;
   roles: Role[];
 };
 
@@ -61,9 +62,10 @@ export const realUser = cache(async (): Promise<CurrentUser | null> => {
   if (!token) return null;
 
   const row = await one<{
-    id: string; email: string; name: string | null; telegram: string | null; roles: Role[] | null;
+    id: string; email: string; name: string | null; telegram: string | null;
+    phone: string | null; roles: Role[] | null;
   }>(
-    `select u.id, u.email, u.name, u.telegram,
+    `select u.id, u.email, u.name, u.telegram, u.phone,
             array_remove(array_agg(r.role), null) as roles
        from sessions s
        join users u on u.id = s.user_id
@@ -75,7 +77,7 @@ export const realUser = cache(async (): Promise<CurrentUser | null> => {
   if (!row) return null;
   return {
     id: row.id, email: row.email, name: row.name,
-    telegram: row.telegram, roles: row.roles ?? [],
+    telegram: row.telegram, phone: row.phone, roles: row.roles ?? [],
   };
 });
 
@@ -94,9 +96,10 @@ export const actingAs = cache(async (): Promise<CurrentUser | null> => {
   if (id === real.id) return null;
 
   const row = await one<{
-    id: string; email: string; name: string | null; telegram: string | null; roles: Role[] | null;
+    id: string; email: string; name: string | null; telegram: string | null;
+    phone: string | null; roles: Role[] | null;
   }>(
-    `select u.id, u.email, u.name, u.telegram,
+    `select u.id, u.email, u.name, u.telegram, u.phone,
             array_remove(array_agg(r.role), null) as roles
        from users u
        left join user_roles r on r.user_id = u.id
@@ -107,7 +110,7 @@ export const actingAs = cache(async (): Promise<CurrentUser | null> => {
   if (!row) return null;
   return {
     id: row.id, email: row.email, name: row.name,
-    telegram: row.telegram, roles: row.roles ?? [],
+    telegram: row.telegram, phone: row.phone, roles: row.roles ?? [],
   };
 });
 

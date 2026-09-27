@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { plural, telegramNick } from '@/lib/format';
+import { phoneNumber, plural, telegramNick } from '@/lib/format';
 import { isAdmin, onlyLooking, requireUser } from '@/lib/session';
 import {
   addChildTo, createParent, hideChild, linkChild, mergeChildren, renameChildById,
@@ -60,7 +60,12 @@ export async function renameUserAction(form: FormData): Promise<void> {
     redirect('/admin/studio/people?error='
       + encodeURIComponent('Ник в телеграме — латиница, цифры и подчёркивание, от пяти знаков'));
   }
-  await saveParent(String(form.get('userId')), text(form, 'name'), billing, tg.nick);
+  const tel = phoneNumber(text(form, 'phone', 40));
+  if (!tel.ok) {
+    redirect('/admin/studio/people?error='
+      + encodeURIComponent('Телефон — цифры, плюс и дефисы'));
+  }
+  await saveParent(String(form.get('userId')), text(form, 'name'), billing, tg.nick, tel.phone);
   refresh();
   redirect('/admin/studio/people');
 }
