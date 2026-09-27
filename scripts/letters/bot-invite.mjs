@@ -1,0 +1,169 @@
+/**
+ * Приглашение в телеграм-бота, осень 2026.
+ *
+ * Письмо личное: у каждого своя ссылка привязки, поэтому рассылка просит
+ * botUrl для каждого получателя (см. needsBotLink ниже). Ссылка живёт две
+ * недели: письмо могут открыть не в тот же день.
+ *
+ * Длинных тире в тексте нет: так просила Варя. Если правите письмо,
+ * держите это в голове и разбивайте фразу на две вместо тире.
+ */
+
+export const campaign = 'bot-invite-2026-09';
+
+export const subject = 'Бот студии: неделя, запись и напоминания';
+
+/** Строка, которую почтовик показывает рядом с темой. */
+const preheader =
+  'Запись в телеграме в одно нажатие. И две мелочи в профиле, которые стоит проверить.';
+
+/** Рассылка подставит личную ссылку привязки каждому получателю. */
+export const needsBotLink = true;
+
+export function hello(name) {
+  const who = (name ?? '').trim().split(/\s+/)[0];
+  return who ? `Здравствуйте, ${who}.` : 'Здравствуйте.';
+}
+
+export function text({ name, botUrl, unsubscribeUrl }) {
+  return `${hello(name)}
+
+У студии появился телеграм-бот. Он показывает ближайшую неделю, записывает
+на занятия в одно нажатие и предупреждает, если занятие отменили или
+перенесли.
+
+Подключить: ${botUrl}
+
+Ссылка личная и живёт две недели. Она откроет бота, там нужно нажать
+«Запустить». Открывайте её с того телефона, где стоит телеграм.
+
+Что умеет бот
+· Показывает ближайшую неделю: кто на какое занятие записан и сколько
+  осталось мест.
+· Записывает и снимает запись прямо в сообщении, одним нажатием.
+· Пока идёт лагерь, показывает его дни отдельно.
+· Пишет, если занятие отменили или перенесли. Раньше об этом узнавали
+  не все.
+
+Заодно две мелочи в кабинете
+
+Ник в телеграме. Он нужен не боту, а Варе: по нику она может написать вам
+лично. Поле в профиле, заполняется один раз.
+
+Возможные дни посещений. Отметьте дни недели, в которые ребёнок обычно
+ходит. По ним мы понимаем, кого ждать на занятии, и не спрашиваем лишний
+раз. Если дни с тех пор поменялись, проверьте, что там стоит сейчас.
+
+Профиль: https://www.re-create.art/account/profile
+
+Мест на занятии девять. Никого не разворачиваем, но записанных ждём в
+первую очередь, и по записям видно, к скольким детям готовиться.
+
+Записываться по-прежнему можно и на сайте. Бот ничего не отменяет, это
+просто способ делать то же самое быстрее.
+
+Варя
+
+Это письмо пришло вам как родителю ребёнка, который ходит в студию.
+Отказаться от таких писем: ${unsubscribeUrl}
+`;
+}
+
+export function html({ name, botUrl, unsubscribeUrl }) {
+  const p = 'margin:0 0 18px;font-size:16px;line-height:1.75;color:#1a1a2e';
+  const li = 'margin:0 0 10px;font-size:15px;line-height:1.7;color:#333';
+  const h2 =
+    'margin:36px 0 14px;font-family:Georgia,serif;font-size:21px;font-weight:400;color:#1a1a2e';
+
+  return `<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f5f0fa">
+<div style="display:none;font-size:1px;color:#f5f0fa;max-height:0;overflow:hidden">${preheader}</div>
+<div style="max-width:560px;margin:0 auto;padding:40px 28px;background:#ffffff;font-family:Georgia,serif">
+
+  <p style="font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:#666;margin:0 0 32px">
+    Re.Create.Art · Варя Перлина
+  </p>
+
+  <p style="${p}">${hello(name)}</p>
+
+  <p style="${p}">
+    У студии появился <strong>телеграм-бот</strong>. Он показывает ближайшую
+    неделю, записывает на занятия в одно нажатие и предупреждает, если
+    занятие отменили или перенесли.
+  </p>
+
+  <p style="margin:0 0 14px">
+    <a href="${botUrl}"
+       style="display:inline-block;padding:14px 28px;background:#e91e8c;color:#fff;
+              font-size:13px;letter-spacing:.15em;text-transform:uppercase;
+              text-decoration:none">Подключить бота</a>
+  </p>
+  <p style="margin:0 0 28px;font-size:14px;line-height:1.7;color:#666">
+    Ссылка личная и живёт две недели. Она откроет бота, там нужно нажать
+    «Запустить». Открывайте её с того телефона, где стоит телеграм.
+  </p>
+
+  <h2 style="${h2}">Что умеет бот</h2>
+  <ul style="margin:0 0 18px;padding-left:20px">
+    <li style="${li}">
+      <strong>Показывает ближайшую неделю:</strong> кто на какое занятие
+      записан и сколько осталось мест.
+    </li>
+    <li style="${li}">
+      <strong>Записывает и снимает запись</strong> прямо в сообщении, одним
+      нажатием.
+    </li>
+    <li style="${li}">
+      <strong>Пока идёт лагерь,</strong> показывает его дни отдельно.
+    </li>
+    <li style="${li}">
+      <strong>Пишет, если занятие отменили или перенесли.</strong> Раньше об
+      этом узнавали не все.
+    </li>
+  </ul>
+
+  <h2 style="${h2}">Заодно две мелочи в кабинете</h2>
+
+  <p style="${p}">
+    <strong>Ник в телеграме.</strong> Он нужен не боту, а Варе: по нику она
+    может написать вам лично. Поле в профиле, заполняется один раз.
+  </p>
+
+  <p style="${p}">
+    <strong>Возможные дни посещений.</strong> Отметьте дни недели, в которые
+    ребёнок обычно ходит. По ним мы понимаем, кого ждать на занятии, и не
+    спрашиваем лишний раз. Если дни с тех пор поменялись, проверьте, что там
+    стоит сейчас.
+  </p>
+
+  <p style="margin:0 0 28px">
+    <a href="https://www.re-create.art/account/profile"
+       style="display:inline-block;padding:12px 24px;border:1.5px solid #e91e8c;
+              color:#e91e8c;font-size:13px;letter-spacing:.15em;
+              text-transform:uppercase;text-decoration:none">Открыть профиль</a>
+  </p>
+
+  <p style="${p}">
+    Мест на занятии девять. Никого не разворачиваем, но записанных ждём в
+    первую очередь, и по записям видно, к скольким детям готовиться.
+  </p>
+
+  <p style="margin:0 0 6px;font-size:14px;line-height:1.7;color:#666">
+    Записываться по-прежнему можно и на сайте. Бот ничего не отменяет, это
+    просто способ делать то же самое быстрее.<br>
+    Вопросы задавайте ответом на это письмо или пишите на
+    <a href="mailto:info@re-create.art" style="color:#e91e8c">info@re-create.art</a>.
+  </p>
+  <p style="margin:24px 0 0;font-size:16px;color:#1a1a2e">Варя</p>
+
+  <p style="margin:40px 0 0;padding-top:20px;border-top:1px solid #eee;
+            font-size:12px;line-height:1.7;color:#999">
+    Это письмо пришло вам как родителю ребёнка, который ходит в студию.
+    <a href="${unsubscribeUrl}" style="color:#999">Отказаться от таких писем</a>.
+  </p>
+
+</div>
+</body></html>`;
+}

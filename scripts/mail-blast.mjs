@@ -13,7 +13,7 @@
 //
 // Повторный запуск не шлёт то же письмо дважды: отправленное записано
 // в mail_log. Кто отказался от рассылки — не получает ничего.
-import { createHmac } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -71,6 +71,30 @@ function unsubToken(email) {
 function unsubUrl(email, path = '/unsubscribe') {
   const q = new URLSearchParams({ e: email.toLowerCase(), t: unsubToken(email) });
   return `${SITE}${path}?${q}`;
+}
+
+/**
+ * Личная ссылка привязки к боту. Та же механика, что у кнопки в профиле
+ * (src/lib/telegram.ts): в базе лежит только хеш, в письмо уходит сам
+ * токен. Если меняете хеширование там, поменяйте и здесь, иначе ссылки
+ * из писем перестанут работать.
+ *
+ * Срок больше, чем у кнопки: письмо открывают не в тот же день.
+ */
+const BOT_LINK_DAYS = 14;
+
+async function botLink(client, userId) {
+  const bot = process.env.TELEGRAM_BOT_NAME;
+  if (!bot || !userId) return null;
+  const raw = randomBytes(24).toString('base64url');
+  const pepper = process.env.SESSION_SECRET ?? '';
+  const hash = createHash('sha256').update(`tg:${raw}:${pepper}`).digest('hex');
+  await client.query(
+    `insert into tg_links (user_id, token_hash, expires_at)
+     values ($1, $2, now() + ($3 || ' days')::interval)`,
+    [userId, hash, String(BOT_LINK_DAYS)],
+  );
+  return `https://t.me/${bot.replace(/^@/, '')}?start=${raw}`;
 }
 
 const c = new pg.Client(local ? { connectionString: url } : { connectionString: url, ssl: { rejectUnauthorized: true } });
@@ -151,7 +175,14 @@ if (to.length === 0) {
 if (!send) {
   const sample = to[0];
   const file = join(tmpdir(), `${campaign}.html`);
-  await writeFile(file, letter.html({ name: sample.name, unsubscribeUrl: unsubUrl(sample.email) }));
+  // В показе ссылку подставляем ненастоящую: живой токен на просмотр
+  // означал бы строку в базе на каждый запуск, а запускают его часто.
+  const shown = {
+    name: sample.name,
+    unsubscribeUrl: unsubUrl(sample.email),
+    botUrl: 'https://t.me/БОТ?start=ЛИЧНАЯ-ССЫЛКА-У-КАЖДОГО-СВОЯ',
+  };
+  await writeFile(file, letter.html(shown));
   // Не просто список адресов, а то, чем начнётся письмо у каждого: имена
   // в базе бывают пустые, задом наперёд и не тем алфавитом, и увидеть это
   // надо до отправки, а не в чужом почтовом ящике.
@@ -164,6 +195,12 @@ if (!send) {
   }
   if (to.length > SHOW) console.log(`   … и ещё ${to.length - SHOW}`);
   console.log(`\nПисьмо целиком: ${file}`);
+  if (letter.needsBotLink) {
+    console.log('Ссылка на бота в показе ненастоящая: личные токены заводятся только при отправке.');
+    if (!process.env.TELEGRAM_BOT_NAME) {
+      console.log('Внимание: TELEGRAM_BOT_NAME не задан, при отправке ссылки не будет.');
+    }
+  }
   console.log('Ничего не отправлено. Отправить — флаг --send.');
   await c.end();
   process.exit(0);
@@ -176,6 +213,12 @@ let ok = 0;
 let failed = 0;
 for (const r of to) {
   const vars = { name: r.name, unsubscribeUrl: unsubUrl(r.email) };
+  if (letter.needsBotLink) {
+    vars.botUrl = await botLink(c, r.id)
+      // Ссылку сделать не из чего: человека нет в базе или бот не настроен.
+      // Отправляем без неё, через кнопку в профиле путь тот же.
+      ?? 'https://www.re-create.art/account/profile';
+  }
   try {
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
