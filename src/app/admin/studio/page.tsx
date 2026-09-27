@@ -5,27 +5,44 @@ import {
   debtors, ensureSessions, lessonPrice, nextSessions, sessionRoster, teacherSessions,
   unclosedBefore,
 } from '@/lib/studio';
-import { dayMonth, hhmm, money, plural, todayISO, weekdayDayMonth } from '@/lib/format';
+import {
+  dayMonth, hhmm, money, plural, plusDays, todayISO, weekdayDayMonth,
+} from '@/lib/format';
 import { isConfigured as receiptsConfigured } from '@/lib/icount';
 
 export const dynamic = 'force-dynamic';
 
-export default async function TodayPage() {
+export default async function TodayPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ d?: string }>;
+}) {
   const user = await requireTeacher();
   await ensureSessions();
 
+  // Соседний день открывается стрелками: журнал за вчера закрывают чаще,
+  // чем ищут его в календаре, да и завтрашний список полезно увидеть.
+  const params = await searchParams;
+  const now = todayISO();
+  const asked = /^\d{4}-\d{2}-\d{2}$/.test(params.d ?? '') ? params.d! : null;
+  const day = asked ?? now;
+  const isNow = day === now;
+
   const scope = isAdmin(user) ? null : user.id;
-  const [todaySessions, missed, debts, price] = await Promise.all([
-    teacherSessions(scope),
+  const [daySessions, missed, debts, price] = await Promise.all([
+    // Сегодняшний день берём у базы: она знает время студии точнее.
+    teacherSessions(scope, isNow ? null : day),
     unclosedBefore(scope),
     debtors(),
     lessonPrice(),
   ]);
 
   // Если сегодня занятий нет, показываем ближайшее — тоже с журналом.
-  const upcoming = todaySessions.length === 0 ? await nextSessions(scope) : [];
-  const today = todaySessions.length > 0 ? todaySessions : upcoming;
-  const isToday = todaySessions.length > 0;
+  // На выбранный стрелками день не подменяем: спрашивали именно про него.
+  const upcoming = isNow && daySessions.length === 0 ? await nextSessions(scope) : [];
+  const today = daySessions.length > 0 ? daySessions : upcoming;
+  /** Показываем не тот день, о котором спросили: сегодня пусто. */
+  const fallback = isNow && daySessions.length === 0 && upcoming.length > 0;
 
   const rosters = await Promise.all(today.map((s) => sessionRoster(s.session_id)));
   // Без iCount чек попросить не у кого: тогда и выбора в журнале нет.
@@ -36,15 +53,30 @@ export default async function TodayPage() {
     <>
       <div className="top">
         <div className="kicker">Re.Create.Art · Преподаватель</div>
-        <h1 className="h1">{weekdayDayMonth(todayISO())}</h1>
+        <div className="row">
+          <h1 className="h1">{weekdayDayMonth(day)}</h1>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <Link className="btn-quiet" href={`/admin/studio?d=${plusDays(day, -1)}`}
+                  aria-label="Предыдущий день">←</Link>
+            <Link className="btn-quiet" href={`/admin/studio?d=${plusDays(day, 1)}`}
+                  aria-label="Следующий день">→</Link>
+          </div>
+        </div>
+        {/* Из чужого дня надо уметь вернуться одним движением: стрелками
+            легко уехать на неделю и считать, что сегодня пусто. */}
+        {!isNow && (
+          <Link className="linky" href="/admin/studio">Сегодня</Link>
+        )}
       </div>
 
       <div className="body">
         {today.length === 0 && (
-          <p className="hint" style={{ marginTop: 12 }}>Занятий нет ни сегодня, ни впереди.</p>
+          <p className="hint" style={{ marginTop: 12 }}>
+            {isNow ? 'Занятий нет ни сегодня, ни впереди.' : 'В этот день занятий нет.'}
+          </p>
         )}
 
-        {!isToday && today.length > 0 && (
+        {fallback && (
           <div className="lbl" style={{ marginTop: 0 }}>
             Сегодня занятий нет. Ближайшее: {weekdayDayMonth(today[0].held_on).toLowerCase()}
           </div>
@@ -55,7 +87,9 @@ export default async function TodayPage() {
             <div className="row" style={{ alignItems: 'baseline' }}>
               <div>
                 <div className="when" style={{ marginBottom: 2 }}>
-                  {isToday ? hhmm(s.starts_at) : `${dayMonth(s.held_on)} · ${hhmm(s.starts_at)}`}
+                  {fallback
+                    ? `${dayMonth(s.held_on)} · ${hhmm(s.starts_at)}`
+                    : hhmm(s.starts_at)}
                 </div>
                 <div className="what">{s.group_title}</div>
               </div>

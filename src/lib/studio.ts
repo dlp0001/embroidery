@@ -762,8 +762,13 @@ export type TeacherSession = {
   marked: number;
 };
 
-/** Занятия преподавателя: сегодняшние и недавние незакрытые. */
-export async function teacherSessions(teacherId: string | null): Promise<TeacherSession[]> {
+/**
+ * Занятия преподавателя за день. Без даты — за сегодня: так эту функцию
+ * зовут с главной, и день студии берётся из базы, а не из часов сервера.
+ */
+export async function teacherSessions(
+  teacherId: string | null, day?: string | null,
+): Promise<TeacherSession[]> {
   return query<TeacherSession>(
     `select s.id as session_id, g.id as group_id, g.title as group_title,
             s.held_on::text, coalesce(s.starts_at, g.starts_at)::text as starts_at,
@@ -786,10 +791,10 @@ export async function teacherSessions(teacherId: string | null): Promise<Teacher
        from studio_sessions s
        join studio_groups g on g.id = s.group_id
       where ($1::uuid is null or g.teacher_id = $1)
-        and s.held_on = current_date
+        and s.held_on = coalesce($2::date, current_date)
         and s.status <> 'cancelled'
       order by coalesce(s.starts_at, g.starts_at)`,
-    [teacherId],
+    [teacherId, day ?? null],
   );
 }
 
