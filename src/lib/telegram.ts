@@ -133,12 +133,13 @@ function hashToken(raw: string): string {
 }
 
 /**
- * Ссылка привязки. Одноразовая, на четверть часа, и это единственный
+ * Ссылка привязки. Одноразовая, по умолчанию на четверть часа, и это
+ * единственный
  * способ связать чат с учёткой. Ни по почте, ни по нику, ни по номеру
  * телефона: иначе к чужой семье с детьми и долгами привяжется
  * посторонний, назвавший чужой адрес.
  */
-export async function linkUrl(userId: string): Promise<string | null> {
+export async function linkUrl(userId: string, ttlMin = LINK_TTL_MIN): Promise<string | null> {
   const bot = process.env.TELEGRAM_BOT_NAME;
   if (!bot) return null;
   // base64url: в start телеграм пускает латиницу, цифры, дефис и
@@ -147,7 +148,7 @@ export async function linkUrl(userId: string): Promise<string | null> {
   await query(
     `insert into tg_links (user_id, token_hash, expires_at)
      values ($1, $2, now() + ($3 || ' minutes')::interval)`,
-    [userId, hashToken(raw), String(LINK_TTL_MIN)],
+    [userId, hashToken(raw), String(ttlMin)],
   );
   return `https://t.me/${bot.replace(/^@/, '')}?start=${raw}`;
 }

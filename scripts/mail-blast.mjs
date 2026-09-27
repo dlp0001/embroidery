@@ -13,7 +13,6 @@
 //
 // Повторный запуск не шлёт то же письмо дважды: отправленное записано
 // в mail_log. Кто отказался от рассылки — не получает ничего.
-import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -59,63 +58,37 @@ const FROM = process.env.MAIL_FROM ?? 'Варя · Re.Create.Art <info@re-create
 const REPLY_TO = process.env.MAIL_REPLY_TO ?? 'info@re-create.art';
 
 /**
- * Ссылка отказа подписана, чтобы по чужому адресу нельзя было отписать
- * человека. Та же подпись проверяется в src/lib/mail.ts — если меняете
- * здесь, поменяйте и там.
- */
-function unsubToken(email) {
-  const secret = process.env.SESSION_SECRET ?? '';
-  return createHmac('sha256', secret).update(`unsub:${email.toLowerCase()}`).digest('hex').slice(0, 32);
-}
-
-function unsubUrl(email, path = '/unsubscribe') {
-  const q = new URLSearchParams({ e: email.toLowerCase(), t: unsubToken(email) });
-  return `${SITE}${path}?${q}`;
-}
-
-/**
- * Личная ссылка привязки к боту. Та же механика, что у кнопки в профиле
- * (src/lib/telegram.ts): в базе лежит только хеш, в письмо уходит сам
- * токен. Если меняете хеширование там, поменяйте и здесь, иначе ссылки
- * из писем перестанут работать.
+ * Подписанные ссылки просим у сайта: и отказ от писем, и привязку к боту.
  *
- * Срок больше, чем у кнопки: письмо открывают не в тот же день.
+ * Раньше скрипт считал их сам, своей копией SESSION_SECRET. Копии на
+ * ноутбуке не оказалось, подписи разошлись с серверными, и письма ушли с
+ * нерабочими ссылками — молча, потому что проверить их можно только
+ * нажав. Теперь подписывает тот, кто потом и проверяет, а соль живёт в
+ * одном месте.
  */
 const BOT_LINK_DAYS = 14;
 
-/**
- * Имя бота узнаём у самого телеграма, а не из переменной окружения.
- * Переменная живёт в Vercel, локально её нет, и первая же проверочная
- * отправка ушла с запасной ссылкой вместо личной. Токена достаточно.
- */
-let botName;
-async function botUsername() {
-  if (botName !== undefined) return botName;
-  const named = process.env.TELEGRAM_BOT_NAME;
-  if (named) return (botName = named.replace(/^@/, ''));
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) return (botName = null);
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/getMe`);
-    const data = await res.json();
-    return (botName = data?.result?.username ?? null);
-  } catch {
-    return (botName = null);
-  }
+async function askLinks(people, withBotLink) {
+  const secret = process.env.CRON_FORCE_SECRET;
+  if (!secret) throw new Error('CRON_FORCE_SECRET не задан: без него сайт ссылок не даст');
+
+  const res = await fetch(`${SITE}/api/mail-links`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${secret}` },
+    body: JSON.stringify({
+      users: people.map((p) => ({ id: p.id, email: p.email })),
+      withBotLink,
+      botLinkDays: BOT_LINK_DAYS,
+    }),
+  });
+  if (!res.ok) throw new Error(`${SITE}/api/mail-links: ${res.status} ${await res.text()}`);
+  const { links } = await res.json();
+  return links;
 }
 
-async function botLink(client, userId) {
-  const bot = await botUsername();
-  if (!bot || !userId) return null;
-  const raw = randomBytes(24).toString('base64url');
-  const pepper = process.env.SESSION_SECRET ?? '';
-  const hash = createHash('sha256').update(`tg:${raw}:${pepper}`).digest('hex');
-  await client.query(
-    `insert into tg_links (user_id, token_hash, expires_at)
-     values ($1, $2, now() + ($3 || ' days')::interval)`,
-    [userId, hash, String(BOT_LINK_DAYS)],
-  );
-  return `https://t.me/${bot}?start=${raw}`;
+function unsubUrl(email, token, path = '/unsubscribe') {
+  const q = new URLSearchParams({ e: email.toLowerCase(), t: token });
+  return `${SITE}${path}?${q}`;
 }
 
 const c = new pg.Client(local ? { connectionString: url } : { connectionString: url, ssl: { rejectUnauthorized: true } });
@@ -200,7 +173,7 @@ if (!send) {
   // означал бы строку в базе на каждый запуск, а запускают его часто.
   const shown = {
     name: sample.name,
-    unsubscribeUrl: unsubUrl(sample.email),
+    unsubscribeUrl: `${SITE}/unsubscribe?e=${sample.email}&t=ПОДПИСЬ`,
     botUrl: 'https://t.me/БОТ?start=ЛИЧНАЯ-ССЫЛКА-У-КАЖДОГО-СВОЯ',
   };
   await writeFile(file, letter.html(shown));
@@ -216,11 +189,7 @@ if (!send) {
   }
   if (to.length > SHOW) console.log(`   … и ещё ${to.length - SHOW}`);
   console.log(`\nПисьмо целиком: ${file}`);
-  if (letter.needsBotLink) {
-    console.log('Ссылка на бота в показе ненастоящая: личные токены заводятся только при отправке.');
-    const bot = await botUsername();
-    console.log(bot ? `Бот: @${bot}` : 'Внимание: имя бота не узнать, при отправке ссылок не будет.');
-  }
+  console.log('Ссылки в показе ненастоящие: подписанные сайт выдаёт только при отправке.');
   console.log('Ничего не отправлено. Отправить — флаг --send.');
   await c.end();
   process.exit(0);
@@ -229,25 +198,14 @@ if (!send) {
 const key = process.env.RESEND_API_KEY;
 if (!key) { console.error('RESEND_API_KEY не задан, отправлять нечем.'); await c.end(); process.exit(1); }
 
-// Без соли подписи не сходятся с серверными, и письмо уходит с нерабочей
-// ссылкой отказа: человек жмёт «отписаться», получает отлуп и в следующий
-// раз жмёт «это спам». Ссылка на бота ломается ровно так же. Молчать об
-// этом нельзя, отправка без соли запрещена.
-if (!process.env.SESSION_SECRET) {
-  console.error('SESSION_SECRET не задан.');
-  console.error('Им подписываются ссылки отказа и привязки к боту, и без него');
-  console.error('они не сработают. Положите в .env.production.local то же значение,');
-  console.error('что стоит в Vercel.');
-  await c.end();
-  process.exit(1);
-}
-
-// Письмо с личной ссылкой без личной ссылки отправлять нельзя: оно уйдёт
-// с запасной, никто этого не заметит, а повторить его уже не выйдет.
-// Именно так и произошло на первой проверочной отправке.
-if (letter.needsBotLink && !(await botUsername())) {
-  console.error('Имя бота не узнать: нет TELEGRAM_BOT_TOKEN и TELEGRAM_BOT_NAME.');
-  console.error('Письмо просит личную ссылку, без неё отправлять не будем.');
+// Ссылки берём одним запросом на всю рассылку: сайт подпишет их своим
+// ключом, и разойтись с ним уже невозможно.
+let links;
+try {
+  links = await askLinks(to, Boolean(letter.needsBotLink));
+} catch (err) {
+  console.error(err.message);
+  console.error('Письмо без рабочих ссылок отправлять не будем.');
   await c.end();
   process.exit(1);
 }
@@ -255,12 +213,12 @@ if (letter.needsBotLink && !(await botUsername())) {
 let ok = 0;
 let failed = 0;
 for (const r of to) {
-  const vars = { name: r.name, unsubscribeUrl: unsubUrl(r.email) };
+  const mine = links[r.email.toLowerCase()];
+  const vars = { name: r.name, unsubscribeUrl: unsubUrl(r.email, mine.unsubToken) };
   if (letter.needsBotLink) {
-    vars.botUrl = await botLink(c, r.id)
-      // Ссылку сделать не из чего: человека нет в базе или бот не настроен.
-      // Отправляем без неё, через кнопку в профиле путь тот же.
-      ?? 'https://www.re-create.art/account/profile';
+    // Ссылки нет только у того, кого нет в базе: так проверяют письмо на
+    // своей почте. Путь через кнопку в профиле тот же.
+    vars.botUrl = mine.botUrl ?? `${SITE}/account/profile`;
   }
   try {
     const res = await fetch('https://api.resend.com/emails', {
@@ -276,7 +234,7 @@ for (const r of to) {
         headers: {
           // Кнопка «отписаться» в самом почтовике: письмо без неё чаще
           // уезжает в спам, а человек вместо отказа жмёт «это спам».
-          'List-Unsubscribe': `<${unsubUrl(r.email, '/api/unsubscribe')}>`,
+          'List-Unsubscribe': `<${unsubUrl(r.email, mine.unsubToken, '/api/unsubscribe')}>`,
           'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
         },
       }),
