@@ -419,7 +419,10 @@ const UNBILLED = `select p.id, p.provider, p.amount::text, p.currency, p.purpose
       where p.status = 'paid' and p.invoice_url is null and p.raw -> 'receipt' is null
         /* Картой — квитанция всегда. Деньги, отданные Варе в руки, только
            если она сама попросила чек: иначе выпишем лишнюю бумагу. */
-        and (p.provider <> 'cash' or p.raw ->> 'receipt_wanted' = 'yes')`;
+        and (p.provider <> 'cash' or p.raw ->> 'receipt_wanted' = 'yes')
+        /* Сказали «чек не нужен» — значит не нужен и по переводу: это
+           ответ на галочку в форме, а не молчание старого платежа. */
+        and coalesce(p.raw ->> 'receipt_wanted', '') <> 'no'`;
 
 /**
  * Выписывает квитанцию на оплаченный платёж и запоминает ссылку на неё.

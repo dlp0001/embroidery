@@ -31,7 +31,8 @@ const label: React.CSSProperties = {
  * дороже, чем добрать в пакет.
  */
 function ExtendForm(
-  { pass: p, currency }: { pass: PassRow; currency: string },
+  { pass: p, currency, receipts }:
+  { pass: PassRow; currency: string; receipts: boolean },
 ) {
   if (p.extra_price === null || p.max_days < 1) return null;
 
@@ -55,6 +56,12 @@ function ExtendForm(
           <option value="unpaid">пока не оплачено</option>
         </select>
       </div>
+      <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+        <input type="checkbox" name="receipt" style={{ width: 20, height: 20 }} />
+        <span className="hint">
+          Чек в iCount{receipts ? '' : ' — не подключён'}
+        </span>
+      </label>
       <button className="btn-quiet" type="submit">
         Продлить · {money(p.extra_price, currency)} за день
       </button>
@@ -208,7 +215,7 @@ export default async function DebtsPage() {
               </div>
             </div>
 
-            {admin && <ExtendForm pass={p} currency={currency} />}
+            {admin && <ExtendForm pass={p} currency={currency} receipts={receipts} />}
           </div>
         ))}
 
@@ -226,7 +233,7 @@ export default async function DebtsPage() {
                   {p.last_used ? ` · последнее ${dayMonth(p.last_used)}` : ''}
                   {p.paid ? ` · оплачен ${PAID[p.paid] ?? p.paid}` : ' · не оплачен'}
                 </div>
-                {admin && <ExtendForm pass={p} currency={currency} />}
+                {admin && <ExtendForm pass={p} currency={currency} receipts={receipts} />}
               </div>
             ))}
           </>

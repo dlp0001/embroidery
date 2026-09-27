@@ -1748,9 +1748,11 @@ export async function extendPass(
     days: number;
     price: number;
     paid: 'cash' | 'transfer' | 'unpaid';
+    /** Нужен ли чек: за наличные его выписывают только по просьбе. */
+    receipt: boolean;
   },
   byUser: string | null,
-): Promise<{ ok: boolean; reason?: string; total?: number }> {
+): Promise<{ ok: boolean; reason?: string; total?: number; paymentId?: string }> {
   if (!Number.isInteger(input.days) || input.days < 1 || input.days > 30) {
     return { ok: false, reason: 'Странное число дней.' };
   }
@@ -1791,7 +1793,13 @@ export async function extendPass(
         `insert into payments (provider, user_id, amount, currency, status, purpose, raw)
          values ($1, $2, $3, $4, 'paid', 'studio_pass', $5) returning id`,
         [input.paid, pass.owner_id, sum, currency,
-         JSON.stringify({ extends_pass: pass.id, days: input.days, issued_by: byUser })],
+         JSON.stringify({
+           extends_pass: pass.id, days: input.days, issued_by: byUser,
+           // Способ нужен чеку: наличные, перевод и приложения —
+           // в отчётности разные места.
+           pay_method: input.paid,
+           receipt_wanted: input.receipt ? 'yes' : 'no',
+         })],
       );
       paymentId = pay.rows[0].id;
     }
@@ -1806,7 +1814,7 @@ export async function extendPass(
       details: { days: input.days, price: input.price, paid: input.paid },
     });
 
-    return { ok: true, total };
+    return { ok: true, total, paymentId: paymentId ?? undefined };
   });
 }
 

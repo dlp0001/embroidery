@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { after } from 'next/server';
-import { confirmCash, declineCash } from '@/lib/billing';
+import { confirmCash, declineCash, issueReceipt } from '@/lib/billing';
 import { hhmm } from '@/lib/format';
 import { cashConfirmed, cashDeclined, sessionChanged } from '@/lib/notify';
 import type { SaveResult } from '@/components/AutoSave';
@@ -260,13 +260,19 @@ export async function extendPassAction(form: FormData): Promise<void> {
   const paid = String(form.get('paid'));
   if (paid !== 'cash' && paid !== 'transfer' && paid !== 'unpaid') throw new Error('BAD_PAID');
 
+  const receipt = form.get('receipt') === 'on';
+
   const offer = await extendOffer(passId);
   if (!offer) throw new Error('NOT_EXTENDABLE');
 
   // Пока страница была открыта, дни смены могли кончиться: тогда молча
   // не продлеваем, а падаем — иначе деньги взяли бы за сгоревшее.
-  const done = await extendPass({ passId, days, price: offer.price, paid }, user.id);
+  const done = await extendPass(
+    { passId, days, price: offer.price, paid, receipt }, user.id,
+  );
   if (!done.ok) throw new Error(done.reason ?? 'NOT_EXTENDED');
+  // Чек выписываем сразу: Варя просит его, когда родитель стоит рядом.
+  if (receipt && done.paymentId) await issueReceipt(done.paymentId);
   revalidatePath('/admin/studio/debts');
   revalidatePath('/admin/studio/ledger');
   revalidatePath('/account');
