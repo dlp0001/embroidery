@@ -67,15 +67,15 @@ if (origin) {
   // подсказывает команды при наборе слэша. Список короткий нарочно:
   // главное действие в боте это просто написать сообщение, а не выбрать
   // пункт, и длинное меню сбивало бы с этого.
-  await api('setMyCommands', {
-    commands: [
+  const commands = [
       { command: 'week', description: 'Расписание и запись' },
       { command: 'pay', description: 'Оплата и задолженность' },
       { command: 'help', description: 'Что умеет бот' },
-    ],
-    scope: { type: 'all_private_chats' },
-  });
-  console.log('Меню: /week, /help');
+  ];
+  await api('setMyCommands', { commands, scope: { type: 'all_private_chats' } });
+  // Печатаем то, что поставили, а не то, что когда-то ставили: список
+  // растёт, и жёстко зашитая строка начинает врать.
+  console.log(`Меню: ${commands.map((c) => `/${c.command}`).join(', ')}`);
 }
 
 const menu = await api('getMyCommands', { scope: { type: 'all_private_chats' } });
