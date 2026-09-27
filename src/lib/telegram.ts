@@ -46,6 +46,8 @@ async function call<T>(method: string, payload: unknown): Promise<ApiResult<T>> 
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(payload),
+      // Телеграм иногда молчит минутами. Рассылка подождёт, вебхук — нет.
+      signal: AbortSignal.timeout(10_000),
     });
     const data = (await res.json()) as {
       ok?: boolean; result?: T; error_code?: number; description?: string;

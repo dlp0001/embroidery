@@ -34,6 +34,9 @@ export function isConfigured(): boolean {
   return Boolean(e.apiKey && e.secretKey && e.pageUid);
 }
 
+/** Сколько ждём кассу. Дальше отвечаем «не знаем», а не висим. */
+const TIMEOUT_MS = 15_000;
+
 async function call<T>(path: string, body: unknown): Promise<T> {
   const e = env();
   const res = await fetch(`${e.base}${path}`, {
@@ -44,6 +47,7 @@ async function call<T>(path: string, body: unknown): Promise<T> {
       'secret-key': e.secretKey,
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
   });
   const text = await res.text();
   let data: unknown;

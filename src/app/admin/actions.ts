@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { after } from 'next/server';
 import { canTeach, isAdmin, onlyLooking, requireUser } from '@/lib/session';
 import { issueReceipt } from '@/lib/billing';
 import { WAY, type PayMethod } from '@/lib/format';
@@ -72,10 +73,16 @@ export async function saveJournal(formData: FormData): Promise<void> {
   const marks: Mark[] = [...seen.values()];
 
   const res = await saveAttendance(sessionId, marks, { id: user.id });
-  // Квитанции — после того, как журнал записан: отказ iCount не должен
-  // отменять отметки, за которые Варя уже нажала кнопку. Непоявившийся
-  // чек останется помеченным в платеже, и следующая попытка его добьёт.
-  for (const paymentId of res.bill) await issueReceipt(paymentId);
+  // Квитанции — после ответа, а не до него. Отказ iCount не должен
+  // отменять отметки, за которые Варя уже нажала кнопку, а медленный
+  // iCount — держать журнал: кнопка крутилась бы, хотя всё записано.
+  // Непоявившийся чек останется помеченным в платеже, и следующая
+  // попытка его добьёт.
+  if (res.bill.length > 0) {
+    after(async () => {
+      for (const paymentId of res.bill) await issueReceipt(paymentId);
+    });
+  }
   // Без redirect: ответ на само действие уже несёт свежую страницу, а
   // переход добавлял к сохранению ещё два похода на сервер.
   revalidatePath('/admin/studio');

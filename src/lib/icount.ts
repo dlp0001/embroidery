@@ -43,15 +43,33 @@ export const ALREADY_ISSUED = 'doc_exists_based_on_sanity_string';
 
 type Answer = { status?: boolean; reason?: string; error_description?: string };
 
+/**
+ * Сколько ждём ответа. Без срока запрос висит, пока его не оборвёт сам
+ * хостинг, а вместе с ним висит и то, ради чего его позвали: журнал
+ * сохранён, а кнопка крутится.
+ */
+const TIMEOUT_MS = 12_000;
+
 async function call<T>(method: string, body: Record<string, unknown>): Promise<T & Answer> {
-  const res = await fetch(`${BASE}/${method}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${env().token}`,
-    },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/${method}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env().token}`,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (err) {
+    // Обрыв по сроку — такой же отказ, как и любой другой: платёж
+    // остаётся без квитанции, и следующая попытка её добьёт.
+    const why = err instanceof Error && err.name === 'TimeoutError'
+      ? `не ответил за ${TIMEOUT_MS / 1000} с`
+      : err instanceof Error ? err.message : 'запрос не прошёл';
+    throw new ICountError('network', why);
+  }
   const text = await res.text();
   let data: (T & Answer) | null = null;
   try {
