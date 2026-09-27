@@ -62,8 +62,22 @@ if (origin) {
     drop_pending_updates: drop,
   });
   console.log(`Вебхук: ${url}${drop ? ' (очередь очищена)' : ''}`);
+
+  // Меню у поля ввода. Телеграм показывает его кнопкой «Меню» и
+  // подсказывает команды при наборе слэша. Список короткий нарочно:
+  // главное действие в боте это просто написать сообщение, а не выбрать
+  // пункт, и длинное меню сбивало бы с этого.
+  await api('setMyCommands', {
+    commands: [
+      { command: 'week', description: 'Расписание и запись' },
+      { command: 'help', description: 'Что умеет бот' },
+    ],
+    scope: { type: 'all_private_chats' },
+  });
+  console.log('Меню: /week, /help');
 }
 
+const menu = await api('getMyCommands', { scope: { type: 'all_private_chats' } });
 const info = await api('getWebhookInfo');
 console.log('\nСейчас у телеграма:');
 console.log(`  адрес            ${info.url || 'не задан'}`);
@@ -72,6 +86,8 @@ console.log(`  секрет           ${info.has_custom_certificate ? 'свой 
 // сообщениями будут нажиматься впустую, и никакой ошибки при этом нет.
 console.log(`  апдейты          ${(info.allowed_updates ?? ['все']).join(', ')}`);
 console.log(`  в очереди        ${info.pending_update_count ?? 0}`);
+console.log(`  меню             ${
+  menu.length ? menu.map((c) => `/${c.command}`).join(', ') : 'пусто'}`);
 if (info.last_error_message) {
   console.log(`  последняя ошибка ${info.last_error_message}`);
 }

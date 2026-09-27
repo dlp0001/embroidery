@@ -87,11 +87,27 @@ async function onMessage(
   }
 
   const teaches = await isTeacher(user.id);
+  // Команда это всё, что начинается со слэша. Иначе каждая новая команда
+  // уезжала бы в студию как сообщение родителя: до сих пор исключения
+  // были перечислены руками, и список бы рос.
+  const cmd = text.startsWith('/') ? text.split(/\s+/)[0].toLowerCase() : null;
+
+  if (cmd === '/help' || (cmd !== null && cmd !== '/week' && cmd !== '/today')) {
+    await send(chatId, help(teaches, origin));
+    return;
+  }
+
+  // Преподавателю журнал на сегодня: и по команде, и на любое слово.
+  if (teaches && cmd !== '/week') {
+    const day = await teacherDayView(user.id, user.name);
+    await send(chatId, day.text);
+    return;
+  }
 
   // Родитель пишет боту не затем, чтобы увидеть расписание: расписание он
   // и так получает вечером. Он пишет в студию — и до сих пор бот отвечал
   // ему расписанием, а сообщение выбрасывал. Теперь передаём.
-  if (!teaches && text !== '/week' && text !== '/start') {
+  if (cmd === null) {
     const ok = await relayFromParent(user, text);
     await send(chatId, ok
       ? 'Передали в студию. Ответ придёт сюда же.\n\nРасписание — командой /week.'
@@ -99,14 +115,7 @@ async function onMessage(
     return;
   }
 
-  if (teaches) {
-    const day = await teacherDayView(user.id, user.name);
-    await send(chatId, day.text);
-  }
-
-  // Родительскую неделю преподавателю показываем только если она не
-  // пустая: у Вари своей семьи в студии нет, и «занятий нет» сразу после
-  // журнала выглядит поломкой, а не ответом.
+  // Сюда доходит только /week.
   const week = await weekView(user.id, origin);
   if (!teaches || !week.empty) await send(chatId, week.text, week.keyboard);
 
@@ -115,6 +124,32 @@ async function onMessage(
   for (const view of await eventViews(user.id, origin)) {
     await send(chatId, view.text, view.keyboard);
   }
+}
+
+/** Что бот умеет. Разное у родителя и у преподавателя. */
+function help(teaches: boolean, origin: string): string {
+  return teaches
+    ? [
+      'Что я умею',
+      '',
+      '/today — кто записан на сегодня.',
+      '/week — ваша неделя как родителя.',
+      '/help — это сообщение.',
+      '',
+      `Журнал и финансы: ${origin}/admin/studio`,
+    ].join('\n')
+    : [
+      'Что я умею',
+      '',
+      'Напишите мне что угодно, и я передам это в студию. Ответ придёт',
+      'в этот же чат.',
+      '',
+      '/week — ближайшая неделя. Записаться и отменить можно прямо там,',
+      'одним нажатием.',
+      '/help — это сообщение.',
+      '',
+      `Оплата, история и всё остальное: ${origin}/account`,
+    ].join('\n');
 }
 
 /**
