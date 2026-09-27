@@ -1,4 +1,6 @@
-import { dayMonth, hhmm, money, packageFrom, plural, todayISO } from '@/lib/format';
+import {
+  dayMonth, eventClosed, EVENT_CLOSES_AT, hhmm, money, packageFrom, plural, todayISO,
+} from '@/lib/format';
 import type { SlotRow } from '@/lib/studio';
 import { toggleBooking } from '@/app/account/actions';
 
@@ -98,6 +100,9 @@ export default function EventSignup({ rows }: { rows: SlotRow[] }) {
                 ? 'Платится за те дни, в которые ребёнок пришёл.'
                 : `Если планируете ${from} ${plural(from, 'день', 'дня', 'дней')} и больше,
                    выгоднее взять пакет: он покупается в «Оплате».`}
+              {' '}Запись на день закрывается в {EVENT_CLOSES_AT}:00 в этот же
+              день: дальше состав уже у студии — напишите, если планы
+              изменились.
             </div>
 
             {people.map(([participantId, who]) => {
@@ -141,11 +146,15 @@ export default function EventSignup({ rows }: { rows: SlotRow[] }) {
                       );
                     }
                     const left = seats(slot.capacity, slot.taken, slot.booked);
+                    // День закрыт — клетка не нажимается вовсе: после
+                    // закрытия состав уже у студии, и снимать запись
+                    // молча, не сказав никому, поздно.
+                    const closed = eventClosed(day);
+                    const past = day < today;
                     // Занять последнее место можно только тому, кто ещё не
                     // записан: себя отменить всегда можно.
-                    const past = day < today;
-                    const full = (slot.capacity !== null
-                      && slot.taken >= slot.capacity && !slot.booked) || (past && !slot.booked);
+                    const full = closed || (slot.capacity !== null
+                      && slot.taken >= slot.capacity && !slot.booked);
                     return (
                       <form action={toggleBooking} key={day}>
                         <input type="hidden" name="sessionId" value={slot.session_id} />
@@ -157,7 +166,8 @@ export default function EventSignup({ rows }: { rows: SlotRow[] }) {
                           aria-pressed={slot.booked}
                           disabled={full}
                           aria-label={`${who}, ${dayMonth(day)}${left ? `, ${left}` : ''}: ${
-                            past && !slot.booked ? 'день прошёл'
+                            past ? 'день прошёл'
+                              : closed ? `запись закрыта, состав нужен к ${EVENT_CLOSES_AT}:00`
                               : full ? 'мест нет'
                               : slot.booked ? 'отменить запись' : 'записать'}`}
                           style={{ ...cell, opacity: full ? 0.45 : 1,

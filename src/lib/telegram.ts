@@ -1,7 +1,8 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { one, query, tx } from './db';
 import {
-  dayMonth, hhmm, money, nowHM, packageFrom, plural, plusDays, todayISO, weekdayDayMonth,
+  dayMonth, eventClosed, hhmm, money, nowHM, packageFrom, plural, plusDays, todayISO,
+  weekdayDayMonth,
 } from './format';
 import {
   eventSlotsForUser, markDeclined, sessionIsPast, setBooking, slotsForUser, teacherSessions,
@@ -426,6 +427,9 @@ function slotButtons(rows: SlotRow[], today: string): Button[] {
     // День прошёл — обещать приход поздно. Мест нет — записаться некуда,
     // но свою запись снять можно всегда.
     if (r.held_on < today) continue;
+    // День смены закрывается в обед: состав к этому часу уже у студии,
+    // и кнопка, которая ничего не сделает, хуже её отсутствия.
+    if (r.kind !== 'lesson' && eventClosed(r.held_on)) continue;
     const free = r.capacity === null ? null : Math.max(r.capacity - r.taken, 0);
     if (!r.booked && free === 0) continue;
     buttons.push({
@@ -556,7 +560,7 @@ export async function eventViews(userId: string, origin: string): Promise<GroupV
     // на полсотни строк. Текстом остаётся то, чего на кнопке не написать,
     // — сколько мест свободно.
     const left = days
-      .filter((d) => d.held_on >= today)
+      .filter((d) => d.held_on >= today && !eventClosed(d.held_on))
       .map((d) => {
         const free = d.capacity === null ? null : Math.max(d.capacity - d.taken, 0);
         const when = d.starts_at === usual ? '' : ` (${hhmm(d.starts_at)})`;

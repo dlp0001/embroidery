@@ -1,6 +1,8 @@
 import type { PoolClient } from 'pg';
 import { one, query, tx } from './db';
-import { plural, providerOf, WAY, type PayMethod } from './format';
+import {
+  EVENT_CLOSES_AT, plural, providerOf, WAY, type PayMethod,
+} from './format';
 import { logMoneyIn } from './ledger';
 
 export type AttendanceStatus = 'present' | 'absent' | 'sick' | 'trial';
@@ -668,6 +670,23 @@ export async function sessionIsPast(sessionId: string): Promise<boolean> {
   return row?.past ?? false;
 }
 
+/**
+ * День смены закрыт для родителя: прошёл или сегодня уже за 13:00.
+ * Считает база — у неё время студии; экран те же дни рисует серыми, но
+ * вкладка могла провисеть открытой с утра.
+ */
+export async function eventBookingClosed(sessionId: string): Promise<boolean> {
+  const row = await one<{ closed: boolean }>(
+    `select (g.kind <> 'lesson'
+             and (s.held_on < current_date
+                  or (s.held_on = current_date and localtime >= time '13:00'))) as closed
+       from studio_sessions s join studio_groups g on g.id = s.group_id
+      where s.id = $1`,
+    [sessionId],
+  );
+  return row?.closed ?? false;
+}
+
 /** Откуда пришло изменение записи: кабинет, журнал или бот. */
 export type BookingVia = 'cabinet' | 'journal' | 'bot';
 export type BookingBy = { userId: string | null; via: BookingVia };
@@ -682,6 +701,15 @@ export async function setBooking(
   booked: boolean,
   by: BookingBy,
 ): Promise<{ ok: boolean; reason?: string }> {
+  // Из журнала состав правят и после закрытия: Варя видит, кто пришёл,
+  // и это её право. Закрывается только запись родителем.
+  if (by.via !== 'journal' && await eventBookingClosed(sessionId)) {
+    return {
+      ok: false,
+      reason: `Запись на этот день уже закрыта: состав нужен студии к ${EVENT_CLOSES_AT}:00.`,
+    };
+  }
+
   if (booked) {
     const done = await tx(async (c) => {
       const { rows } = await c.query<{ capacity: number | null; taken: number }>(

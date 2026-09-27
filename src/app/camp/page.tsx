@@ -5,7 +5,7 @@ import {
   type EventDay, type PublicEvent, type SlotRow,
 } from '@/lib/studio';
 import { toggleBooking } from '@/app/account/actions';
-import { dayMonth, hhmm, money, plural, todayISO } from '@/lib/format';
+import { dayMonth, eventClosed, hhmm, money, plural, todayISO } from '@/lib/format';
 import { CAMP_CSS } from './styles';
 
 export const dynamic = 'force-dynamic';
@@ -297,11 +297,13 @@ function Day({
 }) {
   const free = day.capacity === null ? null : Math.max(day.capacity - day.taken, 0);
   const text = PROGRAMME[day.held_on];
-  // Прошедший день смены записи не принимает: он уже был.
+  // Записи не принимает ни прошедший день, ни сегодняшний после обеда:
+  // состав к этому часу уже у студии.
   const past = day.held_on < todayISO();
+  const closed = eventClosed(day.held_on);
 
   return (
-    <div className={past ? 'prog-row is-past' : 'prog-row'}>
+    <div className={closed ? 'prog-row is-past' : 'prog-row'}>
       <div>
         <span className="prog-dow">{dowName(day.held_on)}</span>
         <span className="prog-day">{dayMonth(day.held_on)}</span>
@@ -314,19 +316,21 @@ function Day({
       {/* В прошедшем дне нечего ни занимать, ни отменять: ни мест, ни
           кнопок, только пометка, что он уже был. */}
       <div className="prog-act">
-        {past && <span className="prog-past">прошёл</span>}
+        {closed && (
+          <span className="prog-past">{past ? 'прошёл' : 'запись закрыта'}</span>
+        )}
 
-        {!past && free !== null && (
+        {!closed && free !== null && (
           <span className="prog-seats">{free > 0 ? `мест: ${free}` : 'мест нет'}</span>
         )}
 
-        {!past && !signedIn && <a className="prog-cta" href="/login">Кабинет</a>}
+        {!closed && !signedIn && <a className="prog-cta" href="/login">Кабинет</a>}
 
-        {!past && signedIn && slots.length === 0 && (
+        {!closed && signedIn && slots.length === 0 && (
           <a className="prog-cta" href="/account/profile">Кабинет</a>
         )}
 
-        {!past && slots.map((s) => {
+        {!closed && slots.map((s) => {
           const full = free === 0 && !s.booked;
           return (
             <form action={toggleBooking} key={s.participant_id}>

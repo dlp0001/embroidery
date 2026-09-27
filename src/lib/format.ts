@@ -71,6 +71,23 @@ export function todayISO(): string {
   }).format(new Date());
 }
 
+/**
+ * Во сколько день смены перестаёт принимать запись от родителей. Смена
+ * идёт с утра, и к обеду состав нужен студии на руках: кто придёт, тому
+ * готовят место и материалы, а не считают заново в дверях.
+ */
+export const EVENT_CLOSES_AT = 13;
+
+/**
+ * Закрыт ли день смены для родителя. Прошедший закрыт весь, сегодняшний —
+ * после 13:00. Обычных занятий это не касается: у них правило другое.
+ */
+export function eventClosed(heldOn: string): boolean {
+  const today = todayISO();
+  if (heldOn !== today) return heldOn < today;
+  return nowHM().hour >= EVENT_CLOSES_AT;
+}
+
 /** Часы и минуты по времени студии: от них зависит, здороваться утром или днём. */
 export function nowHM(): { hour: number; hhmm: string } {
   const parts = new Intl.DateTimeFormat('en-GB', {
