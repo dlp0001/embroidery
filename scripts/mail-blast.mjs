@@ -83,8 +83,29 @@ function unsubUrl(email, path = '/unsubscribe') {
  */
 const BOT_LINK_DAYS = 14;
 
+/**
+ * Имя бота узнаём у самого телеграма, а не из переменной окружения.
+ * Переменная живёт в Vercel, локально её нет, и первая же проверочная
+ * отправка ушла с запасной ссылкой вместо личной. Токена достаточно.
+ */
+let botName;
+async function botUsername() {
+  if (botName !== undefined) return botName;
+  const named = process.env.TELEGRAM_BOT_NAME;
+  if (named) return (botName = named.replace(/^@/, ''));
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return (botName = null);
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+    const data = await res.json();
+    return (botName = data?.result?.username ?? null);
+  } catch {
+    return (botName = null);
+  }
+}
+
 async function botLink(client, userId) {
-  const bot = process.env.TELEGRAM_BOT_NAME;
+  const bot = await botUsername();
   if (!bot || !userId) return null;
   const raw = randomBytes(24).toString('base64url');
   const pepper = process.env.SESSION_SECRET ?? '';
@@ -94,7 +115,7 @@ async function botLink(client, userId) {
      values ($1, $2, now() + ($3 || ' days')::interval)`,
     [userId, hash, String(BOT_LINK_DAYS)],
   );
-  return `https://t.me/${bot.replace(/^@/, '')}?start=${raw}`;
+  return `https://t.me/${bot}?start=${raw}`;
 }
 
 const c = new pg.Client(local ? { connectionString: url } : { connectionString: url, ssl: { rejectUnauthorized: true } });
@@ -197,9 +218,8 @@ if (!send) {
   console.log(`\nПисьмо целиком: ${file}`);
   if (letter.needsBotLink) {
     console.log('Ссылка на бота в показе ненастоящая: личные токены заводятся только при отправке.');
-    if (!process.env.TELEGRAM_BOT_NAME) {
-      console.log('Внимание: TELEGRAM_BOT_NAME не задан, при отправке ссылки не будет.');
-    }
+    const bot = await botUsername();
+    console.log(bot ? `Бот: @${bot}` : 'Внимание: имя бота не узнать, при отправке ссылок не будет.');
   }
   console.log('Ничего не отправлено. Отправить — флаг --send.');
   await c.end();
@@ -208,6 +228,16 @@ if (!send) {
 
 const key = process.env.RESEND_API_KEY;
 if (!key) { console.error('RESEND_API_KEY не задан, отправлять нечем.'); await c.end(); process.exit(1); }
+
+// Письмо с личной ссылкой без личной ссылки отправлять нельзя: оно уйдёт
+// с запасной, никто этого не заметит, а повторить его уже не выйдет.
+// Именно так и произошло на первой проверочной отправке.
+if (letter.needsBotLink && !(await botUsername())) {
+  console.error('Имя бота не узнать: нет TELEGRAM_BOT_TOKEN и TELEGRAM_BOT_NAME.');
+  console.error('Письмо просит личную ссылку, без неё отправлять не будем.');
+  await c.end();
+  process.exit(1);
+}
 
 let ok = 0;
 let failed = 0;
