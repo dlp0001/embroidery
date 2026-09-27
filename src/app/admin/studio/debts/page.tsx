@@ -3,11 +3,14 @@ import {
   PASS_WARN_DAYS, allActivePasses, debtors, lessonPrice, passOwners, saleOffers,
   spentPasses, unbilledVisits,
 } from '@/lib/studio';
+import type { PassRow } from '@/lib/studio';
 import { pendingCash } from '@/lib/billing';
 import { isConfigured as receiptsConfigured } from '@/lib/icount';
 import { dayMonth, daysUntil, money, plural, todayISO, WAY } from '@/lib/format';
 import Link from 'next/link';
-import { confirmCashAction, declineCashAction, issuePassAction } from '@/app/admin/schedule-actions';
+import {
+  confirmCashAction, declineCashAction, extendPassAction, issuePassAction,
+} from '@/app/admin/schedule-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,6 +24,43 @@ const label: React.CSSProperties = {
   display: 'block', fontSize: 10, letterSpacing: '0.3em',
   textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 6,
 };
+
+/**
+ * Докупить дни в пакет смены. Стоит и у действующего пакета, и у
+ * кончившегося: дни в смене ещё идут, а платить за них как за разовые
+ * дороже, чем добрать в пакет.
+ */
+function ExtendForm(
+  { pass: p, currency }: { pass: PassRow; currency: string },
+) {
+  if (p.extra_price === null || p.max_days < 1) return null;
+
+  return (
+    <form action={extendPassAction} style={{
+      display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 12,
+    }}>
+      <input type="hidden" name="passId" value={p.id} />
+      <div className="field" style={{ marginBottom: 0, width: 80 }}>
+        <label htmlFor={`ext-${p.id}`}>Дней</label>
+        <select id={`ext-${p.id}`} name="days" defaultValue="1">
+          {Array.from({ length: Math.min(p.max_days, 10) }, (_, i) => i + 1)
+            .map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+      </div>
+      <div className="field" style={{ marginBottom: 0, width: 150 }}>
+        <label htmlFor={`extpaid-${p.id}`}>Оплата</label>
+        <select id={`extpaid-${p.id}`} name="paid" defaultValue="cash">
+          <option value="cash">наличными</option>
+          <option value="transfer">переводом</option>
+          <option value="unpaid">пока не оплачено</option>
+        </select>
+      </div>
+      <button className="btn-quiet" type="submit">
+        Продлить · {money(p.extra_price, currency)} за день
+      </button>
+    </form>
+  );
+}
 
 export default async function DebtsPage() {
   const user = await requireTeacher();
@@ -167,6 +207,8 @@ export default async function DebtsPage() {
                 </div>
               </div>
             </div>
+
+            {admin && <ExtendForm pass={p} currency={currency} />}
           </div>
         ))}
 
@@ -184,6 +226,7 @@ export default async function DebtsPage() {
                   {p.last_used ? ` · последнее ${dayMonth(p.last_used)}` : ''}
                   {p.paid ? ` · оплачен ${PAID[p.paid] ?? p.paid}` : ' · не оплачен'}
                 </div>
+                {admin && <ExtendForm pass={p} currency={currency} />}
               </div>
             ))}
           </>

@@ -76,6 +76,16 @@ const OFFER_PRICE = `
     where og.id = ps.group_id and (o->>'lessons')::int = ps.lessons_total
     limit 1)`;
 
+/**
+ * Сколько за пакет заплатили всего: покупка плюс докупленные дни. Без
+ * второго слагаемого день по продлённому пакету считался бы по старой
+ * цене, размазанной на большее число дней.
+ */
+const PASS_PAID = `
+  (coalesce(pay.amount, 0)
+   + coalesce((select sum(ep.amount) from payments ep
+                where ep.status = 'paid' and ep.raw ->> 'extends_pass' = ps.id::text), 0))`;
+
 export async function monthStats(month: string): Promise<MonthStats> {
   const first = `${month}-01`;
   const [price, types] = await Promise.all([lessonPrice(), passTypes()]);
@@ -102,7 +112,7 @@ export async function monthStats(month: string): Promise<MonthStats> {
     lessons_total: number | null; pass_paid: string | null;
   }>(
     `select ch.pass_id, ch.amount::text, g.kind, ps.lessons_total,
-            coalesce(pay.amount, ${OFFER_PRICE})::text as pass_paid
+            coalesce(nullif(${PASS_PAID}, 0), ${OFFER_PRICE})::text as pass_paid
        from charges ch
        join studio_sessions s on s.id = ch.session_id
        join studio_groups g on g.id = s.group_id
@@ -122,6 +132,18 @@ export async function monthStats(month: string): Promise<MonthStats> {
     [first],
   );
 
+  // Докупленные дни — продажа того месяца, когда за них заплатили, и
+  // считаются вместе с абонементами: это и есть пополнение пакета.
+  const extras = await query<{ provider: string | null; amount: string; days: number }>(
+    `select pay.provider, pay.amount::text, coalesce((pay.raw ->> 'days')::int, 0) as days
+       from payments pay
+      where pay.raw ? 'extends_pass'
+        and pay.status = 'paid'
+        and pay.created_at >= $1::date
+        and pay.created_at < ($1::date + interval '1 month')`,
+    [first],
+  );
+
   /** Сколько абонемент стоил. У неоплаченного цены нет — берём из справочника. */
   const worth = (p: PassRow): number => {
     if (p.amount !== null) return Number(p.amount);
@@ -135,7 +157,15 @@ export async function monthStats(month: string): Promise<MonthStats> {
 
   const cell = (kind: PayKind): Cell => {
     const mine = passes.filter((p) => bucket(p) === kind);
-    return { count: mine.length, sum: mine.reduce((s, p) => s + worth(p), 0) };
+    const grown = extras.filter(
+      (e) => (e.provider === null ? 'due'
+        : e.provider === 'cash' || e.provider === 'transfer' ? 'direct' : 'card') === kind,
+    );
+    return {
+      count: mine.length + grown.length,
+      sum: mine.reduce((s, p) => s + worth(p), 0)
+        + grown.reduce((s, e) => s + Number(e.amount), 0),
+    };
   };
 
   const L = lessons ?? {
@@ -183,7 +213,8 @@ export async function monthStats(month: string): Promise<MonthStats> {
       average: totalDone.count > 0 ? totalDone.sum / totalDone.count : 0,
     },
     onPass: L.pass_n,
-    passLessons: passes.reduce((s, p) => s + p.lessons_total, 0),
+    passLessons: passes.reduce((s, p) => s + p.lessons_total, 0)
+      + extras.reduce((s, e) => s + e.days, 0),
     rows: [
       {
         key: 'direct',

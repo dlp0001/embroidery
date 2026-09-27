@@ -87,6 +87,16 @@ export async function testPaymentAction(): Promise<void> {
   await go({ kind: 'test' });
 }
 
+/** Докупить дни в пакет смены: сколько именно — выбирает родитель. */
+export async function extendPassAction(form: FormData): Promise<void> {
+  const passId = String(form.get('passId') ?? '');
+  const days = Number(form.get('days'));
+  if (!passId || !Number.isInteger(days) || days < 1 || days > 30) {
+    redirect('/account/pay?error=' + encodeURIComponent('Странное число дней.'));
+  }
+  await go({ kind: 'extend', passId, days });
+}
+
 export async function buyPassAction(form: FormData): Promise<void> {
   if (await onlyLooking()) return;
   // Один ключ «id группы:дней»: пакет лагеря не перепутать с абонементом.

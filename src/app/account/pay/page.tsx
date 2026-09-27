@@ -12,7 +12,7 @@ import {
 } from '@/lib/billing';
 import DebtPicker from './DebtPicker';
 import {
-  buyPassAction, cancelCashAction, dropPaymentAction,
+  buyPassAction, cancelCashAction, dropPaymentAction, extendPassAction,
 } from './actions';
 
 export const dynamic = 'force-dynamic';
@@ -93,9 +93,43 @@ export default async function PayPage({
         {soon && (
           <div className="money-due" style={{ marginTop: 10 }}>
             {ends! > 0
-              ? `Осталось ${ends} ${plural(ends!, 'день', 'дня', 'дней')} и ${p.left} ${what}. Неиспользованные сгорят.`
+              /* У пакета смены и срок, и остаток считаются в днях, и
+                 «осталось 5 дней и 5 дней» читается как опечатка. */
+              ? p.group_id
+                ? `До конца смены ${ends} ${plural(ends!, 'день', 'дня', 'дней')}, а в пакете ещё ${p.left}. Неиспользованные сгорят.`
+                : `Осталось ${ends} ${plural(ends!, 'день', 'дня', 'дней')} и ${p.left} ${what}. Неиспользованные сгорят.`
               : `Сегодня последний день: ${p.left} ${what} ещё не использовано.`}
           </div>
+        )}
+
+        {/* Пакет смены можно нарастить: у кого он самый большой, тому
+            дешевле докупить день, чем платить за него как за разовый. */}
+        {p.extra_price !== null && p.max_days > 0 && (
+          online ? (
+            <form action={extendPassAction} style={{
+              display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 14,
+            }}>
+              <input type="hidden" name="passId" value={p.id} />
+              <div className="field" style={{ marginBottom: 0, width: 92 }}>
+                <label htmlFor={`days-${p.id}`}>Дней</label>
+                <select id={`days-${p.id}`} name="days" defaultValue="1">
+                  {Array.from({ length: Math.min(p.max_days, 10) }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
+              <button className="btn-quiet" type="submit">
+                Продлить · {money(p.extra_price, 'ILS')} за день
+              </button>
+            </form>
+          ) : (
+            /* Без оплаты картой выбирать число дней не на чем: остаётся
+               сказать, что день докупается, и почём. */
+            <p className="hint" style={{ marginTop: 12 }}>
+              Можно докупить ещё {p.max_days === 1 ? 'день' : `до ${p.max_days} дней`} по{' '}
+              {money(p.extra_price, 'ILS')} — скажите Варе.
+            </p>
+          )
         )}
       </div>
     );

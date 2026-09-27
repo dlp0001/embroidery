@@ -462,6 +462,14 @@ export type PassBalance = {
   group_id: string | null;
   group_title: string | null;
   kind: GroupKind;
+  /**
+   * Цена докупаемого дня, если пакет можно продлить. Продлевают только
+   * самый большой пакет смены: у меньших есть куда расти — следующий
+   * пакет, и он выгоднее поштучных дней.
+   */
+  extra_price: number | null;
+  /** Сколько дней ещё можно докупить: дальше конца смены смысла нет. */
+  max_days: number;
 };
 
 export async function passBalances(ownerId: string): Promise<PassBalance[]> {
@@ -470,7 +478,22 @@ export async function passBalances(ownerId: string): Promise<PassBalance[]> {
             (select g.title from studio_groups g where g.id = p.group_id) as group_title,
             coalesce((select g.kind from studio_groups g where g.id = p.group_id), 'lesson') as kind,
             (select count(*)::int from charges ch where ch.pass_id = p.id) as used,
-            p.lessons_total - (select count(*)::int from charges ch where ch.pass_id = p.id) as left
+            p.lessons_total - (select count(*)::int from charges ch where ch.pass_id = p.id) as left,
+            /* Продлевается только самый большой пакет смены: пока есть
+               пакет побольше, дешевле купить его. */
+            (select g.extra_price::float from studio_groups g
+              where g.id = p.group_id and g.extra_price is not null
+                and g.active and (g.ends_on is null or g.ends_on >= current_date)
+                and p.lessons_total >= coalesce((
+                      select max((o->>'lessons')::int)
+                        from jsonb_array_elements(g.pass_offers) o), 0)) as extra_price,
+            /* Докупать есть смысл ровно до конца смены: дни сверх
+               оставшихся всё равно сгорят. */
+            greatest(coalesce((select count(*)::int from studio_sessions s
+                       where s.group_id = p.group_id and s.status <> 'cancelled'
+                         and s.held_on >= current_date), 0)
+                     - (p.lessons_total - (select count(*)::int from charges ch
+                                            where ch.pass_id = p.id)), 0) as max_days
        from passes p
       where p.owner_id = $1
         and (p.valid_to is null or p.valid_to >= current_date)
@@ -1207,6 +1230,8 @@ export type GroupRow = {
   kind: GroupKind;
   /** Своя цена дня. У обычных занятий её нет — берётся студийная. */
   price: string | null;
+  /** Цена дня, докупаемого к самому большому пакету. */
+  extra_price: string | null;
   pass_offers: PassOffer[] | null;
   starts_on: string | null;
   ends_on: string | null;
@@ -1219,7 +1244,8 @@ export async function allGroups(): Promise<GroupRow[]> {
   return query<GroupRow>(
     `select g.id, g.title, g.teacher_id, g.weekday, g.starts_at::text, g.duration_min,
             g.room, g.audience, g.age_hint, g.capacity, g.active,
-            g.kind, g.price::text, g.pass_offers, g.starts_on::text, g.ends_on::text, g.weekdays,
+            g.kind, g.price::text, g.extra_price::text, g.pass_offers,
+            g.starts_on::text, g.ends_on::text, g.weekdays,
             (select count(*)::int from studio_sessions s
               where s.group_id = g.id and s.status <> 'cancelled') as days,
             /* Те же люди, что и в журнале: скрытые дети и взрослые,
@@ -1267,6 +1293,7 @@ export type GroupInput = {
   teacherId: string | null;
   kind: GroupKind;
   price: number | null;
+  extraPrice: number | null;
   passOffers: PassOffer[] | null;
   startsOn: string | null;
   endsOn: string | null;
@@ -1276,7 +1303,7 @@ export type GroupInput = {
 const GROUP_COLS = [
   'title', 'weekday', 'starts_at', 'duration_min', 'audience', 'age_hint',
   'capacity', 'room', 'teacher_id', 'kind', 'price', 'pass_offers',
-  'starts_on', 'ends_on', 'weekdays',
+  'starts_on', 'ends_on', 'weekdays', 'extra_price',
 ];
 
 function groupValues(input: GroupInput): unknown[] {
@@ -1284,7 +1311,7 @@ function groupValues(input: GroupInput): unknown[] {
     input.title, input.weekday, input.startsAt, input.durationMin, input.audience,
     input.ageHint, input.capacity, input.room, input.teacherId, input.kind,
     input.price, input.passOffers ? JSON.stringify(input.passOffers) : null,
-    input.startsOn, input.endsOn, input.weekdays,
+    input.startsOn, input.endsOn, input.weekdays, input.extraPrice,
   ];
 }
 
@@ -1663,6 +1690,126 @@ export async function issuePass(input: IssuePassInput, byUser: string): Promise<
   });
 }
 
+export type ExtendOffer = {
+  passId: string;
+  ownerId: string;
+  title: string;
+  /** Цена одного докупаемого дня. */
+  price: number;
+  /** Сколько дней ещё можно докупить. */
+  maxDays: number;
+};
+
+/**
+ * Можно ли продлить этот пакет и почём. Отвечает только про пакеты смен,
+ * у которых задана цена докупаемого дня и нет пакета побольше: пока он
+ * есть, дешевле купить его.
+ */
+export async function extendOffer(passId: string, ownerId?: string): Promise<ExtendOffer | null> {
+  const row = await one<{
+    owner_id: string; title: string; price: string; max_days: number;
+  }>(
+    `select p.owner_id, g.title, g.extra_price::text as price,
+            greatest((select count(*)::int from studio_sessions s
+                       where s.group_id = g.id and s.status <> 'cancelled'
+                         and s.held_on >= current_date)
+                     - (p.lessons_total - (select count(*)::int from charges ch
+                                            where ch.pass_id = p.id)), 0) as max_days
+       from passes p
+       join studio_groups g on g.id = p.group_id
+      where p.id = $1
+        and ($2::uuid is null or p.owner_id = $2::uuid)
+        and g.kind <> 'lesson' and g.active and g.extra_price is not null
+        and (g.ends_on is null or g.ends_on >= current_date)
+        and (p.valid_to is null or p.valid_to >= current_date)
+        and p.lessons_total >= coalesce((
+              select max((o->>'lessons')::int) from jsonb_array_elements(g.pass_offers) o), 0)`,
+    [passId, ownerId ?? null],
+  );
+  if (!row || row.max_days < 1) return null;
+  return {
+    passId, ownerId: row.owner_id, title: row.title,
+    price: Number(row.price), maxDays: row.max_days,
+  };
+}
+
+/**
+ * Докупает дни в уже купленный пакет смены. Пакет не заводится второй
+ * раз: у семьи один пакет на смену, и он просто становится больше — так
+ * же, как его и читают, «осталось 3 из 10».
+ *
+ * Деньги за докупленные дни — отдельный платёж, но он помнит, к какому
+ * пакету относится: иначе в отчёте день по такому пакету считался бы по
+ * старой цене, размазанной на большее число дней.
+ */
+export async function extendPass(
+  input: {
+    passId: string;
+    days: number;
+    price: number;
+    paid: 'cash' | 'transfer' | 'unpaid';
+  },
+  byUser: string | null,
+): Promise<{ ok: boolean; reason?: string; total?: number }> {
+  if (!Number.isInteger(input.days) || input.days < 1 || input.days > 30) {
+    return { ok: false, reason: 'Странное число дней.' };
+  }
+
+  return tx(async (c) => {
+    const { rows } = await c.query<{
+      id: string; owner_id: string; lessons_total: number;
+      max_days: number; currency: string | null;
+    }>(
+      `select p.id, p.owner_id, p.lessons_total,
+              greatest((select count(*)::int from studio_sessions s
+                         where s.group_id = p.group_id and s.status <> 'cancelled'
+                           and s.held_on >= current_date)
+                       - (p.lessons_total - (select count(*)::int from charges ch
+                                              where ch.pass_id = p.id)), 0) as max_days,
+              (select value from settings where key = 'studio_currency') as currency
+         from passes p where p.id = $1 for update`,
+      [input.passId],
+    );
+    const pass = rows[0];
+    if (!pass) return { ok: false, reason: 'Пакет не найден.' };
+    /* Оплаченные дни сверх оставшихся сгорят вместе со сменой. */
+    if (input.days > pass.max_days) {
+      return {
+        ok: false,
+        reason: pass.max_days < 1
+          ? 'В пакете уже оплачены все оставшиеся дни смены.'
+          : `До конца смены можно докупить не больше ${pass.max_days} ${plural(pass.max_days, 'дня', 'дней', 'дней')}.`,
+      };
+    }
+
+    const currency = pass.currency ?? 'ILS';
+    const sum = input.price * input.days;
+
+    let paymentId: string | null = null;
+    if (input.paid !== 'unpaid') {
+      const pay = await c.query<{ id: string }>(
+        `insert into payments (provider, user_id, amount, currency, status, purpose, raw)
+         values ($1, $2, $3, $4, 'paid', 'studio_pass', $5) returning id`,
+        [input.paid, pass.owner_id, sum, currency,
+         JSON.stringify({ extends_pass: pass.id, days: input.days, issued_by: byUser })],
+      );
+      paymentId = pay.rows[0].id;
+    }
+
+    const total = pass.lessons_total + input.days;
+    await c.query('update passes set lessons_total = $2 where id = $1', [pass.id, total]);
+
+    await logMoneyIn(c, {
+      kind: 'pass_extended', actorId: byUser, ownerId: pass.owner_id,
+      passId: pass.id, paymentId, amount: sum, currency,
+      note: `докуплено ${input.days} ${plural(input.days, 'день', 'дня', 'дней')} к пакету, всего стало ${total}`,
+      details: { days: input.days, price: input.price, paid: input.paid },
+    });
+
+    return { ok: true, total };
+  });
+}
+
 export type PassRow = {
   id: string;
   owner_name: string | null;
@@ -1673,6 +1820,10 @@ export type PassRow = {
   paid: string | null;
   group_title: string | null;
   kind: GroupKind;
+  /** Цена докупаемого дня, если этот пакет можно нарастить. */
+  extra_price: number | null;
+  /** Сколько дней ещё можно докупить: дальше конца смены смысла нет. */
+  max_days: number;
 };
 
 export async function allActivePasses(): Promise<PassRow[]> {
@@ -1682,6 +1833,19 @@ export async function allActivePasses(): Promise<PassRow[]> {
             p.valid_to::text,
             (select g.title from studio_groups g where g.id = p.group_id) as group_title,
             coalesce((select g.kind from studio_groups g where g.id = p.group_id), 'lesson') as kind,
+            (select g.extra_price::float from studio_groups g
+              where g.id = p.group_id and g.extra_price is not null
+                and g.active and (g.ends_on is null or g.ends_on >= current_date)
+                and p.lessons_total >= coalesce((
+                      select max((o->>'lessons')::int)
+                        from jsonb_array_elements(g.pass_offers) o), 0)) as extra_price,
+            /* Докупать есть смысл ровно до конца смены: дни сверх
+               оставшихся всё равно сгорят. */
+            greatest(coalesce((select count(*)::int from studio_sessions s
+                       where s.group_id = p.group_id and s.status <> 'cancelled'
+                         and s.held_on >= current_date), 0)
+                     - (p.lessons_total - (select count(*)::int from charges ch
+                                            where ch.pass_id = p.id)), 0) as max_days,
             (select pay.provider from payments pay where pay.id = p.payment_id) as paid
        from passes p
        join users u on u.id = p.owner_id
@@ -1707,6 +1871,18 @@ export async function spentPasses(days = 30): Promise<SpentPass[]> {
             0 as left, p.valid_to::text,
             (select g.title from studio_groups g where g.id = p.group_id) as group_title,
             coalesce((select g.kind from studio_groups g where g.id = p.group_id), 'lesson') as kind,
+            /* Кончившийся пакет смены — первый кандидат на продление:
+               дни в смене ещё есть, а платить за них как за разовые
+               дороже. */
+            (select g.extra_price::float from studio_groups g
+              where g.id = p.group_id and g.extra_price is not null
+                and g.active and (g.ends_on is null or g.ends_on >= current_date)
+                and p.lessons_total >= coalesce((
+                      select max((o->>'lessons')::int)
+                        from jsonb_array_elements(g.pass_offers) o), 0)) as extra_price,
+            coalesce((select count(*)::int from studio_sessions s
+                       where s.group_id = p.group_id and s.status <> 'cancelled'
+                         and s.held_on >= current_date), 0) as max_days,
             (select pay.provider from payments pay where pay.id = p.payment_id) as paid,
             (select max(s.held_on)::text from charges c
                join studio_sessions s on s.id = c.session_id

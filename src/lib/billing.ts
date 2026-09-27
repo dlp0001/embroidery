@@ -7,12 +7,14 @@ import {
 } from './icount';
 import { logMoneyIn } from './ledger';
 import { createPaymentLink, fetchTransaction, isConfigured } from './payplus';
-import { lessonPrice, saleOffers } from './studio';
+import { extendOffer, lessonPrice, saleOffers } from './studio';
 
 export type Intent =
   | { kind: 'debt'; chargeIds?: string[] }
   /** Абонемент студии, а с groupId — пакет дней лагеря или мастер-класса. */
   | { kind: 'pass'; lessons: number; groupId?: string | null }
+  /** Докупить дни в уже купленный пакет смены. */
+  | { kind: 'extend'; passId: string; days: number }
   | { kind: 'test' };
 
 /** Сумма проверочного платежа: маленькая, чтобы не жалко было вернуть. */
@@ -70,6 +72,20 @@ export async function startPayment(
     amount = debts.reduce((s, c) => s + Number(c.amount), 0);
     description = `Занятия в студии, ${debts.length}`;
     raw = { charge_ids: debts.map((c) => c.id) };
+  } else if (intent.kind === 'extend') {
+    // Цену берём у смены, а не с экрана: на экране её мог поправить кто
+    // угодно, а платить человек должен ровно столько, сколько стоит день.
+    const offer = await extendOffer(intent.passId, user.id);
+    if (!offer) return { error: 'Этот пакет продлить нельзя.' };
+    if (intent.days < 1 || intent.days > offer.maxDays) {
+      return { error: 'Столько дней в смене уже не осталось.' };
+    }
+    amount = offer.price * intent.days;
+    description = `${offer.title}: ещё ${intent.days} ${plural(intent.days, 'день', 'дня', 'дней')}`;
+    raw = {
+      extends_pass: offer.passId, days: intent.days,
+      lessons: intent.days, group_title: offer.title,
+    };
   } else {
     // Абонемент стоит своих денег, а не «занятий умножить на цену».
     const key = intent.groupId ?? '';
@@ -199,6 +215,25 @@ export async function applyPayment(
       return;
     }
 
+    // Продление: пакет не заводим заново, он просто становится больше.
+    const extends_ = p.raw?.extends_pass as string | undefined;
+    if (p.purpose === 'studio_pass' && extends_) {
+      const days = Number(p.raw?.days ?? 0);
+      if (days < 1) return;
+      const { rows: grown } = await c.query<{ lessons_total: number }>(
+        'update passes set lessons_total = lessons_total + $2 where id = $1 returning lessons_total',
+        [extends_, days],
+      );
+      if (grown.length === 0) return;
+      await logMoneyIn(c, {
+        kind: 'pass_extended', actorId: null, ownerId: p.user_id,
+        passId: extends_, paymentId: p.id, amount: p.amount, currency: p.currency,
+        note: `докуплено ${days} ${plural(days, 'день', 'дня', 'дней')} к пакету картой, всего стало ${grown[0].lessons_total}`,
+        details: { days },
+      });
+      return;
+    }
+
     if (p.purpose === 'studio_pass') {
       const lessons = Number(p.raw?.lessons ?? 0);
       const months = Number(p.raw?.months ?? 1);
@@ -250,6 +285,15 @@ function lessonOf(kind: string): string {
  * было видно, за что платил. Ивритской половине название не подставить:
  * оно у нас русское, а читать её будет бухгалтерия.
  */
+/** Докупленные дни: пакет тот же, в чеке — только добавка к нему. */
+function extraDaysLine(kind: string, title: string | null, days: number): string {
+  const he = kind === 'event' ? 'סדנה' : 'קייטנה';
+  return line(
+    `Дополнительные дни${title ? `: ${title}` : ''}, ${days} ${plural(days, 'день', 'дня', 'дней')}`,
+    `ימים נוספים ל${he}: ${days} ימים`,
+  );
+}
+
 function packageLine(kind: string, title: string, days: number): string {
   const he = kind === 'event' ? 'סדנה' : 'קייטנה';
   return line(
@@ -292,6 +336,24 @@ async function receiptItems(p: ToBill): Promise<ReceiptItem[]> {
   const total = Number(p.amount);
 
   if (p.purpose === 'studio_pass') {
+    // Продление: в пакете стало больше дней, нового пакета не появилось.
+    // Число дней берём из самого платежа: у него оно и есть.
+    const extends_ = p.raw?.extends_pass as string | undefined;
+    if (extends_) {
+      const days = Number(p.raw?.days ?? 0);
+      const pass = await one<{ title: string | null; kind: string | null }>(
+        `select g.title, g.kind from passes ps
+           left join studio_groups g on g.id = ps.group_id
+          where ps.id = $1`,
+        [extends_],
+      );
+      return [{
+        description: extraDaysLine(pass?.kind ?? 'camp', pass?.title ?? null, days),
+        quantity: 1,
+        price: total,
+      }];
+    }
+
     const n = Number(p.raw?.lessons ?? 0);
     const title = (p.raw?.group_title as string | null | undefined) ?? null;
     const groupId = (p.raw?.group_id as string | null | undefined) ?? null;

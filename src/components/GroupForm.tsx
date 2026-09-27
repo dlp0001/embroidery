@@ -128,19 +128,32 @@ export default function GroupForm({
       </div>
 
       {!weekly && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 14 }}>
-          <div>
-            <label style={label} htmlFor={`price-${id}`}>Цена дня</label>
-            <input style={field} id={`price-${id}`} name="price" type="number"
-                   min={0} max={100000} step={10} required
-                   defaultValue={group?.price ? Number(group.price) : ''} placeholder="330" />
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: 14 }}>
+            <div>
+              <label style={label} htmlFor={`price-${id}`}>Цена дня</label>
+              <input style={field} id={`price-${id}`} name="price" type="number"
+                     min={0} max={100000} step={10} required
+                     defaultValue={group?.price ? Number(group.price) : ''} placeholder="330" />
+            </div>
+            <div>
+              <label style={label} htmlFor={`extraPrice-${id}`}>Докупить день</label>
+              <input style={field} id={`extraPrice-${id}`} name="extraPrice" type="number"
+                     min={0} max={100000} step={10}
+                     defaultValue={group?.extra_price ? Number(group.extra_price) : ''}
+                     placeholder="280" />
+            </div>
+            <div>
+              <label style={label} htmlFor={`passOffers-${id}`}>Пакеты</label>
+              <input style={field} id={`passOffers-${id}`} name="passOffers"
+                     defaultValue={offersText(group)} placeholder="5 — 1550, 6 — 1800, 7 — 2000" />
+            </div>
           </div>
-          <div>
-            <label style={label} htmlFor={`passOffers-${id}`}>Пакеты</label>
-            <input style={field} id={`passOffers-${id}`} name="passOffers"
-                   defaultValue={offersText(group)} placeholder="5 — 1550, 6 — 1800, 7 — 2000" />
-          </div>
-        </div>
+          <p className="hint">
+            Докупать дни можно только к самому большому пакету: у кого он уже
+            есть, тот продлевает по этой цене. Пусто — продления нет.
+          </p>
+        </>
       )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>

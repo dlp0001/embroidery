@@ -8,7 +8,7 @@ import { cashConfirmed, cashDeclined, sessionChanged } from '@/lib/notify';
 import type { SaveResult } from '@/components/AutoSave';
 import { isAdmin, onlyLooking, requireUser } from '@/lib/session';
 import {
-  addSession, createGroup, issuePass, resyncGroupSessions, saleOffers,
+  addSession, createGroup, extendOffer, extendPass, issuePass, resyncGroupSessions, saleOffers,
   sessionNow, setBooking, setGroupActive, setSessionStatus, setSessionTime, updateGroup,
   type GroupInput, type GroupKind, type PassOffer,
 } from '@/lib/studio';
@@ -95,6 +95,7 @@ function readGroup(form: FormData): GroupInput {
     teacherId: text('teacherId'),
     kind,
     price: weekly ? null : num('price'),
+    extraPrice: weekly ? null : num('extraPrice'),
     passOffers: offers && offers.length > 0 ? offers : null,
     startsOn: weekly ? null : startsOn,
     endsOn: weekly ? null : endsOn,
@@ -247,6 +248,27 @@ export async function issuePassAction(form: FormData): Promise<void> {
   );
   revalidatePath('/admin/studio/debts');
   revalidatePath('/admin/studio');
+  revalidatePath('/account');
+  revalidatePath('/account/pay');
+}
+
+/** Докупить дни в пакет смены за наличные или перевод. Цену берём у смены. */
+export async function extendPassAction(form: FormData): Promise<void> {
+  const user = await requireAdmin();
+  const passId = String(form.get('passId') ?? '');
+  const days = Number(form.get('days'));
+  const paid = String(form.get('paid'));
+  if (paid !== 'cash' && paid !== 'transfer' && paid !== 'unpaid') throw new Error('BAD_PAID');
+
+  const offer = await extendOffer(passId);
+  if (!offer) throw new Error('NOT_EXTENDABLE');
+
+  // Пока страница была открыта, дни смены могли кончиться: тогда молча
+  // не продлеваем, а падаем — иначе деньги взяли бы за сгоревшее.
+  const done = await extendPass({ passId, days, price: offer.price, paid }, user.id);
+  if (!done.ok) throw new Error(done.reason ?? 'NOT_EXTENDED');
+  revalidatePath('/admin/studio/debts');
+  revalidatePath('/admin/studio/ledger');
   revalidatePath('/account');
   revalidatePath('/account/pay');
 }
