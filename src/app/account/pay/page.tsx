@@ -106,22 +106,21 @@ export default async function PayPage({
             дешевле докупить день, чем платить за него как за разовый. */}
         {p.extra_price !== null && p.max_days > 0 && (
           online ? (
-            <form action={extendPassAction} style={{
-              display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 14,
-            }}>
-              <input type="hidden" name="passId" value={p.id} />
-              <div className="field" style={{ marginBottom: 0, width: 92 }}>
-                <label htmlFor={`days-${p.id}`}>Дней</label>
-                <select id={`days-${p.id}`} name="days" defaultValue="1">
-                  {Array.from({ length: Math.min(p.max_days, 10) }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-              </div>
-              <button className="btn-quiet" type="submit">
-                Продлить · {money(p.extra_price, 'ILS')} за день
-              </button>
-            </form>
+            /* Сколько дней и почём — на самой кнопке: выбор из списка, а
+               рядом с ним цена за день, заставлял умножать в уме. Дней
+               к докупке редко больше двух-трёх, и кнопки тут короче. */
+            <div style={{ marginTop: 16 }}>
+              <div className="lbl" style={{ margin: '0 0 8px' }}>Докупить дни</div>
+              <form action={extendPassAction}
+                    style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input type="hidden" name="passId" value={p.id} />
+                {Array.from({ length: Math.min(p.max_days, 5) }, (_, i) => i + 1).map((n) => (
+                  <button className="chip" type="submit" name="days" value={n} key={n}>
+                    +{n} {plural(n, 'день', 'дня', 'дней')} · {money(p.extra_price! * n, 'ILS')}
+                  </button>
+                ))}
+              </form>
+            </div>
           ) : (
             /* Без оплаты картой выбирать число дней не на чем: остаётся
                сказать, что день докупается, и почём. */
@@ -308,7 +307,13 @@ export default async function PayPage({
             {packs.map((t) => (
               <form action={buyPassAction} key={t.lessons}>
                 <input type="hidden" name="offer" value={`:${t.lessons}`} />
-                <button className="btn-quiet" type="submit" style={{ width: '100%', justifyContent: 'space-between' }}>
+                {/* Строка с выгодой на телефон в одну линию не влезала и
+                    уезжала за край карточки: цена налезала на срок.
+                    Пусть переносится. */}
+                <button className="btn-quiet" type="submit"
+                        style={{ width: '100%', justifyContent: 'space-between',
+                                 flexWrap: 'wrap', gap: '2px 12px', whiteSpace: 'normal',
+                                 textAlign: 'left' }}>
                   <span>
                     {t.lessons}&nbsp;{plural(t.lessons, 'занятие', 'занятия', 'занятий')}
                     <span className="hint">

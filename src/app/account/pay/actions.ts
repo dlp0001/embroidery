@@ -89,6 +89,7 @@ export async function testPaymentAction(): Promise<void> {
 
 /** Докупить дни в пакет смены: сколько именно — выбирает родитель. */
 export async function extendPassAction(form: FormData): Promise<void> {
+  if (await onlyLooking()) return;
   const passId = String(form.get('passId') ?? '');
   const days = Number(form.get('days'));
   if (!passId || !Number.isInteger(days) || days < 1 || days > 30) {
