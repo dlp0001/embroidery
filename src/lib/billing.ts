@@ -655,7 +655,8 @@ export async function confirmCash(
       `update payments set status = 'paid',
               raw = coalesce(raw, '{}'::jsonb) || jsonb_build_object(
                       'pay_method', $2::text,
-                      'receipt_wanted', $3::text)
+                      'receipt_wanted', $3::text,
+                      'receipt_asked_at', now()::text)
         where id = $1`,
       [p.id, how.method, how.receipt ? 'yes' : 'no'],
     );

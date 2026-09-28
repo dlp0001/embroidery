@@ -345,8 +345,13 @@ export async function saveAttendance(
       // подхватит её сама.
       if (way === 'cash') {
         const want = mark.receipt ?? null;
+        // Время просьбы нужно журналу: по нему он отличает «выписывается
+        // прямо сейчас» от «просили давно, а чека нет».
         const detail = want
-          ? JSON.stringify({ pay_method: want, receipt_wanted: 'yes' })
+          ? JSON.stringify({
+              pay_method: want, receipt_wanted: 'yes',
+              receipt_asked_at: new Date().toISOString(),
+            })
           : null;
         if (!charge.payment_id) {
           const pay = await c.query<{ id: string }>(
@@ -906,10 +911,11 @@ export type RosterRow = {
   /** Деньги уже проведены: менять может только суперадмин. */
   locked: boolean;
   /**
-   * Чек: 'none' — не просили, 'wanted' — попросили, но iCount ещё не
-   * ответил, 'done' — выписан. Выписанный чек запирает строку насовсем.
+   * Чек: 'none' — не просили, 'sending' — просьба только что ушла и
+   * квитанция выписывается, 'wanted' — просили давно, а её всё нет,
+   * 'done' — выписана. Выписанный чек запирает строку насовсем.
    */
-  receipt: 'none' | 'wanted' | 'done';
+  receipt: 'none' | 'sending' | 'wanted' | 'done';
   receipt_url: string | null;
   /** Каким способом провели оплату, если про чек уже говорили. */
   pay_method: PayMethod | null;
@@ -960,8 +966,15 @@ export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
             (c.pass_id is not null) as on_pass,
             (c.payment_id is not null) as paid,
             coalesce((select pay.provider = 'cash' from payments pay where pay.id = c.payment_id), false) as cash,
+            /* Квитанция выписывается уже после ответа страницы, поэтому
+               первые секунды её честно ещё нет. Сказать в этот момент
+               «не вышел» — соврать: она в дороге. */
             coalesce((select case
                         when pay.invoice_url is not null or pay.raw ? 'receipt' then 'done'
+                        when pay.raw ->> 'receipt_wanted' = 'yes'
+                             and coalesce((pay.raw ->> 'receipt_asked_at')::timestamptz,
+                                          pay.created_at) > now() - interval '3 minutes'
+                          then 'sending'
                         when pay.raw ->> 'receipt_wanted' = 'yes' then 'wanted'
                         else 'none' end
                         from payments pay where pay.id = c.payment_id), 'none') as receipt,
@@ -1679,6 +1692,7 @@ export async function issuePass(
            // в отчётности разные места.
            pay_method: input.paid,
            receipt_wanted: input.receipt ? 'yes' : 'no',
+           receipt_asked_at: new Date().toISOString(),
          })],
       );
       paymentId = pay.rows[0].id;
@@ -1838,6 +1852,7 @@ export async function extendPass(
            // в отчётности разные места.
            pay_method: input.paid,
            receipt_wanted: input.receipt ? 'yes' : 'no',
+           receipt_asked_at: new Date().toISOString(),
          })],
       );
       paymentId = pay.rows[0].id;

@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useActionState, useEffect, useState } from 'react';
 import { addWalkInAction, saveJournal } from '@/app/admin/actions';
 import { plural, type PayMethod } from '@/lib/format';
@@ -111,6 +112,23 @@ export default function Journal({
     },
     0,
   );
+
+  // Квитанция уходит в iCount уже после ответа, и строка про неё в этот
+  // момент ещё пустая. Сами заглядываем через несколько секунд, чтобы
+  // не просить Варю обновлять страницу руками.
+  const router = useRouter();
+  const asked = roster.some((r) => {
+    const row = rowFor(r);
+    return row.pay === 'cash' && Boolean(row.receipt);
+  });
+  useEffect(() => {
+    if (savedAt === 0 || !asked) return;
+    const t = setTimeout(() => router.refresh(), 6000);
+    return () => clearTimeout(t);
+    // Строки меняются от каждого нажатия, и следить за ними здесь незачем:
+    // важно только то, что сохранение прошло.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedAt]);
 
   // Кнопка крутится молча, сколько бы ни шёл ответ, и на медленной связи
   // это выглядит как «всё пропало». Отметки к этому времени уже записаны:
@@ -244,6 +262,7 @@ export default function Journal({
                     onClick={() => nextReceipt(r)}
                   >
                     {receiptText(row.receipt)}
+                    {r.receipt === 'sending' && ' · выписываем'}
                     {r.receipt === 'wanted' && ' · не вышел'}
                   </button>
                 )
