@@ -13,6 +13,7 @@ const TABS: Tab[] = [
   { href: '/admin/studio', icon: 'week', label: 'Сегодня' },
   { href: '/admin/studio/calendar', icon: 'cal', label: 'Расписание' },
   { href: '/admin/studio/people', icon: 'person', label: 'Люди' },
+  { href: '/admin/studio/pay', icon: 'cash', label: 'Оплаты' },
   { href: '/admin/studio/debts', icon: 'pay', label: 'Финансы' },
 ];
 

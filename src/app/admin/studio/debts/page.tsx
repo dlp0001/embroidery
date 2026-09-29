@@ -1,18 +1,14 @@
 import { isAdmin, requireTeacher } from '@/lib/session';
 import {
-  PASS_WARN_DAYS, allActivePasses, debtors, lessonPrice, passOwners, saleOffers,
-  spentPasses, unbilledVisits,
+  PASS_WARN_DAYS, allActivePasses, debtors, lessonPrice, spentPasses, unbilledVisits,
 } from '@/lib/studio';
 import type { PassRow } from '@/lib/studio';
-import { pendingCash } from '@/lib/billing';
 import { isConfigured as receiptsConfigured } from '@/lib/icount';
 import {
   dayMonth, daysUntil, money, plural, todayISO, WAY, WAYS, type PayMethod,
 } from '@/lib/format';
 import Link from 'next/link';
-import {
-  confirmCashAction, declineCashAction, extendPassAction, issuePassAction,
-} from '@/app/admin/schedule-actions';
+import { extendPassAction } from '@/app/admin/schedule-actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,16 +21,6 @@ function paidWith(p: PassRow): string {
   if (how) return `оплачен ${WAY[how]}`;
   return `оплачен ${p.paid === 'cash' ? 'наличными' : p.paid === 'transfer' ? 'переводом' : 'картой'}`;
 }
-const field: React.CSSProperties = {
-  width: '100%', padding: '11px 0', border: 0,
-  borderBottom: '1.5px solid rgba(180,160,140,0.4)', background: 'transparent',
-  fontSize: 16, outline: 'none',
-};
-const label: React.CSSProperties = {
-  display: 'block', fontSize: 10, letterSpacing: '0.3em',
-  textTransform: 'uppercase', color: 'var(--warm-gray)', marginBottom: 6,
-};
-
 /**
  * Докупить дни в пакет смены. Стоит и у действующего пакета, и у
  * кончившегося: дни в смене ещё идут, а платить за них как за разовые
@@ -81,13 +67,10 @@ function ExtendForm(
 export default async function DebtsPage() {
   const user = await requireTeacher();
   const admin = isAdmin(user);
-  const [rows, passes, owners, price, claims, packs] = await Promise.all([
+  const [rows, passes, price] = await Promise.all([
     debtors(),
     allActivePasses(),
-    admin ? passOwners() : [],
     lessonPrice(),
-    admin ? pendingCash() : [],
-    saleOffers(),
   ]);
   const spent = await spentPasses();
   const unbilled = await unbilledVisits();
@@ -128,58 +111,6 @@ export default async function DebtsPage() {
             они не попадут, пока ребёнка не привяжут.{' '}
             <Link href="/admin/studio/people">Привязать в «Людях»</Link>.
           </div>
-        )}
-
-        {claims.length > 0 && (
-          <>
-            <div className="lbl" style={{ marginTop: 0 }}>Ждут подтверждения</div>
-            {claims.map((cl) => (
-              <div className="card-lin" key={cl.id}>
-                <div className="what">{cl.owner_name ?? cl.owner_email}</div>
-                <div className="sub">
-                  {/* Пишем то, что сказал родитель. У старых заявок способа
-                      нет: они были до того, как о нём стали спрашивать. */}
-                  {cl.declared_way ? WAY[cl.declared_way] : 'наличными или переводом'} за{' '}
-                  {cl.lessons}&nbsp;
-                  {plural(cl.lessons, 'занятие', 'занятия', 'занятий')} ·{' '}
-                  {money(cl.amount, cl.currency)}
-                </div>
-                {/* Обе кнопки в одной форме: подтверждению нужны поля рядом,
-                    а вложить форму в форму нельзя. */}
-                <form action={confirmCashAction} style={{ marginTop: 14 }}>
-                  <input type="hidden" name="paymentId" value={cl.id} />
-
-                  <div className="field" style={{ marginBottom: 14, maxWidth: 260 }}>
-                    <label htmlFor={`how-${cl.id}`}>Чем заплатили</label>
-                    {/* «Перевод» у родителя значит и биток, и пейбокс, и
-                        банковский перевод, а в чеке это три разные вещи.
-                        Поэтому не подставляем ничего: Варя видит, куда
-                        деньги пришли, и говорит это сама. Наличные другое
-                        дело — их она берёт в руки. */}
-                    <select id={`how-${cl.id}`} name="payMethod" required
-                            defaultValue={cl.declared_way === 'transfer' ? '' : 'cash'}>
-                      <option value="" disabled>— чем именно —</option>
-                      {WAYS.map((w) => <option key={w} value={w}>{WAY[w]}</option>)}
-                    </select>
-                  </div>
-
-                  <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 16, cursor: 'pointer' }}>
-                    <input type="checkbox" name="receipt" style={{ width: 20, height: 20, marginTop: 2 }} />
-                    <span className="hint">
-                      Выписать чек в iCount{receipts ? '' : ' — сейчас не подключён'}
-                    </span>
-                  </label>
-
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <button className="btn" type="submit">Деньги получены</button>
-                    <button className="btn-quiet" type="submit" formAction={declineCashAction}>
-                      Отклонить
-                    </button>
-                  </div>
-                </form>
-              </div>
-            ))}
-          </>
         )}
 
         {rows.length === 0 && <p className="hint">Долгов нет.</p>}
@@ -246,70 +177,12 @@ export default async function DebtsPage() {
         )}
 
         {admin && (
-          <div className="card" style={{ borderStyle: 'dashed', marginTop: 16 }}>
-            <div className="what" style={{ marginBottom: 16 }}>Продать абонемент или пакет</div>
-            <form action={issuePassAction} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-              <div>
-                <label style={label} htmlFor="ownerId">Кому</label>
-                <select style={field} id="ownerId" name="ownerId" required>
-                  {owners.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.name ?? o.email}{o.active_left > 0 ? ` · уже есть ${o.active_left}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={label} htmlFor="offer">Что продаём</label>
-                <select style={field} id="offer" name="offer" required>
-                  {packs.map((t) => (
-                    <option key={`${t.groupId ?? ''}:${t.lessons}`}
-                            value={`${t.groupId ?? ''}:${t.lessons}`}>
-                      {t.groupTitle ? `${t.groupTitle}: ` : ''}
-                      {t.lessons}&nbsp;
-                      {t.groupId
-                        ? plural(t.lessons, 'день', 'дня', 'дней')
-                        : plural(t.lessons, 'занятие', 'занятия', 'занятий')}
-                      {' · '}{money(t.price, currency)}
-                      {' · '}
-                      {t.validTo
-                        ? `до ${dayMonth(t.validTo)}`
-                        : `${t.months} ${plural(t.months, 'месяц', 'месяца', 'месяцев')}`}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={label} htmlFor="paid">Оплата</label>
-                <select style={field} id="paid" name="paid" defaultValue="cash">
-                  {WAYS.map((w) => <option key={w} value={w}>{WAY[w]}</option>)}
-                  <option value="unpaid">пока не оплачен</option>
-                </select>
-              </div>
-
-              <label style={{ display: 'flex', gap: 10, alignItems: 'center', cursor: 'pointer' }}>
-                <input type="checkbox" name="receipt" style={{ width: 20, height: 20 }} />
-                <span className="hint">
-                  Выписать чек в iCount{receipts ? '' : ' — сейчас не подключён'}
-                </span>
-              </label>
-
-              <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer' }}>
-                <input type="checkbox" name="coverDebt" style={{ width: 20, height: 20, marginTop: 2 }} />
-                <span className="hint">
-                  Закрыть им уже накопленные неоплаченные занятия, начиная с самых старых.
-                  Пакет лагеря закрывает только дни этого лагеря
-                </span>
-              </label>
-
-              <button className="btn-wide" type="submit">Продать</button>
-            </form>
-            <p className="hint" style={{ marginTop: 14 }}>
-              Цена занятия {money(price.amount, price.currency)}. Оплата картой появится вместе с PayPlus,
-              пока абонемент продаётся здесь, вручную.
+          <div className="card-lin" style={{ marginTop: 16 }}>
+            <div className="what" style={{ marginBottom: 6 }}>Принять деньги</div>
+            <p className="sub" style={{ marginBottom: 14 }}>
+              Наличные и переводы, заявки родителей и продажа абонементов — на «Оплатах».
             </p>
+            <Link className="btn-quiet" href="/admin/studio/pay">Открыть оплаты</Link>
           </div>
         )}
       </div>

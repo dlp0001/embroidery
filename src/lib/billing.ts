@@ -1,5 +1,5 @@
 import { one, query, tx } from './db';
-import { plural, todayISO, WAY, type PayMethod } from './format';
+import { plural, providerOf, todayISO, WAY, type PayMethod } from './format';
 import {
   ALREADY_ISSUED, createReceipt, ICountError,
   isConfigured as receiptsConfigured,
@@ -680,6 +680,81 @@ export async function confirmCash(
   // Квитанция — уже после того, как деньги зачтены: отказ iCount не должен
   // отменять подтверждение, за которое Варя уже нажала кнопку.
   if (how.receipt) await issueReceipt(paymentId);
+}
+
+export type TakenCash = {
+  ownerId: string;
+  chargeIds: string[];
+  method: PayMethod;
+  receipt: boolean;
+};
+
+/**
+ * Деньги принесли в студию, и Варя проводит их сама: выбрала семью,
+ * отметила занятия, назвала способ. От заявки родителя это отличается
+ * тем, что подтверждать нечего — платёж сразу оплачен.
+ *
+ * Занятия берём под замок и только те, что ещё никому не отданы: пока
+ * страница была открыта, их могли закрыть абонементом или другим
+ * платежом, и второй раз брать за них деньги нельзя.
+ */
+export async function takeCash(
+  input: TakenCash, actorId: string,
+): Promise<{ ok: boolean; error?: string; paymentId?: string; count?: number }> {
+  if (input.chargeIds.length === 0) return { ok: false, error: 'Отметьте занятия.' };
+
+  const done = await tx(async (c) => {
+    const { rows: debts } = await c.query<{ id: string; amount: string; currency: string }>(
+      `select ch.id, ch.amount::text, ch.currency
+         from charges ch
+        where ch.owner_id = $1 and ch.id = any($2::uuid[])
+          and ch.pass_id is null and ch.payment_id is null
+          /* Занятие, на которое родитель уже подал заявку, проводим
+             через неё: иначе за одни деньги будет два платежа. */
+          and not exists (
+            select 1 from payments pay
+             where pay.provider = 'cash' and pay.status = 'pending'
+               and pay.purpose = 'studio_debt' and pay.user_id = ch.owner_id
+               and pay.raw -> 'charge_ids' ? ch.id::text)
+        order by ch.created_at
+        for update of ch`,
+      [input.ownerId, input.chargeIds],
+    );
+    if (debts.length === 0) {
+      return { ok: false, error: 'Эти занятия уже закрыты или ждут подтверждения.' };
+    }
+
+    const amount = debts.reduce((sum, d) => sum + Number(d.amount), 0);
+    const currency = debts[0].currency;
+    const ids = debts.map((d) => d.id);
+
+    const { rows } = await c.query<{ id: string }>(
+      `insert into payments (provider, user_id, amount, currency, status, purpose, raw)
+       values ($1, $2, $3, $4, 'paid', 'studio_debt', $5) returning id`,
+      [providerOf(input.method), input.ownerId, amount, currency,
+       JSON.stringify({
+         charge_ids: ids, taken_by: actorId,
+         pay_method: input.method,
+         receipt_wanted: input.receipt ? 'yes' : 'no',
+         receipt_asked_at: new Date().toISOString(),
+       })],
+    );
+    const paymentId = rows[0].id;
+    await c.query(
+      `update charges set payment_id = $1 where id = any($2::uuid[])`,
+      [paymentId, ids],
+    );
+    await logMoneyIn(c, {
+      kind: 'cash_taken', actorId, ownerId: input.ownerId, paymentId,
+      amount, currency,
+      note: `приняли оплату за ${ids.length} ${
+        plural(ids.length, 'занятие', 'занятия', 'занятий')}, ${WAY[input.method]}`,
+      details: { pay_method: input.method, receipt: input.receipt, charge_ids: ids },
+    });
+    return { ok: true, paymentId, count: ids.length };
+  });
+
+  return done;
 }
 
 export async function declineCash(
