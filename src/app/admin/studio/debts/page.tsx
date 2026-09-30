@@ -9,6 +9,7 @@ import {
 } from '@/lib/format';
 import Link from 'next/link';
 import { extendPassAction } from '@/app/admin/schedule-actions';
+import ExtendFold from './ExtendFold';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,12 +27,15 @@ function paidWith(p: PassRow): string {
  * кончившегося: дни в смене ещё идут, а платить за них как за разовые
  * дороже, чем добрать в пакет.
  */
+/** Можно ли в этот пакет добавить дни: цена дня задана и запас есть. */
+function canExtend(p: PassRow): boolean {
+  return p.extra_price !== null && p.max_days > 0;
+}
+
 function ExtendForm(
   { pass: p, currency, receipts }:
   { pass: PassRow; currency: string; receipts: boolean },
 ) {
-  if (p.extra_price === null || p.max_days < 1) return null;
-
   return (
     <form action={extendPassAction} style={{
       display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap', marginTop: 12,
@@ -58,7 +62,7 @@ function ExtendForm(
         </span>
       </label>
       <button className="btn-quiet" type="submit">
-        Продлить · {money(p.extra_price, currency)} за день
+        Продлить · {money(p.extra_price ?? 0, currency)} за день
       </button>
     </form>
   );
@@ -152,7 +156,11 @@ export default async function DebtsPage() {
               </div>
             </div>
 
-            {admin && <ExtendForm pass={p} currency={currency} receipts={receipts} />}
+            {admin && canExtend(p) && (
+                  <ExtendFold>
+                    <ExtendForm pass={p} currency={currency} receipts={receipts} />
+                  </ExtendFold>
+                )}
           </div>
         ))}
 
@@ -170,7 +178,11 @@ export default async function DebtsPage() {
                   {p.last_used ? ` · последнее ${dayMonth(p.last_used)}` : ''}
                   {` · ${paidWith(p)}`}
                 </div>
-                {admin && <ExtendForm pass={p} currency={currency} receipts={receipts} />}
+                {admin && canExtend(p) && (
+                  <ExtendFold>
+                    <ExtendForm pass={p} currency={currency} receipts={receipts} />
+                  </ExtendFold>
+                )}
               </div>
             ))}
           </>
