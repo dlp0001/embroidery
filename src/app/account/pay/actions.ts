@@ -45,7 +45,7 @@ async function declare(form: FormData, way: 'cash' | 'transfer'): Promise<never>
   // можно только открыв «Финансы». Говорим Варе сразу, но уже после
   // ответа: родителю незачем ждать, пока письмо дойдёт.
   after(cashDeclared(user.id));
-  redirect('/account/pay?cash=' + res.count);
+  redirect(`/account/pay?cash=${res.count}&way=${way}`);
 }
 
 export async function declareCashAction(form: FormData): Promise<void> {

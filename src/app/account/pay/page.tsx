@@ -21,10 +21,10 @@ export const dynamic = 'force-dynamic';
 export default async function PayPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; cash?: string }>;
+  searchParams: Promise<{ error?: string; cash?: string; way?: string }>;
 }) {
   const user = await requireParent();
-  const { error, cash } = await searchParams;
+  const { error, cash, way } = await searchParams;
   const online = isConfigured();
   // Всё разом, а не по очереди. Дольше всех обычно проверка зависших
   // платежей: она спрашивает про каждый у PayPlus, по сети. Раньше страница
@@ -212,8 +212,9 @@ export default async function PayPage({
 
         {cash && (
           <div className="note" style={{ marginTop: 16 }}>
-            Заявка отправлена. Отдайте деньги Варе на занятии — она отметит получение,
-            и занятия станут оплаченными.
+            {way === 'transfer'
+              ? 'Студия знает, что вы платите переводом. Как деньги дойдут, Варя отметит получение, и занятия станут оплаченными.'
+              : 'Студия знает, что вы платите наличными. Отдайте деньги Варе на занятии — она отметит получение, и занятия станут оплаченными.'}
           </div>
         )}
 

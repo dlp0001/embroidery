@@ -5,6 +5,21 @@ import { declareCashAction, declareTransferAction, payDebtAction } from './actio
 import type { UnpaidCharge } from '@/lib/studio';
 import { money, plural, weekdayDayMonth } from '@/lib/format';
 
+/** Что случится от нажатия. Про карту тут ничего: она уводит в банк. */
+const SAYS: Record<'transfer' | 'cash', { title: string; what: string }> = {
+  transfer: {
+    title: 'Переводом',
+    what: 'Переведите деньги — биток, пейбокс или обычный перевод — и скажите'
+      + ' студии, что перевели. Варя отметит получение, и занятия станут'
+      + ' оплаченными.',
+  },
+  cash: {
+    title: 'Наличными',
+    what: 'Отдайте деньги Варе на занятии. Она отметит получение, и занятия'
+      + ' станут оплаченными.',
+  },
+};
+
 /** Регулярное занятие или день смены: в долге это первое, что спрашивают. */
 function kindOf(c: UnpaidCharge): string {
   if (c.kind === 'camp') return 'лагерь';
@@ -45,6 +60,10 @@ export default function DebtPicker({
   }
 
   const all = picked.size === payable.length;
+  // Нажатие на «Перевод» или «Наличные» раньше сразу заводило заявку:
+  // человек ещё выбирал способ, а студии уже уходило обещание. Теперь
+  // сначала говорим, что именно произойдёт, и спрашиваем ещё раз.
+  const [way, setWay] = useState<'transfer' | 'cash' | null>(null);
 
   // День → занятия этого дня: дата пишется один раз на всех.
   const byDay = new Map<string, UnpaidCharge[]>();
@@ -125,23 +144,43 @@ export default function DebtPicker({
                 style={{ flex: '1 1 96px' }}>
           Карта
         </button>
-        <button className="btn-quiet" formAction={declareTransferAction}
+        <button type="button" className={way === 'transfer' ? 'btn' : 'btn-quiet'}
+                onClick={() => setWay(way === 'transfer' ? null : 'transfer')}
                 disabled={picked.size === 0} style={{ flex: '1 1 96px' }}>
           Перевод
         </button>
-        <button className="btn-quiet" formAction={declareCashAction}
+        <button type="button" className={way === 'cash' ? 'btn' : 'btn-quiet'}
+                onClick={() => setWay(way === 'cash' ? null : 'cash')}
                 disabled={picked.size === 0} style={{ flex: '1 1 96px' }}>
           Наличные
         </button>
       </div>
 
+      {way && picked.size > 0 && (
+        <div className="card-lin" style={{ marginTop: 14 }}>
+          <div className="what">
+            {SAYS[way].title} · {money(total, currency)} за {picked.size}&nbsp;
+            {plural(picked.size, 'занятие', 'занятия', 'занятий')}
+          </div>
+          <p className="sub" style={{ marginTop: 8 }}>{SAYS[way].what}</p>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 14 }}>
+            <button className="btn"
+                    formAction={way === 'cash' ? declareCashAction : declareTransferAction}>
+              Сказать студии
+            </button>
+            <button type="button" className="btn-quiet" onClick={() => setWay(null)}>
+              Отмена
+            </button>
+          </div>
+        </div>
+      )}
+
       <p className="hint" style={{ marginTop: 14 }}>
         {online
-          ? 'Картой — на защищённой странице банка. '
+          ? 'Картой — на защищённой странице банка, занятия закроются сразу. '
           : 'Оплата картой ещё не подключена. '}
-        Переводом считается и биток, и пейбокс, и обычный банковский
-        перевод. Перевод и наличные Варя подтвердит, когда деньги дойдут:
-        до этого занятия остаются неоплаченными.
+        Перевод и наличные Варя подтверждает руками: до этого занятия
+        остаются неоплаченными.
       </p>
     </form>
   );

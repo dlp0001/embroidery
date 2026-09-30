@@ -1076,6 +1076,8 @@ export type SlotRow = {
   is_adult: boolean;
   booked: boolean;
   preferred: boolean;
+  /** Ходит сюда: был на этом занятии за последний месяц. */
+  went: boolean;
 };
 
 /** Общая часть запроса: кто из семьи на какое занятие может записаться. */
@@ -1094,7 +1096,15 @@ function slotsQuery(extra: string): string {
             coalesce(c.name, u.name, 'Я') as who,
             (p.user_id is not null) as is_adult,
             (b.id is not null and b.status = 'booked') as booked,
-            (pd.weekday is not null) as preferred
+            (pd.weekday is not null) as preferred,
+            /* «Возможно придёт» — это либо отмеченный день в профиле,
+               либо привычка: был здесь на днях. Второе важнее, потому
+               что профиль заполняют далеко не все. */
+            exists (select 1 from attendance a
+                      join studio_sessions s2 on s2.id = a.session_id
+                     where a.participant_id = p.id and a.status = 'present'
+                       and s2.group_id = g.id
+                       and s2.held_on > current_date - 30) as went
        from studio_sessions s
        join studio_groups g on g.id = s.group_id and g.active
        join participants p

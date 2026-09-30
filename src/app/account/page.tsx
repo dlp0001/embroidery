@@ -2,6 +2,7 @@ import Link from 'next/link';
 import BookingHint from '@/components/BookingHint';
 import ContactCard from '@/components/ContactCard';
 import EventSignup from '@/components/EventSignup';
+import OnlyMine from '@/components/OnlyMine';
 import SlotList from '@/components/SlotList';
 import { requireParent } from '@/lib/session';
 import {
@@ -12,8 +13,15 @@ import { dayMonth, daysUntil, money, plural, plusDays, todayISO, weekdayDayMonth
 
 export const dynamic = 'force-dynamic';
 
-export default async function WeekPage() {
+export default async function WeekPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ all?: string }>;
+}) {
   const user = await requireParent();
+  // По умолчанию показываем только свои дни: в неделе студии занятий
+  // вчетверо больше, чем у одной семьи, и среди чужих теряются свои.
+  const showAll = (await searchParams).all === '1';
   const today = todayISO();
   const [passes, unpaid, slots, events, chat] = await Promise.all([
     passBalances(user.id),
@@ -29,8 +37,13 @@ export default async function WeekPage() {
 
   // Дни лагеря показываем отдельно и целиком, а из недели убираем:
   // два раза одно и то же на одном экране только путает.
-  const week = slots.filter((s) => s.kind === 'lesson');
+  const all = slots.filter((s) => s.kind === 'lesson');
+  // «Возможно ходит»: день отмечен в профиле, уже записан или был здесь
+  // на днях. Фильтр прячет человека, а не занятие: в семье один ребёнок
+  // может ходить по вторникам, другой по четвергам.
+  const week = showAll ? all : all.filter((s) => s.preferred || s.booked || s.went);
   const days = [...new Set(week.map((s) => s.held_on))];
+  const hidden = all.length - week.length;
 
   return (
     <>
@@ -97,15 +110,23 @@ export default async function WeekPage() {
 
         {/* Заголовок нужен там, где на экране есть ещё и лагерь: без него
             два разных списка с кнопками «Записать» читаются как один. */}
-        {days.length === 0 ? (
+        {all.length === 0 ? (
           <p className="hint" style={{ marginTop: 20 }}>
             На ближайшую неделю обычных занятий нет.
           </p>
         ) : (
           <>
             <div className="what" style={{ margin: '26px 0 12px' }}>Регулярные занятия</div>
-            <BookingHint />
+            <OnlyMine on={!showAll} />
+            {days.length > 0 && <BookingHint />}
           </>
+        )}
+
+        {all.length > 0 && days.length === 0 && (
+          <p className="hint">
+            На этой неделе занятий в ваши дни нет. Снимите отметку, чтобы
+            увидеть все {all.length} — записаться можно на любое.
+          </p>
         )}
 
         {days.length > 0 && (
@@ -115,6 +136,14 @@ export default async function WeekPage() {
               <SlotList rows={week.filter((s) => s.held_on === day)} />
             </section>
           ))
+        )}
+
+        {/* Сказать, что список неполный, честнее, чем молча его урезать. */}
+        {days.length > 0 && hidden > 0 && (
+          <p className="hint" style={{ marginTop: 12 }}>
+            Ещё {hidden} {plural(hidden, 'занятие', 'занятия', 'занятий')} на неделе
+            в другие дни — снимите отметку, чтобы увидеть.
+          </p>
         )}
 
         {/* Внизу «Недели»: сюда доходят, когда что-то понадобилось, а
