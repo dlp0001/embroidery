@@ -51,7 +51,12 @@ export default async function PayPage({
       ])
     : [history0, unpaid0, passes0, started0];
   // Пакет лагеря живёт рядом с обычным абонементом: показываем оба.
-  const mine = passes.filter((p) => p.left > 0);
+  // Кончившийся пакет с экрана не убираем, пока в него можно докупить
+  // дни: это и есть тот случай, ради которого докупка затевалась —
+  // дни в пакете вышли, а смена ещё идёт.
+  const mine = passes.filter(
+    (p) => p.left > 0 || (p.extra_price !== null && p.max_days > 0),
+  );
   const hasStudioPass = mine.some((p) => !p.group_id);
   const packs = offers.filter((o) => !o.groupId);
   // Цена дня ближайшей смены: нужна, чтобы объяснить, что ещё тут бывает.
@@ -90,7 +95,14 @@ export default async function PayPage({
           {p.group_id ? 'Только на эти дни' : 'Общий на всех'}
           {p.valid_to ? ` · действует до ${dayMonth(p.valid_to)}` : ''}
         </div>
-        {soon && (
+        {/* Дни вышли, а смена идёт: это не тревога, а приглашение
+            докупить — кнопки стоят прямо под этой строчкой. */}
+        {p.left === 0 && (
+          <div className="sub" style={{ marginTop: 10 }}>
+            Все {p.lessons_total} {p.group_id ? 'дней' : 'занятий'} использованы.
+          </div>
+        )}
+        {soon && p.left > 0 && (
           <div className="money-due" style={{ marginTop: 10 }}>
             {ends! > 0
               /* У пакета смены и срок, и остаток считаются в днях, и
