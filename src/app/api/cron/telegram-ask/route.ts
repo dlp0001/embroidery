@@ -1,7 +1,9 @@
 import { cronRights, describeAuth } from '@/lib/cron-auth';
 import {
-  askTargets, askView, claimSend, isConfigured, recordSent, releaseSend, send,
+  askTargets, askView, claimSend, isConfigured, packOutTargets, packOutView,
+  recordSent, releaseSend, send,
 } from '@/lib/telegram';
+import { siteOrigin } from '@/lib/site';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -58,6 +60,27 @@ export async function GET(req: Request): Promise<Response> {
     await pause();
   }
 
-  console.log(`cron: вопросов ${targets.length}, отправлено ${sent}, пропущено ${skipped}, не ушло ${failed}`);
-  return Response.json({ targets: targets.length, sent, skipped, failed });
+  // Тем же заходом — про кончившиеся пакеты смены: сообщение вечернее,
+  // как и вопрос, и второй рассылке ради него заводиться незачем.
+  const origin = await siteOrigin();
+  let packs = 0;
+  for (const t of await packOutTargets()) {
+    // Ключ помнит и размер пакета: докупили дни, снова истратили —
+    // и про это скажем ещё раз, а про то же самое дважды не скажем.
+    const campaign = `pack-out:${t.pass_id}:${t.lessons_total}`;
+    if (!(await claimSend(campaign, t.chat_id))) continue;
+
+    const view = packOutView(t, origin);
+    if (await send(Number(t.chat_id), view.text)) {
+      await recordSent(campaign, t.chat_id, view.text);
+      packs++;
+    } else {
+      await releaseSend(campaign, t.chat_id);
+    }
+    await pause();
+  }
+
+  console.log(`cron: вопросов ${targets.length}, отправлено ${sent}, пропущено ${skipped},`
+    + ` не ушло ${failed}, про кончившиеся пакеты ${packs}`);
+  return Response.json({ targets: targets.length, sent, skipped, failed, packs });
 }

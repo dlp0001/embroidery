@@ -930,6 +930,77 @@ export async function debtorsView(origin: string): Promise<string> {
 
 export type AskTarget = { chat_id: string; user_id: string; session_id: string };
 
+export type PackOut = {
+  chat_id: string;
+  pass_id: string;
+  title: string;
+  /** Сколько дней было в пакете: все они уже отмечены. */
+  lessons_total: number;
+  /** Цена докупаемого дня. */
+  price: string;
+  /** Дни смены, которые ещё впереди. */
+  days: string[];
+};
+
+/**
+ * У кого пакет смены кончился, а смена идёт. Про это молчать нельзя:
+ * ребёнок приходит дальше, дни начисляются поштучно и дороже, а семья
+ * узнаёт об этом в конце — если вообще заглянет в «Оплату».
+ *
+ * Пишем только тем, кому есть что предложить: цена докупаемого дня
+ * задана, и пакет самый большой — меньший дешевле нарастить покупкой
+ * большего, а это уже другой разговор.
+ *
+ * Сегодняшний день не считаем: сообщение уходит вечером, когда смена
+ * за день уже прошла.
+ */
+export async function packOutTargets(): Promise<PackOut[]> {
+  return query<PackOut>(
+    `select u.tg_chat_id::text as chat_id, p.id as pass_id, g.title,
+            p.lessons_total, g.extra_price::text as price,
+            array(select s.held_on::text from studio_sessions s
+                   where s.group_id = g.id and s.status <> 'cancelled'
+                     and s.held_on > current_date
+                   order by s.held_on) as days
+       from passes p
+       join studio_groups g on g.id = p.group_id
+       join users u on u.id = p.owner_id
+      where g.kind <> 'lesson' and g.active and g.extra_price is not null
+        and u.tg_chat_id is not null
+        and (p.valid_to is null or p.valid_to >= current_date)
+        and (g.ends_on is null or g.ends_on >= current_date)
+        /* Пакет израсходован весь. */
+        and p.lessons_total <= (select count(*) from charges ch where ch.pass_id = p.id)
+        /* И он самый большой из тех, что продаются в эту смену. */
+        and p.lessons_total >= coalesce((
+              select max((o->>'lessons')::int)
+                from jsonb_array_elements(g.pass_offers) o), 0)
+        /* Впереди есть куда ходить. */
+        and exists (select 1 from studio_sessions s
+                     where s.group_id = g.id and s.status <> 'cancelled'
+                       and s.held_on > current_date)`,
+  );
+}
+
+/** Письмо про кончившийся пакет. Дни перечисляем: их два-три, не список. */
+export function packOutView(t: PackOut, origin: string): { text: string } {
+  const n = t.days.length;
+  const when = n <= 3
+    ? t.days.map((d) => dayMonth(d)).join(', ')
+    : `${dayMonth(t.days[0])} — ${dayMonth(t.days[n - 1])}`;
+  return {
+    text: [
+      `В пакете «${t.title}» кончились дни: все ${t.lessons_total} отмечены.`,
+      '',
+      `Впереди ещё ${n} ${plural(n, 'день', 'дня', 'дней')}: ${when}.`
+        + ` День можно докупить за ${money(t.price, 'ILS')} — это дешевле,`
+        + ' чем платить за него отдельно.',
+      '',
+      `Докупить: ${origin}/account/pay`,
+    ].join('\n'),
+  };
+}
+
 /**
  * Кому завтра задавать вопрос. Спрашиваем только тех, чей ответ что-то
  * меняет: занятие завтра есть, записи на него нет, а основание ждать —
