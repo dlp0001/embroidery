@@ -392,6 +392,13 @@ function shortName(who: string): string {
   return who.split(' ')[0];
 }
 
+/** "2026-10-02" → "Пт, 2 октября": в списке занятий день недели сокращаем. */
+function shortWeekDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const wd = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'][new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  return `${wd}, ${dayMonth(iso)}`;
+}
+
 /** "2026-09-25" → "пт 25": подпись на кнопке, где длинной даты не поместится. */
 function shortDay(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
@@ -485,7 +492,7 @@ function weekLines(rows: SlotRow[]): string[] {
   const lines: string[] = [];
   for (const people of bySession.values()) {
     const head = people[0];
-    const when = [weekdayDayMonth(head.held_on), hhmm(head.starts_at)];
+    const when = [shortWeekDate(head.held_on), hhmm(head.starts_at)];
     if (head.moved) when.push('перенесено');
     const what = tag(head);
     if (what) when.push(what);
