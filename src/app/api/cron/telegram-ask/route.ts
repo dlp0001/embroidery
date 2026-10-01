@@ -46,7 +46,7 @@ export async function GET(req: Request): Promise<Response> {
     // Занятие отменили или семья ему больше не подходит — спрашивать не о чем.
     if (!view) { skipped++; continue; }
 
-    const ok = await send(Number(t.chat_id), view.text, view.keyboard);
+    const ok = await send(Number(t.chat_id), view.text, view.keyboard, view.html);
     if (ok) {
       await recordSent(campaign, t.chat_id, view.text);
       sent++;

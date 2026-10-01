@@ -126,12 +126,12 @@ async function onMessage(
 
   // Сюда доходит только /week.
   const week = await weekView(user.id, origin);
-  if (!teaches || !week.empty) await send(chatId, week.text, week.keyboard);
+  if (!teaches || !week.empty) await send(chatId, week.text, week.keyboard, week.html);
 
   // Смена — отдельным сообщением, и только пока она есть: кончится лагерь,
   // кончатся и эти сообщения, ничего выключать не придётся.
   for (const view of await eventViews(user.id, origin)) {
-    await send(chatId, view.text, view.keyboard);
+    await send(chatId, view.text, view.keyboard, view.html);
   }
 }
 
@@ -252,7 +252,7 @@ async function onTap(
   // свободных мест, которое видят все строки этого дня. Какое именно
   // сообщение — решает занятие: у смены оно своё.
   const view = await viewAfterTap(user.id, tap, origin);
-  await editMessage(chatId, messageId, view.text, view.keyboard);
+  await editMessage(chatId, messageId, view.text, view.keyboard, view.html);
 }
 
 export async function POST(req: Request): Promise<Response> {

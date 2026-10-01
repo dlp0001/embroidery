@@ -70,17 +70,30 @@ async function call<T>(method: string, payload: unknown): Promise<ApiResult<T>> 
 export type Button = { text: string; callback_data: string };
 export type Keyboard = Button[][];
 
-export async function send(chatId: number, text: string, keyboard?: Keyboard): Promise<boolean> {
-  return (await sendAndGetId(chatId, text, keyboard)) !== null;
+/**
+ * Жирный шрифт телеграм понимает только с разметкой, а разметка ломается
+ * о чужой текст: имя с амперсандом или пересланное сообщение с «<» уедут
+ * в никуда. Поэтому включаем её поштучно — там, где текст собрали мы
+ * сами, — и всё подставляемое прогоняем через esc.
+ */
+export function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+export async function send(
+  chatId: number, text: string, keyboard?: Keyboard, html = false,
+): Promise<boolean> {
+  return (await sendAndGetId(chatId, text, keyboard, html)) !== null;
 }
 
 /** То же, но отдаёт номер сообщения: на него потом отвечают. */
 export async function sendAndGetId(
-  chatId: number, text: string, keyboard?: Keyboard,
+  chatId: number, text: string, keyboard?: Keyboard, html = false,
 ): Promise<number | null> {
   const res = await call<{ message_id: number }>('sendMessage', {
     chat_id: chatId,
     text,
+    ...(html ? { parse_mode: 'HTML' } : {}),
     link_preview_options: { is_disabled: true },
     ...(keyboard?.length ? { reply_markup: { inline_keyboard: keyboard } } : {}),
   });
@@ -100,12 +113,13 @@ export async function sendAndGetId(
  * дело при двойном нажатии, и молчать в ответ правильно.
  */
 export async function editMessage(
-  chatId: number, messageId: number, text: string, keyboard?: Keyboard,
+  chatId: number, messageId: number, text: string, keyboard?: Keyboard, html = false,
 ): Promise<void> {
   const res = await call('editMessageText', {
     chat_id: chatId,
     message_id: messageId,
     text,
+    ...(html ? { parse_mode: 'HTML' } : {}),
     link_preview_options: { is_disabled: true },
     ...(keyboard?.length ? { reply_markup: { inline_keyboard: keyboard } } : {}),
   });
@@ -373,19 +387,6 @@ function tag(row: SlotRow): string | null {
   return row.audience === 'adults' ? 'взрослое' : null;
 }
 
-/**
- * Сколько мест осталось. Своей записи «мест нет» не пишем: место уже
- * занято вами. Правило то же, что в SlotList на экране кабинета, — если
- * меняете здесь, поменяйте и там, иначе бот и сайт начнут считать
- * места по-разному.
- */
-function seats(row: SlotRow, someoneBooked: boolean): string | null {
-  if (row.capacity === null) return null;
-  const free = Math.max(row.capacity - row.taken, 0);
-  if (free > 0) return `мест: ${free}`;
-  return someoneBooked ? null : 'мест нет';
-}
-
 /** Имя без фамилии: на кнопке она не нужна, а места занимает много. */
 function shortName(who: string): string {
   return who.split(' ')[0];
@@ -401,6 +402,8 @@ function shortDay(iso: string): string {
 export type View = {
   text: string;
   keyboard: Keyboard;
+  /** Текст собран с разметкой: слать и перерисовывать его надо как HTML. */
+  html?: boolean;
   /** Показывать нечего. Преподавателю такую неделю не присылаем. */
   empty?: boolean;
 };
@@ -482,14 +485,24 @@ function weekLines(rows: SlotRow[]): string[] {
   const lines: string[] = [];
   for (const people of bySession.values()) {
     const head = people[0];
-    const when = [`${weekdayDayMonth(head.held_on)}, ${hhmm(head.starts_at)}`];
+    const when = [weekdayDayMonth(head.held_on), hhmm(head.starts_at)];
     if (head.moved) when.push('перенесено');
     const what = tag(head);
     if (what) when.push(what);
-    lines.push('', when.join(' · '));
 
-    const left = seats(head, people.some((p) => p.booked));
-    if (left) lines.push(left === 'мест нет' ? 'Мест нет' : `Осталось ${left}`);
+    // Места в той же строке: на отдельную они просили место, а говорят
+    // одно слово. Своим «мест нет» не пишем: место уже занято вами —
+    // правило то же, что в кабинете, в SlotList.
+    const free = head.capacity === null
+      ? null
+      : Math.max(head.capacity - head.taken, 0);
+    const ours = people.some((p) => p.booked);
+    if (free !== null && !(free === 0 && ours)) {
+      when.push(free === 0
+        ? 'мест нет'
+        : `${free} ${plural(free, 'место', 'места', 'мест')}`);
+    }
+    lines.push(when.join(', '));
   }
   return lines;
 }
@@ -512,13 +525,15 @@ export async function weekView(userId: string, origin: string): Promise<View> {
   }
   return {
     text: [
-      'Ближайшие занятия:',
+      '<b>Ближайшие занятия:</b>',
+      '',
       ...weekLines(rows),
       '',
       'Галочка — записан. Нажмите, чтобы записать или отменить.',
       `Оплата, история и остальное: ${origin}/account`,
     ].join('\n'),
     keyboard: personBlocks(rows, today),
+    html: true,
   };
 }
 
@@ -554,7 +569,7 @@ export async function eventViews(userId: string, origin: string): Promise<GroupV
     // Шапка короткая: название, срок и время. Цена и пакеты — в «Оплате»,
     // куда ведёт последняя строка; здесь это только мешало увидеть дни.
     const top = [
-      title,
+      `<b>${esc(title)}</b>`,
       `${dayMonth(days[0].held_on)} — ${dayMonth(days[days.length - 1].held_on)} · ${hhmm(usual)}`,
     ];
 
@@ -580,6 +595,7 @@ export async function eventViews(userId: string, origin: string): Promise<GroupV
       // родитель отмечает все дни одному ребёнку подряд, и в списке из
       // тридцати кнопок это единственный способ не сбиться.
       keyboard: personBlocks(slots, today),
+      html: true,
     });
   }
   return out;
