@@ -95,6 +95,7 @@ export default async function DebtsPage() {
           <h1 className="h1">Финансы</h1>
           {admin && (
             <div style={{ display: 'flex', gap: 8 }}>
+              <Link className="btn-quiet" href="/admin/studio/camp">Лагерь</Link>
               <Link className="btn-quiet" href="/admin/studio/stats">Статистика</Link>
               <Link className="btn-quiet" href="/admin/studio/ledger">Реестр</Link>
             </div>

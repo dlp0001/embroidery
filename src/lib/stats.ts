@@ -254,3 +254,245 @@ export async function monthsWithData(): Promise<string[]> {
   );
   return rows.map((r) => r.m);
 }
+
+// ── Отчёт по смене ────────────────────────────────────────
+
+export type CampDay = {
+  held_on: string;
+  /** Пришли: отметка «был» или «пробное». */
+  came: number;
+  /** Записаны: нужно для дней, которые ещё впереди. */
+  booked: number;
+  /** Деньги этого дня: поштучные начисления плюс доли пакетов. */
+  sum: number;
+  /** День уже прошёл: у будущего считать посещаемость не из чего. */
+  past: boolean;
+};
+
+export type CampStats = {
+  id: string;
+  title: string;
+  currency: string;
+  starts_on: string | null;
+  ends_on: string | null;
+  capacity: number | null;
+  /** Цена разового дня. */
+  dayPrice: number;
+  days: CampDay[];
+  /** Реализация: дни поштучно и дни по пакетам — как на статистике. */
+  done: { single: DoneRow; pass: DoneRow; total: DoneRow; average: number };
+  /** Как оплачено: те же три строки, что в месячном отчёте. */
+  rows: StatsRow[];
+  /** Проданные пакеты этой смены. */
+  packs: { count: number; days: number; sum: number };
+  /** Докупленные в них дни. */
+  extras: { count: number; days: number; sum: number };
+  /** Сколько разных детей пришло хоть раз и сколько дней на каждого. */
+  kids: number;
+  perKid: number;
+};
+
+/**
+ * Отчёт по одной смене целиком: от первого дня до последнего, независимо
+ * от месяцев. Лагерь живёт на стыке сентября и октября, и месячный отчёт
+ * разрезает его пополам — а вопрос «сколько заработала смена» задают про
+ * смену, а не про календарь.
+ *
+ * Деньги считаются так же, как на статистике: разовый день стоит столько,
+ * сколько за него начислено, день по пакету — свою долю от его цены.
+ */
+export async function campStats(groupId: string): Promise<CampStats | null> {
+  const [price, group] = await Promise.all([
+    lessonPrice(),
+    one<{
+      id: string; title: string; starts_on: string | null; ends_on: string | null;
+      capacity: number | null; price: string | null;
+    }>(
+      `select id, title, starts_on::text, ends_on::text, capacity, price::text
+         from studio_groups where id = $1 and kind <> 'lesson'`,
+      [groupId],
+    ),
+  ]);
+  if (!group) return null;
+
+  const [days, delivered, packs, extras, kids] = await Promise.all([
+    query<{ held_on: string; came: number; booked: number; past: boolean }>(
+      `select s.held_on::text, s.held_on <= current_date as past,
+              (select count(*)::int from attendance a
+                where a.session_id = s.id and a.status in ('present', 'trial')) as came,
+              (select count(*)::int from bookings b
+                where b.session_id = s.id and b.status = 'booked') as booked
+         from studio_sessions s
+        where s.group_id = $1 and s.status <> 'cancelled'
+        order by s.held_on`,
+      [groupId],
+    ),
+    query<{
+      held_on: string; pass_id: string | null; amount: string;
+      lessons_total: number | null; pass_paid: string | null;
+    }>(
+      `select s.held_on::text, ch.pass_id, ch.amount::text, ps.lessons_total,
+              coalesce(nullif(${PASS_PAID}, 0), ${OFFER_PRICE})::text as pass_paid
+         from charges ch
+         join studio_sessions s on s.id = ch.session_id
+         left join passes ps on ps.id = ch.pass_id
+         left join payments pay on pay.id = ps.payment_id
+        where s.group_id = $1`,
+      [groupId],
+    ),
+    query<PassRow>(
+      `select ps.id, ps.lessons_total, pay.provider, pay.amount::text,
+              ${OFFER_PRICE}::text as offer_price
+         from passes ps
+         left join payments pay on pay.id = ps.payment_id
+        where ps.group_id = $1`,
+      [groupId],
+    ),
+    query<{ provider: string | null; amount: string; days: number }>(
+      `select pay.provider, pay.amount::text,
+              coalesce((pay.raw ->> 'days')::int, 0) as days
+         from payments pay
+        where pay.status = 'paid'
+          and pay.raw ->> 'extends_pass' in (
+                select ps.id::text from passes ps where ps.group_id = $1)`,
+      [groupId],
+    ),
+    query<{ participant_id: string; n: number }>(
+      `select a.participant_id, count(*)::int as n
+         from attendance a
+         join studio_sessions s on s.id = a.session_id
+        where s.group_id = $1 and a.status in ('present', 'trial')
+        group by a.participant_id`,
+      [groupId],
+    ),
+  ]);
+
+  // Как оплачены сами дни: те же три строки, что в месячном отчёте.
+  const money = await one<LessonAgg>(
+    `select
+       count(*) filter (where pay.provider in ('cash', 'transfer'))::int as cash_n,
+       coalesce(sum(ch.amount) filter (where pay.provider in ('cash', 'transfer')), 0)::text as cash_sum,
+       count(*) filter (where pay.provider is not null
+                          and pay.provider not in ('cash', 'transfer'))::int as card_n,
+       coalesce(sum(ch.amount) filter (where pay.provider is not null
+                          and pay.provider not in ('cash', 'transfer')), 0)::text as card_sum,
+       count(*) filter (where ch.payment_id is null and ch.pass_id is null)::int as due_n,
+       coalesce(sum(ch.amount) filter (where ch.payment_id is null and ch.pass_id is null), 0)::text as due_sum,
+       count(*) filter (where ch.pass_id is not null)::int as pass_n
+     from charges ch
+     join studio_sessions s on s.id = ch.session_id
+     left join payments pay on pay.id = ch.payment_id
+    where s.group_id = $1`,
+    [groupId],
+  );
+
+  /** Сколько стоил пакет: заплаченное, иначе цена из справочника смены. */
+  const worth = (p: PassRow): number => Number(p.amount ?? p.offer_price ?? 0);
+
+  const single: DoneRow = { count: 0, sum: 0 };
+  const onPass: DoneRow = { count: 0, sum: 0 };
+  const byDay = new Map<string, number>();
+
+  for (const d of delivered) {
+    const share = d.pass_id
+      ? (d.lessons_total && d.lessons_total > 0 ? Number(d.pass_paid ?? 0) / d.lessons_total : 0)
+      : Number(d.amount);
+    const row = d.pass_id ? onPass : single;
+    row.count++;
+    row.sum += share;
+    byDay.set(d.held_on, (byDay.get(d.held_on) ?? 0) + share);
+  }
+
+  const total: DoneRow = {
+    count: single.count + onPass.count,
+    sum: single.sum + onPass.sum,
+  };
+
+  const cell = (kind: PayKind): Cell => {
+    const mine = packs.filter((p) => (
+      p.provider === null ? 'due' : p.provider === 'cash' || p.provider === 'transfer' ? 'direct' : 'card'
+    ) === kind);
+    const grown = extras.filter((e) => (
+      e.provider === null ? 'due' : e.provider === 'cash' || e.provider === 'transfer' ? 'direct' : 'card'
+    ) === kind);
+    return {
+      count: mine.length + grown.length,
+      sum: mine.reduce((s, p) => s + worth(p), 0)
+        + grown.reduce((s, e) => s + Number(e.amount), 0),
+    };
+  };
+
+  const L = money ?? {
+    cash_n: 0, cash_sum: '0', card_n: 0, card_sum: '0',
+    due_n: 0, due_sum: '0', pass_n: 0,
+  };
+  const visits = kids.reduce((s, k) => s + k.n, 0);
+
+  return {
+    id: group.id,
+    title: group.title,
+    currency: price.currency,
+    starts_on: group.starts_on,
+    ends_on: group.ends_on,
+    capacity: group.capacity,
+    dayPrice: Number(group.price ?? price.amount),
+    days: days.map((d) => ({
+      held_on: d.held_on,
+      came: d.came,
+      booked: d.booked,
+      past: d.past,
+      sum: byDay.get(d.held_on) ?? 0,
+    })),
+    done: {
+      single,
+      pass: onPass,
+      total,
+      average: total.count > 0 ? total.sum / total.count : 0,
+    },
+    rows: [
+      {
+        key: 'direct',
+        label: 'Нал / перевод',
+        lessons: { count: L.cash_n, sum: Number(L.cash_sum) },
+        passes: cell('direct'),
+      },
+      {
+        key: 'card',
+        label: 'Картой',
+        lessons: { count: L.card_n, sum: Number(L.card_sum) },
+        passes: cell('card'),
+      },
+      {
+        key: 'due',
+        label: 'Не оплачено',
+        lessons: { count: L.due_n, sum: Number(L.due_sum) },
+        passes: cell('due'),
+      },
+    ],
+    packs: {
+      count: packs.length,
+      days: packs.reduce((s, p) => s + p.lessons_total, 0),
+      sum: packs.reduce((s, p) => s + worth(p), 0),
+    },
+    extras: {
+      count: extras.length,
+      days: extras.reduce((s, e) => s + e.days, 0),
+      sum: extras.reduce((s, e) => s + Number(e.amount), 0),
+    },
+    kids: kids.length,
+    perKid: kids.length > 0 ? visits / kids.length : 0,
+  };
+}
+
+/** Смены, по которым есть что показать: для выбора на странице отчёта. */
+export async function campsWithData(): Promise<
+  { id: string; title: string; starts_on: string | null; ends_on: string | null }[]
+> {
+  return query(
+    `select g.id, g.title, g.starts_on::text, g.ends_on::text
+       from studio_groups g
+      where g.kind <> 'lesson'
+        and exists (select 1 from studio_sessions s where s.group_id = g.id)
+      order by g.starts_on desc nulls last`,
+  );
+}
