@@ -1,7 +1,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { one, query, tx } from './db';
 import {
-  dayMonth, eventClosed, hhmm, money, nowHM, packageFrom, plural, plusDays, todayISO,
+  dayMonth, eventClosed, hhmm, money, nowHM, plural, plusDays, todayISO,
   weekdayDayMonth,
 } from './format';
 import {
@@ -386,6 +386,11 @@ function seats(row: SlotRow, someoneBooked: boolean): string | null {
   return someoneBooked ? null : 'мест нет';
 }
 
+/** Имя без фамилии: на кнопке она не нужна, а места занимает много. */
+function shortName(who: string): string {
+  return who.split(' ')[0];
+}
+
 /** "2026-09-25" → "пт 25": подпись на кнопке, где длинной даты не поместится. */
 function shortDay(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number);
@@ -436,55 +441,57 @@ function slotButtons(rows: SlotRow[], today: string): Button[] {
     const free = r.capacity === null ? null : Math.max(r.capacity - r.taken, 0);
     if (!r.booked && free === 0) continue;
     buttons.push({
-      text: `${r.booked ? '✓ ' : ''}${shortDay(r.held_on)} · ${r.who}`,
+      text: `${r.booked ? '✓ ' : ''}${shortDay(r.held_on)} · ${shortName(r.who)}`,
       callback_data: tapData(r, !r.booked, 'list'),
     });
   }
   return buttons;
 }
 
-function renderSlots(
-  rows: SlotRow[], today: string, withTag: boolean,
-): { lines: string[]; buttons: Button[] } {
-  // Порядок строк задаёт база, но два занятия в одно время на одном дне
-  // могли бы перемешаться именами. Группируем, как это делает SlotList.
+/**
+ * Кнопки блоками по людям: сначала все дни одного ребёнка, потом другого.
+ * Вперемешку по дням родитель отмечает один день и ищет глазами, где же
+ * второй ребёнок, — а отмечают обычно всё сразу и на одного.
+ */
+function personBlocks(rows: SlotRow[], today: string): Keyboard {
+  const byWho = new Map<string, SlotRow[]>();
+  const sorted = [...rows].sort(
+    (a, b) => a.who.localeCompare(b.who) || a.held_on.localeCompare(b.held_on),
+  );
+  for (const r of sorted) {
+    byWho.set(r.participant_id, [...(byWho.get(r.participant_id) ?? []), r]);
+  }
+  // Ряды считаем внутри блока: иначе последняя кнопка одного ребёнка
+  // встаёт в пару к первой кнопке другого, и блоки слипаются.
+  const keyboard: Keyboard = [];
+  for (const list of byWho.values()) keyboard.push(...rows2(slotButtons(list, today)));
+  return keyboard;
+}
+
+/**
+ * Занятия недели списком: день со временем одной строкой, места — второй.
+ *
+ * Имён в тексте нет нарочно: они стоят на кнопках под сообщением, и
+ * повторять их ещё и здесь значит растить сообщение вдвое там, где
+ * ничего нового не сказано.
+ */
+function weekLines(rows: SlotRow[]): string[] {
   const bySession = new Map<string, SlotRow[]>();
   for (const r of rows) bySession.set(r.session_id, [...(bySession.get(r.session_id) ?? []), r]);
 
   const lines: string[] = [];
-  const buttons: Button[] = [];
-  let day = '';
-
   for (const people of bySession.values()) {
     const head = people[0];
-    if (head.held_on !== day) {
-      day = head.held_on;
-      lines.push('', weekdayDayMonth(day));
-    }
-    const free = head.capacity === null ? null : Math.max(head.capacity - head.taken, 0);
-    const parts = [hhmm(head.starts_at)];
-    if (head.moved) parts.push('перенесено');
-    // Внутри сообщения про смену пометка «лагерь» стоит на каждой строке
-    // и перестаёт что-либо значить: она уже в заголовке.
-    const what = withTag ? tag(head) : null;
-    if (what) parts.push(what);
-    const left = seats(head, people.some((p) => p.booked));
-    if (left) parts.push(left);
-    lines.push(parts.join(' · '));
+    const when = [`${weekdayDayMonth(head.held_on)}, ${hhmm(head.starts_at)}`];
+    if (head.moved) when.push('перенесено');
+    const what = tag(head);
+    if (what) when.push(what);
+    lines.push('', when.join(' · '));
 
-    for (const p of people) {
-      lines.push(`   ${p.who}${p.booked ? ' — придёт' : ''}`);
-      // День прошёл — обещать приход поздно. Мест нет — записаться некуда,
-      // но свою запись снять можно всегда.
-      if (head.held_on < today) continue;
-      if (!p.booked && free === 0) continue;
-      buttons.push({
-        text: `${p.booked ? '✓ ' : ''}${shortDay(head.held_on)} · ${p.who}`,
-        callback_data: tapData(p, !p.booked, 'list'),
-      });
-    }
+    const left = seats(head, people.some((p) => p.booked));
+    if (left) lines.push(left === 'мест нет' ? 'Мест нет' : `Осталось ${left}`);
   }
-  return { lines, buttons };
+  return lines;
 }
 
 /**
@@ -503,16 +510,15 @@ export async function weekView(userId: string, origin: string): Promise<View> {
       empty: true,
     };
   }
-  const { lines, buttons } = renderSlots(rows, today, true);
   return {
     text: [
-      'Ближайшая неделя',
-      ...lines,
+      'Ближайшие занятия:',
+      ...weekLines(rows),
       '',
       'Галочка — записан. Нажмите, чтобы записать или отменить.',
       `Оплата, история и остальное: ${origin}/account`,
     ].join('\n'),
-    keyboard: rows2(buttons),
+    keyboard: personBlocks(rows, today),
   };
 }
 
@@ -545,17 +551,11 @@ export async function eventViews(userId: string, origin: string): Promise<GroupV
       ? head.group_title
       : `${head.group_title} · ${what}`;
 
-    const from = packageFrom(Number(head.price), head.pass_offers);
+    // Шапка короткая: название, срок и время. Цена и пакеты — в «Оплате»,
+    // куда ведёт последняя строка; здесь это только мешало увидеть дни.
     const top = [
       title,
       `${dayMonth(days[0].held_on)} — ${dayMonth(days[days.length - 1].held_on)} · ${hhmm(usual)}`,
-      '',
-      `День стоит ${money(Number(head.price), 'ILS')}${
-        head.capacity ? `, мест в день ${head.capacity}` : ''}.`,
-      from === null
-        ? 'Платится за те дни, в которые ребёнок пришёл.'
-        : `Если планируете ${from} ${plural(from, 'день', 'дня', 'дней')} и больше, выгоднее`
-          + ' взять пакет: он покупается в «Оплате».',
     ];
 
     // Дни списком, а не карточками: какой день и кто на него идёт, видно
@@ -570,17 +570,7 @@ export async function eventViews(userId: string, origin: string): Promise<GroupV
         if (free === null) return `${shortDay(d.held_on)}${when}`;
         return `${shortDay(d.held_on)}${when} — ${free === 0 ? 'нет мест' : free}`;
       });
-    if (left.length > 0) top.push('', `Свободно: ${left.join(', ')}`);
-
-    // Сколько дней уже отмечено у каждого: от этого зависит, брать пакет
-    // или платить поштучно, и считать это по галочкам в уме не надо.
-    const picked = [...new Map(slots.map((s) => [s.participant_id, s.who])).entries()]
-      .map(([id, who]) => {
-        const n = slots.filter((s) => s.participant_id === id && s.booked).length;
-        return n > 0 ? `${who} — ${n} ${plural(n, 'день', 'дня', 'дней')}` : null;
-      })
-      .filter((x): x is string => x !== null);
-    top.push('', picked.length > 0 ? `Отмечено: ${picked.join(', ')}` : 'Пока ничего не отмечено.');
+    if (left.length > 0) top.push(`Свободно: ${left.join(', ')}`);
 
     out.push({
       groupId: head.group_id,
@@ -589,10 +579,7 @@ export async function eventViews(userId: string, origin: string): Promise<GroupV
       // У смены кнопки идут блоками по человеку, а не вперемешку по дням:
       // родитель отмечает все дни одному ребёнку подряд, и в списке из
       // тридцати кнопок это единственный способ не сбиться.
-      keyboard: rows2(slotButtons(
-        [...slots].sort((a, b) => a.who.localeCompare(b.who) || a.held_on.localeCompare(b.held_on)),
-        today,
-      )),
+      keyboard: personBlocks(slots, today),
     });
   }
   return out;
