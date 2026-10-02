@@ -105,7 +105,10 @@ export default async function WeekPage({
               {pass.ended && pass.valid_to
                 ? `Действовал до ${dayMonth(pass.valid_to)}.`
                 : `Все ${pass.lessons_total} ${
-                    pass.group_id ? 'дней' : 'занятий'} использованы.`}
+                    pass.group_id
+                      ? plural(pass.lessons_total, 'день', 'дня', 'дней')
+                      : plural(pass.lessons_total, 'занятие', 'занятия', 'занятий')
+                  } использованы.`}
               {pass.ended && pass.left > 0
                 ? ` Неиспользованными остались ${pass.left} ${
                     pass.group_id
@@ -114,7 +117,9 @@ export default async function WeekPage({
                 : ''}
               {/* Смена кончилась — звать за новым пакетом некуда: его
                   продают к смене, а её больше нет. */}
-              {pass.group_id ? '' : ' Новый покупается в «Оплате».'}
+              {pass.group_id ? '' : (
+                <> Новый покупается в <Link href="/account/pay">«Оплате»</Link>.</>
+              )}
             </div>
           </div>
         ))}

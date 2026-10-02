@@ -116,7 +116,9 @@ export default async function PayPage({
             докупить — кнопки стоят прямо под этой строчкой. */}
         {p.left === 0 && !p.ended && (
           <div className="sub" style={{ marginTop: 10 }}>
-            Все {p.lessons_total} {p.group_id ? 'дней' : 'занятий'} использованы.
+            Все {p.lessons_total}&nbsp;{p.group_id
+              ? plural(p.lessons_total, 'день', 'дня', 'дней')
+              : plural(p.lessons_total, 'занятие', 'занятия', 'занятий')} использованы.
           </div>
         )}
         {/* У истёкшего абонемента предупреждать не о чем: он уже всё. */}
