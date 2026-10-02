@@ -111,6 +111,10 @@ export default async function CampPage({
   const done = [
     { label: 'Дни поштучно', row: stats.done.single },
     { label: 'Дни по пакетам', row: stats.done.pass },
+    // Подаренные дни видно, но в выручке и в средней их нет.
+    ...(stats.done.gift.count > 0
+      ? [{ label: 'Подарено, вне итога', row: stats.done.gift, free: true }]
+      : []),
   ];
   const sum = (c: Cell[]) => c.reduce((s, x) => s + x.sum, 0);
   const allDays = sum(stats.rows.map((r) => r.lessons));
@@ -212,7 +216,7 @@ export default async function CampPage({
                   <td>{r.label}</td>
                   <td>{r.row.count || <span className="dim">—</span>}</td>
                   <td>
-                    {r.row.count === 0
+                    {'free' in r || r.row.count === 0
                       ? <span className="dim">—</span>
                       : money(r.row.sum, cur)}
                   </td>

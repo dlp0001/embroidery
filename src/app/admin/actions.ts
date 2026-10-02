@@ -11,7 +11,7 @@ import {
 } from '@/lib/studio';
 
 const STATUSES: AttendanceStatus[] = ['present', 'absent', 'sick', 'trial'];
-const WAYS: PayWay[] = ['none', 'cash', 'pass'];
+const WAYS: PayWay[] = ['none', 'cash', 'pass', 'gift'];
 const METHODS = Object.keys(WAY) as PayMethod[];
 
 /**

@@ -38,9 +38,14 @@ function Booked({ on }: { on: boolean }) {
   return <div className="signed">записан</div>;
 }
 
-/** Абонемент можно выбрать, только если он есть или занятие уже на нём. */
+/**
+ * Абонемент можно выбрать, только если он есть или занятие уже на нём.
+ * Подарок есть всегда: он ни от чего не зависит, кроме решения Вари.
+ */
 function ways(r: RosterRow): PayWay[] {
-  return r.has_pass || r.on_pass ? ['none', 'cash', 'pass'] : ['none', 'cash'];
+  return r.has_pass || r.on_pass
+    ? ['none', 'cash', 'pass', 'gift']
+    : ['none', 'cash', 'gift'];
 }
 
 /** Ребёнка привели, а родителя у него ещё нет: платить пока некому. */
@@ -52,6 +57,7 @@ function NoParent({ on }: { on: boolean }) {
 /** Что уже проведено по деньгам: это и требует подтверждения при правке. */
 function settledWay(r: RosterRow): PayWay | null {
   if (r.cash) return 'cash';
+  if (r.gift) return 'gift';
   if (r.on_pass) return 'pass';
   return null;
 }
@@ -164,7 +170,8 @@ export default function Journal({
     // говорить нечего: «пропуск» пишем только там, где журнал уже закрыт.
     if (!row.present) return r.status ? { text: 'пропуск', cls: 'money-off' } : null;
     // Оплату картой из журнала не снять: деньги пришли через банк.
-    if (r.paid && !r.cash) return { text: 'оплачено картой', cls: 'money' };
+    if (r.paid && !r.cash && !r.gift) return { text: 'оплачено картой', cls: 'money' };
+    if (row.pay === 'gift') return { text: 'подарок', cls: 'money' };
     if (row.pay === 'cash') return { text: 'оплачено наличными или переводом', cls: 'money' };
     if (row.pay === 'pass') return { text: passWord, cls: 'money' };
     return { text: `не оплачено · ${price}`, cls: 'money-due' };
@@ -202,7 +209,7 @@ export default function Journal({
   function line(r: RosterRow) {
     const row = rowFor(r);
     const m = moneyFor(r);
-    const card = r.paid && !r.cash;
+    const card = r.paid && !r.cash && !r.gift;
     const settled = Boolean(card || settledWay(r));
     // Чек выписан — строка закрыта навсегда: бумага уже у родителя и в
     // бухгалтерии, и снять по ней явку или переписать оплату нельзя.

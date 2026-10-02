@@ -46,6 +46,8 @@ export type Done = {
   event: DoneRow;
   /** Дни лагеря, списанные с пакета. */
   eventPass: DoneRow;
+  /** Подаренные занятия: прошли, но денег за них нет. */
+  gift: DoneRow;
   total: DoneRow;
   average: number;
 };
@@ -97,9 +99,9 @@ export async function monthStats(month: string): Promise<MonthStats> {
        count(*) filter (where pay.provider in ('cash', 'transfer'))::int as cash_n,
        coalesce(sum(ch.amount) filter (where pay.provider in ('cash', 'transfer')), 0)::text as cash_sum,
        count(*) filter (where pay.provider is not null
-                          and pay.provider not in ('cash', 'transfer'))::int as card_n,
+                          and pay.provider not in ('cash', 'transfer', 'gift'))::int as card_n,
        coalesce(sum(ch.amount) filter (where pay.provider is not null
-                          and pay.provider not in ('cash', 'transfer')), 0)::text as card_sum,
+                          and pay.provider not in ('cash', 'transfer', 'gift')), 0)::text as card_sum,
        count(*) filter (where ch.payment_id is null and ch.pass_id is null)::int as due_n,
        coalesce(sum(ch.amount) filter (where ch.payment_id is null and ch.pass_id is null), 0)::text as due_sum,
        count(*) filter (where ch.pass_id is not null)::int as pass_n
@@ -113,15 +115,17 @@ export async function monthStats(month: string): Promise<MonthStats> {
   // Реализация считается по занятиям месяца, а не по платежам.
   const delivered = await query<{
     pass_id: string | null; amount: string; kind: string;
-    lessons_total: number | null; pass_paid: string | null;
+    lessons_total: number | null; pass_paid: string | null; gift: boolean;
   }>(
     `select ch.pass_id, ch.amount::text, g.kind, ps.lessons_total,
-            coalesce(nullif(${PASS_PAID}, 0), ${OFFER_PRICE})::text as pass_paid
+            coalesce(nullif(${PASS_PAID}, 0), ${OFFER_PRICE})::text as pass_paid,
+            coalesce(own.provider = 'gift', false) as gift
        from charges ch
        join studio_sessions s on s.id = ch.session_id
        join studio_groups g on g.id = s.group_id
        left join passes ps on ps.id = ch.pass_id
        left join payments pay on pay.id = ps.payment_id
+       left join payments own on own.id = ch.payment_id
       where s.held_on >= $1::date and s.held_on < ($1::date + interval '1 month')`,
     [first],
   );
@@ -181,9 +185,16 @@ export async function monthStats(month: string): Promise<MonthStats> {
   const onPass: DoneRow = { count: 0, sum: 0 };
   const event: DoneRow = { count: 0, sum: 0 };
   const onEventPass: DoneRow = { count: 0, sum: 0 };
+  const gift: DoneRow = { count: 0, sum: 0 };
 
   for (const d of delivered) {
     const camp = d.kind !== 'lesson';
+    // Подарок стоит ноль, и в средней цене занятия ему делать нечего:
+    // он занизил бы её тем сильнее, чем щедрее была студия.
+    if (d.gift) {
+      gift.count++;
+      continue;
+    }
     if (!d.pass_id) {
       const row = camp ? event : single;
       row.count++;
@@ -213,6 +224,7 @@ export async function monthStats(month: string): Promise<MonthStats> {
       pass: onPass,
       event,
       eventPass: onEventPass,
+      gift,
       total: totalDone,
       average: totalDone.count > 0 ? totalDone.sum / totalDone.count : 0,
     },
@@ -280,7 +292,7 @@ export type CampStats = {
   dayPrice: number;
   days: CampDay[];
   /** Реализация: дни поштучно и дни по пакетам — как на статистике. */
-  done: { single: DoneRow; pass: DoneRow; total: DoneRow; average: number };
+  done: { single: DoneRow; pass: DoneRow; gift: DoneRow; total: DoneRow; average: number };
   /** Как оплачено: те же три строки, что в месячном отчёте. */
   rows: StatsRow[];
   /** Проданные пакеты этой смены. */
@@ -329,14 +341,16 @@ export async function campStats(groupId: string): Promise<CampStats | null> {
     ),
     query<{
       held_on: string; pass_id: string | null; amount: string;
-      lessons_total: number | null; pass_paid: string | null;
+      lessons_total: number | null; pass_paid: string | null; gift: boolean;
     }>(
       `select s.held_on::text, ch.pass_id, ch.amount::text, ps.lessons_total,
-              coalesce(nullif(${PASS_PAID}, 0), ${OFFER_PRICE})::text as pass_paid
+              coalesce(nullif(${PASS_PAID}, 0), ${OFFER_PRICE})::text as pass_paid,
+              coalesce(own.provider = 'gift', false) as gift
          from charges ch
          join studio_sessions s on s.id = ch.session_id
          left join passes ps on ps.id = ch.pass_id
          left join payments pay on pay.id = ps.payment_id
+         left join payments own on own.id = ch.payment_id
         where s.group_id = $1`,
       [groupId],
     ),
@@ -373,9 +387,9 @@ export async function campStats(groupId: string): Promise<CampStats | null> {
        count(*) filter (where pay.provider in ('cash', 'transfer'))::int as cash_n,
        coalesce(sum(ch.amount) filter (where pay.provider in ('cash', 'transfer')), 0)::text as cash_sum,
        count(*) filter (where pay.provider is not null
-                          and pay.provider not in ('cash', 'transfer'))::int as card_n,
+                          and pay.provider not in ('cash', 'transfer', 'gift'))::int as card_n,
        coalesce(sum(ch.amount) filter (where pay.provider is not null
-                          and pay.provider not in ('cash', 'transfer')), 0)::text as card_sum,
+                          and pay.provider not in ('cash', 'transfer', 'gift')), 0)::text as card_sum,
        count(*) filter (where ch.payment_id is null and ch.pass_id is null)::int as due_n,
        coalesce(sum(ch.amount) filter (where ch.payment_id is null and ch.pass_id is null), 0)::text as due_sum,
        count(*) filter (where ch.pass_id is not null)::int as pass_n
@@ -391,9 +405,15 @@ export async function campStats(groupId: string): Promise<CampStats | null> {
 
   const single: DoneRow = { count: 0, sum: 0 };
   const onPass: DoneRow = { count: 0, sum: 0 };
+  const gift: DoneRow = { count: 0, sum: 0 };
   const byDay = new Map<string, number>();
 
   for (const d of delivered) {
+    // Подарок в средней цене дня не участвует: он её только занижает.
+    if (d.gift) {
+      gift.count++;
+      continue;
+    }
     const share = d.pass_id
       ? (d.lessons_total && d.lessons_total > 0 ? Number(d.pass_paid ?? 0) / d.lessons_total : 0)
       : Number(d.amount);
@@ -446,6 +466,7 @@ export async function campStats(groupId: string): Promise<CampStats | null> {
     done: {
       single,
       pass: onPass,
+      gift,
       total,
       average: total.count > 0 ? total.sum / total.count : 0,
     },

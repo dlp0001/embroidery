@@ -419,6 +419,8 @@ const UNBILLED = `select p.id, p.provider, p.amount::text, p.currency, p.purpose
             u.id as user_id, u.name, u.billing_name, u.email
        from payments p join users u on u.id = p.user_id
       where p.status = 'paid' and p.invoice_url is null and p.raw -> 'receipt' is null
+        /* Подарок закрыт нулевым платежом: чек на ноль не выписывают. */
+        and p.provider <> 'gift'
         /* Картой — квитанция всегда. Деньги, отданные Варе в руки, только
            если она сама попросила чек: иначе выпишем лишнюю бумагу. */
         and (p.provider <> 'cash' or p.raw ->> 'receipt_wanted' = 'yes')

@@ -363,11 +363,13 @@ export default async function PayPage({
                 : h.purpose === 'studio_test' ? 'проверочный платёж'
                 : h.purpose === 'studio_lesson' ? 'занятие'
                 : `занятия${h.lessons ? `, ${h.lessons}` : ''}`;
-              const how = h.provider !== 'cash' ? 'картой'
+              const how = h.provider === 'gift' ? 'подарок студии'
+                : h.provider !== 'cash' ? 'картой'
                 : h.pay_method ? WAY[h.pay_method]
                 : 'наличными или переводом';
               const state = h.status === 'paid'
-                ? (h.provider === 'cash' ? 'получены' : 'проведён')
+                ? (h.provider === 'gift' ? 'ничего платить не нужно'
+                  : h.provider === 'cash' ? 'получены' : 'проведён')
                 : h.status === 'pending' ? 'ждёт подтверждения'
                 : 'не прошёл';
               return (

@@ -58,6 +58,11 @@ export default async function StatsPage({
           { label: 'По пакетам лагеря', row: stats.done.eventPass },
         ]
       : []),
+    // Подарки стоят в списке, но не в итоге: их цена — ноль, и в средней
+    // они бы только мешали. Строки нет, пока дарить было нечего.
+    ...(stats.done.gift.count > 0
+      ? [{ label: 'Подарено, вне итога', row: stats.done.gift, free: true }]
+      : []),
   ];
   const sum = (c: Cell[]) => c.reduce((s, x) => s + x.sum, 0);
   /** Среднее по нескольким строкам реализации. */
@@ -172,7 +177,7 @@ export default async function StatsPage({
                   <td>{r.label}</td>
                   <td>{r.row.count || <span className="dim">—</span>}</td>
                   <td>
-                    {r.row.count === 0
+                    {'free' in r || r.row.count === 0
                       ? <span className="dim">—</span>
                       : money(r.row.sum, cur)}
                   </td>

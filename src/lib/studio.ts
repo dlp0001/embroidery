@@ -110,7 +110,7 @@ export async function familyParticipants(userId: string): Promise<Participant[]>
   );
 }
 
-export type PayWay = 'none' | 'cash' | 'pass';
+export type PayWay = 'none' | 'cash' | 'pass' | 'gift';
 
 /**
  * Отметка в журнале. Чек — необязательная просьба: если он назван, то
@@ -136,6 +136,8 @@ export type SaveResult = {
   onPass: number;
   toDebt: number;
   cash: number;
+  /** Подаренные занятия: прошли, но денег за них нет. */
+  gift: number;
   /** Сколько уже проведённых строк переписали: это видно в реестре. */
   changed: number;
   /** Платежи, на которые просили чек. Выписывает их уже вызывающий. */
@@ -172,7 +174,9 @@ export async function saveAttendance(
   const ids = marks.map((m) => m.participantId);
 
   return tx(async (c) => {
-    const stat: SaveResult = { present: 0, onPass: 0, toDebt: 0, cash: 0, changed: 0, bill: [] };
+    const stat: SaveResult = {
+      present: 0, onPass: 0, toDebt: 0, cash: 0, gift: 0, changed: 0, bill: [],
+    };
     if (ids.length === 0) return stat;
 
     // 1. Что уже начислено по этому занятию.
@@ -284,6 +288,12 @@ export async function saveAttendance(
 
       if (mark.status !== 'present') {
         if (charge) {
+          // Подарок держится на нулевом платеже: пока он есть, начисление
+          // не удалить, и снятая отметка оставила бы висеть пустой счёт.
+          if (charge.provider === 'gift') {
+            await dropGift(c, charge, amount, sessionId, actor.id);
+            charge = { ...charge, payment_id: null, provider: null };
+          }
           const wasCash = await dropCashPayment(c, sessionId, mark.participantId, actor.id);
           const { rowCount } = await c.query(
             `delete from charges where id = $1 and payment_id is null`, [charge.id]);
@@ -337,6 +347,44 @@ export async function saveAttendance(
           participantId: mark.participantId, sessionId, chargeId: charge.id,
           passId: freed, amount, currency, note: 'занятие возвращено в абонемент',
         });
+      }
+
+      // Подарок сняли — начисление снова стоит своих денег. Делаем это
+      // до всего остального: дальше код считает, что сумма настоящая.
+      if (way !== 'gift' && charge.provider === 'gift') {
+        await dropGift(c, charge, amount, sessionId, actor.id);
+        charge = { ...charge, payment_id: null, provider: null };
+      }
+
+      /* Подарок: занятие прошло, денег за него нет. Начисление обнуляем
+         и закрываем нулевым платежом — так оно не висит в долгах, видно
+         родителю и не попадает в среднюю цену занятия. */
+      if (way === 'gift') {
+        if (charge.payment_id && charge.provider !== 'gift') {
+          const wasCash = await dropCashPayment(c, sessionId, mark.participantId, actor.id);
+          if (!wasCash) continue; // оплачено картой, руками не трогаем
+          charge = { ...charge, payment_id: null, provider: null };
+        }
+        if (!charge.payment_id) {
+          const pay = await c.query<{ id: string }>(
+            `insert into payments (provider, user_id, amount, currency, status, purpose)
+             values ('gift', $1, 0, $2, 'paid', 'studio_lesson') returning id`,
+            [charge.owner_id, currency],
+          );
+          await c.query(
+            'update charges set payment_id = $2, amount = 0 where id = $1',
+            [charge.id, pay.rows[0].id],
+          );
+          charge = { ...charge, payment_id: pay.rows[0].id, provider: 'gift' };
+          await logMoneyIn(c, {
+            kind: 'gift', actorId: actor.id, ownerId: charge.owner_id,
+            participantId: mark.participantId, sessionId, chargeId: charge.id,
+            paymentId: pay.rows[0].id, amount: 0, currency,
+            note: 'занятие подарено',
+          });
+        }
+        stat.gift++;
+        continue;
       }
 
       // Наличные: заводим платёж. Просьбу о чеке и способ оплаты кладём
@@ -434,6 +482,30 @@ export async function saveAttendance(
 }
 
 /** Убирает прямой платёж с начисления. Возвращает true, если он там был. */
+/**
+ * Снимает подарок: начисление снова стоит своих денег. Нулевой платёж
+ * удаляем целиком — он ничего не значил, кроме пометки «подарено».
+ */
+async function dropGift(
+  c: PoolClient,
+  charge: ChargeRow,
+  amount: number,
+  sessionId: string,
+  actorId: string,
+): Promise<void> {
+  if (!charge.payment_id) return;
+  await c.query(
+    'update charges set payment_id = null, amount = $2 where id = $1',
+    [charge.id, amount],
+  );
+  await logMoneyIn(c, {
+    kind: 'gift_reverted', actorId, ownerId: charge.owner_id,
+    participantId: charge.participant_id, sessionId, chargeId: charge.id,
+    paymentId: charge.payment_id, amount, note: 'подарок снят, занятие снова платное',
+  });
+  await c.query('delete from payments where id = $1', [charge.payment_id]);
+}
+
 async function dropCashPayment(
   c: PoolClient,
   sessionId: string,
@@ -555,8 +627,8 @@ export type VisitRow = {
   status: AttendanceStatus;
   amount: string | null;
   currency: string | null;
-  /** Чем закрыто: абонементом, платежом, ничем. */
-  money: 'pass' | 'paid' | 'due' | 'none';
+  /** Чем закрыто: абонементом, платежом, подарком, ничем. */
+  money: 'pass' | 'paid' | 'gift' | 'due' | 'none';
   /** Пакет смены, а не обычный абонемент. */
   pass_event: boolean;
   provider: string | null;
@@ -583,6 +655,7 @@ export async function visitHistory(
             p.id as participant_id, coalesce(c.name, u.name, 'Я') as who, a.status,
             ch.amount::text, ch.currency,
             case when ch.pass_id is not null then 'pass'
+                 when pay.provider = 'gift' then 'gift'
                  when ch.payment_id is not null then 'paid'
                  when ch.id is not null then 'due'
                  else 'none' end as money,
@@ -906,6 +979,8 @@ export type RosterRow = {
   on_pass: boolean;
   paid: boolean;
   cash: boolean;
+  /** Занятие подарено: денег нет и не будет. */
+  gift: boolean;
   booked: boolean;
   preferred: boolean;
   /** Деньги уже проведены: менять может только суперадмин. */
@@ -966,6 +1041,7 @@ export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
             (c.pass_id is not null) as on_pass,
             (c.payment_id is not null) as paid,
             coalesce((select pay.provider = 'cash' from payments pay where pay.id = c.payment_id), false) as cash,
+            coalesce((select pay.provider = 'gift' from payments pay where pay.id = c.payment_id), false) as gift,
             /* Квитанция выписывается уже после ответа страницы, поэтому
                первые секунды её честно ещё нет. Сказать в этот момент
                «не вышел» — соврать: она в дороге. */

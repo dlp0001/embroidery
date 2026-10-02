@@ -15,10 +15,10 @@ function Mark({ r }: { r: VisitRow }) {
   const came = r.status === 'present' || r.status === 'trial';
   if (!came || r.money === 'none') return <span className="visit-mark" />;
   const ok = r.money !== 'due';
+  const what = r.money === 'gift' ? 'Подарок студии' : ok ? 'Оплачено' : 'Не оплачено';
   return (
     <span className={`visit-mark ${ok ? 'mark-ok' : 'mark-due'}`}
-          title={ok ? 'Оплачено' : 'Не оплачено'} role="img"
-          aria-label={ok ? 'Оплачено' : 'Не оплачено'}>
+          title={what} role="img" aria-label={what}>
       <svg viewBox="0 0 20 20">
         <circle cx="10" cy="10" r="8" />
         {ok ? <path d="M6.2 10.4 9 13.2 13.9 7.4" /> : <path d="M10 6.2v5M10 13.4v.9" />}
@@ -39,10 +39,12 @@ function about(r: VisitRow): string {
   if (r.status === 'sick') return 'болезнь';
   if (r.status === 'trial') return 'пробное';
   if (r.money === 'pass') return r.pass_event ? 'из пакета' : 'из абонемента';
+  if (r.money === 'gift') return 'подарок студии';
   if (r.money === 'none') return 'без оплаты';
   if (r.money === 'due') return 'не оплачено';
 
-  const way = r.provider !== 'cash' ? 'картой'
+  const way = r.provider === 'gift' ? 'подарок студии'
+    : r.provider !== 'cash' ? 'картой'
     : r.pay_method === 'bit' ? 'битом'
     : r.pay_method === 'paybox' ? 'пейбоксом'
     : r.pay_method === 'cash' ? 'наличными'
