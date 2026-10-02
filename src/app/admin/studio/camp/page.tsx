@@ -160,32 +160,40 @@ export default async function CampPage({
         <div className="card">
           <div className="what" style={{ marginBottom: 2 }}>Посещаемость по дням</div>
           <p className="hint" style={{ marginBottom: 10 }}>
-            Столбик — сколько детей пришло. Светлые столбики — дни впереди: там
-            пока записи, а не отметки.
+            Столбик — сколько детей пришло.
           </p>
           <Bars days={stats.days} capacity={stats.capacity} />
         </div>
 
-        <div className="row" style={{ gap: 12, flexWrap: 'wrap', margin: '18px 0 6px' }}>
-          <div className="card-lin" style={{ flex: '1 1 150px' }}>
-            <div className="hint">В среднем за день</div>
-            <div className="sum sum-big">{num(perDay)}</div>
-            <div className="sub">
-              {stats.capacity ? `из ${stats.capacity} мест` : 'без ограничения мест'}
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: 12,
+                      flexWrap: 'wrap', margin: '18px 0 6px' }}>
+          {[
+            {
+              head: 'В среднем за день',
+              value: num(perDay),
+              foot: stats.capacity ? `из ${stats.capacity} мест` : 'без ограничения мест',
+            },
+            {
+              head: 'Разных детей',
+              value: String(stats.kids),
+              foot: `по ${num(stats.perKid)} ${days(stats.perKid)} на каждого`,
+            },
+            {
+              head: 'День в среднем стоил',
+              value: money(Math.round(stats.done.average), cur),
+              foot: `разовый — ${money(stats.dayPrice, cur)}`,
+            },
+          ].map((c) => (
+            /* Подпись внизу прижата к низу: у соседей она в одну строку
+               и в две, и без этого числа стояли бы на разной высоте. */
+            <div className="card-lin" key={c.head}
+                 style={{ flex: '1 1 150px', marginBottom: 0, display: 'flex',
+                          flexDirection: 'column' }}>
+              <div className="hint">{c.head}</div>
+              <div className="sum sum-big">{c.value}</div>
+              <div className="sub" style={{ marginTop: 'auto' }}>{c.foot}</div>
             </div>
-          </div>
-          <div className="card-lin" style={{ flex: '1 1 150px' }}>
-            <div className="hint">Разных детей</div>
-            <div className="sum sum-big">{stats.kids}</div>
-            <div className="sub">
-              по {num(stats.perKid)}&nbsp;{days(stats.perKid)} на каждого
-            </div>
-          </div>
-          <div className="card-lin" style={{ flex: '1 1 150px' }}>
-            <div className="hint">День в среднем стоил</div>
-            <div className="sum sum-big">{money(Math.round(stats.done.average), cur)}</div>
-            <div className="sub">разовый — {money(stats.dayPrice, cur)}</div>
-          </div>
+          ))}
         </div>
 
         {busiest && busiest.came > 0 && (
