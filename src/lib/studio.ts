@@ -549,6 +549,8 @@ export type PassBalance = {
   extra_price: number | null;
   /** Сколько дней ещё можно докупить: дальше конца смены смысла нет. */
   max_days: number;
+  /** Срок вышел: тратить нечего, даже если занятия остались. */
+  ended: boolean;
 };
 
 export async function passBalances(ownerId: string): Promise<PassBalance[]> {
@@ -572,10 +574,14 @@ export async function passBalances(ownerId: string): Promise<PassBalance[]> {
                        where s.group_id = p.group_id and s.status <> 'cancelled'
                          and s.held_on >= current_date), 0)
                      - (p.lessons_total - (select count(*)::int from charges ch
-                                            where ch.pass_id = p.id)), 0) as max_days
+                                            where ch.pass_id = p.id)), 0) as max_days,
+            coalesce(p.valid_to < current_date, false) as ended
        from passes p
       where p.owner_id = $1
-        and (p.valid_to is null or p.valid_to >= current_date)
+        /* Недавно кончившиеся отдаём тоже: родителю надо видеть, что
+           абонемент истёк, а не гадать, почему он пропал с экрана.
+           Кому нужны только живые, тот отбирает по ended и left. */
+        and (p.valid_to is null or p.valid_to >= current_date - 30)
       order by p.valid_to nulls last, p.created_at`,
     [ownerId],
   );

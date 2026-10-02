@@ -55,8 +55,11 @@ export default async function PayPage({
   // дни: это и есть тот случай, ради которого докупка затевалась —
   // дни в пакете вышли, а смена ещё идёт.
   const mine = passes.filter(
-    (p) => p.left > 0 || (p.extra_price !== null && p.max_days > 0),
+    (p) => !p.ended && (p.left > 0 || (p.extra_price !== null && p.max_days > 0)),
   );
+  // Кончившееся показываем отдельно и бледнее: «куда делся абонемент» —
+  // вопрос, на который экран должен отвечать сам.
+  const over = passes.filter((p) => !mine.includes(p));
   const hasStudioPass = mine.some((p) => !p.group_id);
   const packs = offers.filter((o) => !o.groupId);
   // Цена дня ближайшей смены: нужна, чтобы объяснить, что ещё тут бывает.
@@ -93,16 +96,31 @@ export default async function PayPage({
         </div>
         <div className="sub">
           {p.group_id ? 'Только на эти дни' : 'Общий на всех'}
-          {p.valid_to ? ` · действует до ${dayMonth(p.valid_to)}` : ''}
+          {p.valid_to
+            ? p.ended
+              ? ` · действовал до ${dayMonth(p.valid_to)}`
+              : ` · действует до ${dayMonth(p.valid_to)}`
+            : ''}
         </div>
+        {p.ended && (
+          <div className="sub" style={{ marginTop: 10 }}>
+            Срок вышел.{p.left > 0
+              ? ` Неиспользованными остались ${p.left} ${
+                  p.group_id
+                    ? plural(p.left, 'день', 'дня', 'дней')
+                    : plural(p.left, 'занятие', 'занятия', 'занятий')}.`
+              : ''}
+          </div>
+        )}
         {/* Дни вышли, а смена идёт: это не тревога, а приглашение
             докупить — кнопки стоят прямо под этой строчкой. */}
-        {p.left === 0 && (
+        {p.left === 0 && !p.ended && (
           <div className="sub" style={{ marginTop: 10 }}>
             Все {p.lessons_total} {p.group_id ? 'дней' : 'занятий'} использованы.
           </div>
         )}
-        {soon && p.left > 0 && (
+        {/* У истёкшего абонемента предупреждать не о чем: он уже всё. */}
+        {soon && p.left > 0 && !p.ended && (
           <div className="money-due" style={{ marginTop: 10 }}>
             {ends! > 0
               /* У пакета смены и срок, и остаток считаются в днях, и
@@ -253,10 +271,15 @@ export default async function PayPage({
             купить в смену и как продлить обычный. */}
         <div className="lbl day-band">Абонементы и пакеты</div>
 
-        {mine.length > 0 && (
+        {(mine.length > 0 || over.length > 0) && (
           <>
             <div className="lbl" style={{ marginTop: 0 }}>Что уже куплено</div>
             {mine.map((p) => <PassCard key={p.id} p={p} />)}
+            {over.map((p) => (
+              <div key={p.id} style={{ opacity: 0.65 }}>
+                <PassCard p={p} />
+              </div>
+            ))}
           </>
         )}
 

@@ -888,7 +888,7 @@ export async function payView(userId: string, origin: string): Promise<string> {
   ]);
 
   const lines: string[] = [];
-  const mine = passes.filter((p) => p.left > 0);
+  const mine = passes.filter((p) => p.left > 0 && !p.ended);
   for (const p of mine) {
     const what = p.group_id
       ? plural(p.left, 'день', 'дня', 'дней')

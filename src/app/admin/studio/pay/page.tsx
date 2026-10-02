@@ -62,7 +62,7 @@ export default async function PayPage({
   const claim = chosen ? claims.find((cl) => cl.id && cl.owner_email === owner?.email) : undefined;
   const receipts = receiptsConfigured();
   const currency = price.currency;
-  const alive = balances.filter((b) => b.left > 0);
+  const alive = balances.filter((b) => b.left > 0 && !b.ended);
 
   return (
     <>

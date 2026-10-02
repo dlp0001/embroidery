@@ -32,7 +32,10 @@ export default async function WeekPage({
   ]);
 
   // Пакет лагеря лежит рядом с обычным абонементом: показываем оба.
-  const mine = passes.filter((p) => p.left > 0);
+  const mine = passes.filter((p) => p.left > 0 && !p.ended);
+  // Кончившийся абонемент с экрана не убираем: «куда он делся» — вопрос
+  // неприятнее, чем строчка «закончился». Держим его, пока свежий.
+  const over = passes.filter((p) => p.ended || p.left === 0);
   const debt = unpaid.reduce((sum, c) => sum + Number(c.amount), 0);
 
   // Дни лагеря показываем отдельно и целиком, а из недели убираем:
@@ -77,7 +80,7 @@ export default async function WeekPage({
                   ? 'Только на эти дни. Списывается с того, кто пришёл.'
                   : 'Общий на всех. Списывается с того, кто пришёл.'}
               </div>
-              {soon && pass.valid_to && (
+              {soon && pass.valid_to && !pass.ended && (
                 <div className="money-due" style={{ marginTop: 10 }}>
                   {ends! > 0
                     ? `Действует до ${dayMonth(pass.valid_to)}: ${ends} ${
@@ -88,6 +91,33 @@ export default async function WeekPage({
             </div>
           );
         })}
+
+        {over.map((pass) => (
+          <div className="card" key={pass.id} style={{ opacity: 0.65 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between',
+                          alignItems: 'baseline', marginBottom: 8 }}>
+              <div className="what">{pass.group_title ?? 'Абонемент'}</div>
+              <div style={{ fontSize: 13, color: 'var(--warm-gray)' }}>
+                {pass.ended ? 'срок вышел' : 'закончился'}
+              </div>
+            </div>
+            <div className="sub">
+              {pass.ended && pass.valid_to
+                ? `Действовал до ${dayMonth(pass.valid_to)}.`
+                : `Все ${pass.lessons_total} ${
+                    pass.group_id ? 'дней' : 'занятий'} использованы.`}
+              {pass.ended && pass.left > 0
+                ? ` Неиспользованными остались ${pass.left} ${
+                    pass.group_id
+                      ? plural(pass.left, 'день', 'дня', 'дней')
+                      : plural(pass.left, 'занятие', 'занятия', 'занятий')}.`
+                : ''}
+              {/* Смена кончилась — звать за новым пакетом некуда: его
+                  продают к смене, а её больше нет. */}
+              {pass.group_id ? '' : ' Новый покупается в «Оплате».'}
+            </div>
+          </div>
+        ))}
 
         {unpaid.length > 0 && (
           <div className="card-lin">
