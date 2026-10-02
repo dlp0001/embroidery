@@ -2,11 +2,11 @@ import { one, query } from './db';
 import { lessonPrice, passTypes } from './studio';
 
 /**
- * Отчёт за месяц: что студия продала и сколько за это получила.
+ * Отчёт за выбранные дни: что студия продала и сколько за это получила.
  *
- * Считаем по дате события, а не по дате денег: занятие попадает в месяц,
- * когда оно случилось, абонемент — когда его купили. Так строка отчёта
- * сходится с тем, что Варя помнит про этот месяц.
+ * Считаем по дате события, а не по дате денег: занятие попадает в тот
+ * день, когда оно прошло, абонемент — когда его купили. Так строка
+ * отчёта сходится с тем, что Варя помнит про эти дни.
  *
  * Занятие, закрытое абонементом, продажей не считается: деньги за него
  * пришли раньше, когда абонемент покупали. Такие занятия показываем
@@ -16,8 +16,9 @@ export type Cell = { count: number; sum: number };
 export type StatsRow = { key: PayKind; label: string; lessons: Cell; passes: Cell };
 export type PayKind = 'direct' | 'card' | 'due';
 
-export type MonthStats = {
-  month: string;
+export type PeriodStats = {
+  from: string;
+  to: string;
   currency: string;
   rows: StatsRow[];
   /** Занятия, списанные с абонементов: их оплатили раньше. */
@@ -88,8 +89,7 @@ const PASS_PAID = `
    + coalesce((select sum(ep.amount) from payments ep
                 where ep.status = 'paid' and ep.raw ->> 'extends_pass' = ps.id::text), 0))`;
 
-export async function monthStats(month: string): Promise<MonthStats> {
-  const first = `${month}-01`;
+export async function periodStats(from: string, to: string): Promise<PeriodStats> {
   const [price, types] = await Promise.all([lessonPrice(), passTypes()]);
 
   const lessons = await one<LessonAgg>(
@@ -108,8 +108,8 @@ export async function monthStats(month: string): Promise<MonthStats> {
      from charges ch
      join studio_sessions s on s.id = ch.session_id
      left join payments pay on pay.id = ch.payment_id
-    where s.held_on >= $1::date and s.held_on < ($1::date + interval '1 month')`,
-    [first],
+    where s.held_on between $1::date and $2::date`,
+    [from, to],
   );
 
   // Реализация считается по занятиям месяца, а не по платежам.
@@ -126,8 +126,8 @@ export async function monthStats(month: string): Promise<MonthStats> {
        left join passes ps on ps.id = ch.pass_id
        left join payments pay on pay.id = ps.payment_id
        left join payments own on own.id = ch.payment_id
-      where s.held_on >= $1::date and s.held_on < ($1::date + interval '1 month')`,
-    [first],
+      where s.held_on between $1::date and $2::date`,
+    [from, to],
   );
 
   const passes = await query<PassRow>(
@@ -136,8 +136,8 @@ export async function monthStats(month: string): Promise<MonthStats> {
        from passes ps
        left join payments pay on pay.id = ps.payment_id
       where ps.created_at >= $1::date
-        and ps.created_at < ($1::date + interval '1 month')`,
-    [first],
+        and ps.created_at < ($2::date + 1)`,
+    [from, to],
   );
 
   // Докупленные дни — продажа того месяца, когда за них заплатили, и
@@ -148,8 +148,8 @@ export async function monthStats(month: string): Promise<MonthStats> {
       where pay.raw ? 'extends_pass'
         and pay.status = 'paid'
         and pay.created_at >= $1::date
-        and pay.created_at < ($1::date + interval '1 month')`,
-    [first],
+        and pay.created_at < ($2::date + 1)`,
+    [from, to],
   );
 
   /** Сколько абонемент стоил. У неоплаченного цены нет — берём из справочника. */
@@ -217,7 +217,8 @@ export async function monthStats(month: string): Promise<MonthStats> {
   };
 
   return {
-    month,
+    from,
+    to,
     currency: price.currency,
     done: {
       single,

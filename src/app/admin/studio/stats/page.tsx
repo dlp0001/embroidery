@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { isAdmin, requireTeacher } from '@/lib/session';
-import { monthStats, monthsWithData, type Cell } from '@/lib/stats';
-import { money, plural, todayISO } from '@/lib/format';
+import { periodStats, monthsWithData, type Cell } from '@/lib/stats';
+import { dayMonth, money, plural, todayISO } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,21 +10,34 @@ const MONTHS = [
   'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь',
 ];
 
-function shift(month: string, by: number): string {
+/** Первый и последний день месяца: «2026-09» → 1 и 30 сентября. */
+function bounds(month: string): { from: string; to: string } {
   const [y, m] = month.split('-').map(Number);
-  const d = new Date(Date.UTC(y, m - 1 + by, 1));
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return { from: `${month}-01`, to: `${month}-${String(last).padStart(2, '0')}` };
 }
 
-function title(month: string): string {
-  const [y, m] = month.split('-').map(Number);
-  return `${MONTHS[m - 1]} ${y}`;
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Как назвать выбранные дни. Целый месяц — месяцем: «Сентябрь 2026»
+ * короче и понятнее, чем «1 — 30 сентября», а на этот отчёт смотрят
+ * чаще всего именно помесячно.
+ */
+function title(from: string, to: string): string {
+  const month = from.slice(0, 7);
+  const whole = bounds(month);
+  if (from === whole.from && to === whole.to) {
+    return `${MONTHS[Number(month.slice(5)) - 1]} ${month.slice(0, 4)}`;
+  }
+  if (from === to) return dayMonth(from);
+  return `${dayMonth(from)} — ${dayMonth(to)}`;
 }
 
 export default async function StatsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ m?: string }>;
+  searchParams: Promise<{ from?: string; to?: string }>;
 }) {
   const user = await requireTeacher();
   if (!isAdmin(user)) {
@@ -42,8 +55,17 @@ export default async function StatsPage({
   }
 
   const params = await searchParams;
-  const month = /^\d{4}-\d{2}$/.test(params.m ?? '') ? params.m! : todayISO().slice(0, 7);
-  const [stats, months] = await Promise.all([monthStats(month), monthsWithData()]);
+  // Без дат показываем текущий месяц целиком: с него начинают, а дальше
+  // уже выбирают свой промежуток.
+  const now = bounds(todayISO().slice(0, 7));
+  const asked = {
+    from: DATE.test(params.from ?? '') ? params.from! : now.from,
+    to: DATE.test(params.to ?? '') ? params.to! : now.to,
+  };
+  // Перепутанные местами даты не повод отказывать: меняем их сами.
+  const from = asked.from <= asked.to ? asked.from : asked.to;
+  const to = asked.from <= asked.to ? asked.to : asked.from;
+  const [stats, months] = await Promise.all([periodStats(from, to), monthsWithData()]);
 
   const cur = stats.currency;
   // Что студия отработала, по видам. Лагерь появляется в списке только
@@ -72,7 +94,7 @@ export default async function StatsPage({
   };
   const cnt = (c: Cell[]) => c.reduce((s, x) => s + x.count, 0);
 
-  // Итог — вся выручка месяца, вместе с тем, что ещё не заплатили.
+  // Итог — вся выручка за выбранные дни, вместе с неоплаченным.
   const allLessons = sum(stats.rows.map((r) => r.lessons));
   const allPasses = sum(stats.rows.map((r) => r.passes));
   const dueRow = stats.rows.find((r) => r.key === 'due')!;
@@ -98,21 +120,45 @@ export default async function StatsPage({
     <>
       <div className="top">
         <div className="kicker">Re.Create.Art · Деньги</div>
-        <div className="row">
-          <h1 className="h1">{title(month)}</h1>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <Link className="btn-quiet" href={`/admin/studio/stats?m=${shift(month, -1)}`}
-                  aria-label="Предыдущий месяц">←</Link>
-            <Link className="btn-quiet" href={`/admin/studio/stats?m=${shift(month, 1)}`}
-                  aria-label="Следующий месяц">→</Link>
-          </div>
-        </div>
+        <h1 className="h1">{title(from, to)}</h1>
         <p className="sub">
-          Занятие считается в том месяце, когда прошло, абонемент — когда куплен
+          Занятие считается в тот день, когда прошло, абонемент — когда куплен
         </p>
       </div>
 
       <div className="body">
+        {/* Месяцы — кнопками: ими пользуются чаще всего, и выбирать первое
+            и последнее число руками ради «сентября» незачем. */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+          {months.slice(0, 12).map((m) => {
+            const b = bounds(m);
+            const on = from === b.from && to === b.to;
+            return (
+              <Link key={m} href={`/admin/studio/stats?from=${b.from}&to=${b.to}`}
+                    className={`${on ? 'chip-on' : 'chip'} chip-sm`}>
+                {MONTHS[Number(m.slice(5)) - 1]}
+                {m.slice(0, 4) === todayISO().slice(0, 4) ? '' : ` ${m.slice(0, 4)}`}
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Свой промежуток: обычная форма, без лишних нажатий — выбрал
+            даты и нажал «Показать». Адрес остаётся читаемым, им можно
+            поделиться или вернуться к нему завтра. */}
+        <form className="card" style={{ display: 'flex', gap: 12, flexWrap: 'wrap',
+                                        alignItems: 'flex-end', marginBottom: 18 }}>
+          <div className="field" style={{ marginBottom: 0, flex: '1 1 140px' }}>
+            <label htmlFor="from">С какого дня</label>
+            <input id="from" name="from" type="date" defaultValue={from} />
+          </div>
+          <div className="field" style={{ marginBottom: 0, flex: '1 1 140px' }}>
+            <label htmlFor="to">По какой</label>
+            <input id="to" name="to" type="date" defaultValue={to} />
+          </div>
+          <button className="btn-quiet" type="submit">Показать</button>
+        </form>
+
         <div style={{ overflowX: 'auto' }}>
           <table className="rep">
             <thead>
@@ -147,7 +193,7 @@ export default async function StatsPage({
         </div>
 
         <p className="hint" style={{ marginTop: 22 }}>
-          «Итого» — вся выручка месяца, вместе с тем, что ещё не заплатили.
+          «Итого» — вся выручка за эти дни, вместе с тем, что ещё не заплатили.
           Из неё {money(due, cur)} за {cnt([dueRow.lessons, dueRow.passes])}&nbsp;
           {plural(cnt([dueRow.lessons, dueRow.passes]), 'позицию', 'позиции', 'позиций')} пока
           не получено, остальное на руках.
@@ -155,7 +201,7 @@ export default async function StatsPage({
 
         <div className="lbl" style={{ marginTop: 30 }}>Реализация</div>
         <p className="hint" style={{ marginBottom: 14 }}>
-          Занятия, которые прошли в этом месяце, и сколько они стоят. Занятие
+          Занятия, которые прошли за эти дни, и сколько они стоят. Занятие
           по абонементу считается своей долей от его цены, а не ценой разового;
           день лагеря — своей долей от цены пакета.
         </p>
@@ -196,18 +242,18 @@ export default async function StatsPage({
             и триста тридцать в одной средней не значат ничего. */}
         <p className="hint" style={{ marginTop: 16 }}>
           {stats.done.total.count === 0
-            ? 'Занятий в этом месяце ещё не было.'
+            ? 'Занятий за эти дни не было.'
             : camp
               ? <>
                   Среднее обычное занятие стоило {money(mean(
                     [stats.done.single, stats.done.pass]), cur)}, день лагеря —{' '}
                   {money(mean([stats.done.event, stats.done.eventPass]), cur)}.
                 </>
-              : <>Среднее занятие в этом месяце стоило {money(stats.done.average, cur)}.</>}
+              : <>Среднее занятие стоило {money(stats.done.average, cur)}.</>}
         </p>
 
         <div className="card-lin" style={{ marginTop: 18 }}>
-          <div className="what" style={{ marginBottom: 6 }}>Абонементы в этом месяце</div>
+          <div className="what" style={{ marginBottom: 6 }}>Абонементы за эти дни</div>
           <div className="sub">
             Списано с абонементов: {stats.onPass}&nbsp;
             {plural(stats.onPass, 'занятие', 'занятия', 'занятий')}. Продано в
@@ -219,24 +265,6 @@ export default async function StatsPage({
             раньше, когда абонемент покупали.
           </p>
         </div>
-
-        {months.length > 0 && (
-          <>
-            <div className="lbl" style={{ marginTop: 26 }}>Месяцы с движением</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {months.map((m) => (
-                <Link
-                  key={m}
-                  href={`/admin/studio/stats?m=${m}`}
-                  className={m === month ? 'chip-on' : 'chip'}
-                  style={{ textDecoration: 'none' }}
-                >
-                  {title(m)}
-                </Link>
-              ))}
-            </div>
-          </>
-        )}
 
         <p className="hint" style={{ marginTop: 26 }}>
           <Link href="/admin/studio/debts">← К финансам</Link>
