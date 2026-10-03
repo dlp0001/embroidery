@@ -63,6 +63,21 @@ export default async function PayPage({
   const receipts = receiptsConfigured();
   const currency = price.currency;
   const alive = balances.filter((b) => b.left > 0 && !b.ended);
+  /**
+   * Дни смены, за которые проще взять пакетную цену. Долг показывает
+   * разовые 330 за день, и деньги берут по нему: так за кейтану один раз
+   * уже взяли 990 вместо 840, и пришлось отменять чек.
+   */
+  const cheaper = balances
+    .map((b) => {
+      if (b.extra_price === null || b.max_days < 1 || !b.group_id) return null;
+      const days = charges.filter((c) => c.group_id === b.group_id && !c.declared);
+      const take = Math.min(days.length, b.max_days);
+      if (take < 1) return null;
+      const asIs = days.slice(0, take).reduce((n, c) => n + Number(c.amount), 0);
+      return { pass: b, take, asIs, cost: b.extra_price * take };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null && x.cost < x.asIs);
 
   return (
     <>
@@ -188,6 +203,16 @@ export default async function PayPage({
                 Занятия из него закрываются сами, деньги за них брать не надо.
               </div>
             )}
+
+            {cheaper.map(({ pass, take, asIs, cost }) => (
+              <div className="note" key={pass.id} style={{ marginBottom: 14 }}>
+                {take} {plural(take, 'день', 'дня', 'дней')} «{pass.group_title}» дешевле
+                закрыть пакетом: {money(cost, currency)} вместо {money(asIs, currency)}.
+                Это кнопка «Продлить» на карточке пакета, на{' '}
+                <Link href="/admin/studio/debts">Финансах</Link>: дни закроются сами,
+                и брать за них деньги здесь уже не нужно.
+              </div>
+            ))}
 
             {charges.length === 0 ? (
               <p className="hint">Неоплаченных занятий нет.</p>

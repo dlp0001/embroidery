@@ -65,6 +65,24 @@ export default async function PayPage({
   const over = passes.filter((p) => !mine.includes(p));
   const hasStudioPass = mine.some((p) => !p.group_id);
   const packs = offers.filter((o) => !o.groupId);
+  /**
+   * Дни смены, которые висят долгом, и пакет, в который их можно
+   * докупить. Родитель видит долг по 330 за день и не догадывается, что
+   * те же дни в пакет идут по 280: предложение стоит рядом с долгом, а
+   * не в другом блоке страницы.
+   */
+  const cheaper = mine
+    .map((p) => {
+      if (p.extra_price === null || p.max_days < 1 || !p.group_id) return null;
+      const days = unpaid.filter((c) => c.group_id === p.group_id && !c.declared);
+      const take = Math.min(days.length, p.max_days);
+      if (take < 1) return null;
+      // Считаем по тем дням, которые закроются: если долгов больше, чем
+      // можно докупить, обещать закрыть всё нельзя.
+      const asIs = days.slice(0, take).reduce((n, c) => n + Number(c.amount), 0);
+      return { pass: p, take, asIs, cost: p.extra_price * take };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null && x.cost < x.asIs);
   // Цена дня ближайшей смены: нужна, чтобы объяснить, что ещё тут бывает.
   const campDay = offers.find((o) => o.groupId && o.dayPrice !== null)?.dayPrice ?? null;
   const events = [...new Map(
@@ -211,6 +229,29 @@ export default async function PayPage({
             {/* Ключ по списку долгов: когда он меняется — заявили оплату
                 или отменили её — выбор собирается заново, и по умолчанию
                 снова отмечено всё. */}
+            {cheaper.map(({ pass, take, asIs, cost }) => (
+              <div className="note" key={pass.id} style={{ marginBottom: 16 }}>
+                <div style={{ marginBottom: 10 }}>
+                  {take} {plural(take, 'день', 'дня', 'дней')} «{pass.group_title}»
+                  дешевле закрыть пакетом: не по {money(Number(asIs / take), 'ILS')} за
+                  день, а по {money(pass.extra_price!, 'ILS')}. Выйдет {money(cost, 'ILS')}{' '}
+                  вместо {money(asIs, 'ILS')}, и дни закроются сами.
+                </div>
+                {online ? (
+                  <form action={extendPassAction}>
+                    <input type="hidden" name="passId" value={pass.id} />
+                    <input type="hidden" name="days" value={take} />
+                    <button className="btn" type="submit">
+                      Докупить {take}&nbsp;{plural(take, 'день', 'дня', 'дней')} ·{' '}
+                      {money(cost, 'ILS')}
+                    </button>
+                  </form>
+                ) : (
+                  <span className="hint">Скажите Варе, она проведёт.</span>
+                )}
+              </div>
+            ))}
+
             <DebtPicker key={unpaid.map((c) => `${c.id}${c.declared ? '!' : ''}`).join()}
                         charges={unpaid} online={online} />
             {/* Черта закрывает долг: дальше идёт уже не он, а то, что

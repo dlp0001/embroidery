@@ -613,6 +613,8 @@ export async function passBalances(ownerId: string): Promise<PassBalance[]> {
 export type UnpaidCharge = {
   id: string;
   held_on: string;
+  /** Чьё это занятие: по нему долг сходится с пакетом той же смены. */
+  group_id: string;
   group_title: string;
   /** Регулярное занятие, лагерь или мастер-класс: в списке долгов это видно. */
   kind: GroupKind;
@@ -625,7 +627,7 @@ export type UnpaidCharge = {
 
 export async function unpaidCharges(ownerId: string): Promise<UnpaidCharge[]> {
   return query<UnpaidCharge>(
-    `select ch.id, s.held_on::text, g.title as group_title, g.kind,
+    `select ch.id, s.held_on::text, g.id as group_id, g.title as group_title, g.kind,
             ch.amount::text, ch.currency,
             coalesce(c.name, u.name, 'Я') as who,
             exists (
