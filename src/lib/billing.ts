@@ -7,7 +7,7 @@ import {
 } from './icount';
 import { logMoneyIn } from './ledger';
 import { createPaymentLink, fetchTransaction, isConfigured } from './payplus';
-import { extendOffer, lessonPrice, saleOffers } from './studio';
+import { coverCampDays, extendOffer, lessonPrice, saleOffers } from './studio';
 
 export type Intent =
   | { kind: 'debt'; chargeIds?: string[] }
@@ -225,11 +225,18 @@ export async function applyPayment(
         [extends_, days],
       );
       if (grown.length === 0) return;
+      // Докупали затем, чтобы закрыть уже отхоженное: закрываем сразу,
+      // иначе дни лежат в пакете, а те же дни висят долгом.
+      const covered = await coverCampDays(c, extends_, null);
       await logMoneyIn(c, {
         kind: 'pass_extended', actorId: null, ownerId: p.user_id,
         passId: extends_, paymentId: p.id, amount: p.amount, currency: p.currency,
-        note: `докуплено ${days} ${plural(days, 'день', 'дня', 'дней')} к пакету картой, всего стало ${grown[0].lessons_total}`,
-        details: { days },
+        note: `докуплено ${days} ${plural(days, 'день', 'дня', 'дней')} к пакету картой,`
+          + ` всего стало ${grown[0].lessons_total}`
+          + (covered > 0
+            ? `, закрыто ${covered} ${plural(covered, 'день', 'дня', 'дней')}`
+            : ''),
+        details: { days, covered },
       });
       return;
     }
