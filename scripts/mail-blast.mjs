@@ -104,8 +104,10 @@ const where = ['u.email is not null', 'u.mail_optout_at is null'];
 const params = [];
 
 if (only) {
-  params.push(only.toLowerCase());
-  where.push(`u.email = $${params.length}`);
+  // Адресов может быть несколько через запятую: иногда письмо нужно не
+  // всем и не одному, а горстке — тем, кто ходит сегодня, например.
+  params.push(only.toLowerCase().split(',').map((a) => a.trim()).filter(Boolean));
+  where.push(`u.email = any($${params.length})`);
 } else {
   params.push(campaign);
   where.push(`not exists (select 1 from mail_log m
