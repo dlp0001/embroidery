@@ -9,6 +9,7 @@ import {
 } from '@/lib/format';
 import Link from 'next/link';
 import { extendPassAction } from '@/app/admin/schedule-actions';
+import Section from '@/components/Section';
 import ExtendFold from './ExtendFold';
 
 export const dynamic = 'force-dynamic';
@@ -86,6 +87,8 @@ export default async function DebtsPage() {
   );
   const currency = price.currency;
   const total = rows.reduce((s, d) => s + Number(d.amount), 0);
+  const lessons = rows.reduce((s, d) => s + d.lessons, 0);
+  const since = rows.map((d) => d.since).sort()[0] ?? todayISO();
 
   return (
     <>
@@ -97,15 +100,11 @@ export default async function DebtsPage() {
             <div style={{ display: 'flex', gap: 8 }}>
               <Link className="btn-quiet" href="/admin/studio/camp">Лагерь</Link>
               <Link className="btn-quiet" href="/admin/studio/stats">Статистика</Link>
-              <Link className="btn-quiet" href="/admin/studio/ledger">Реестр</Link>
+              <Link className="btn-quiet" href="/admin/studio/payments">Платежи</Link>
             </div>
           )}
         </div>
-        {rows.length > 0 && (
-          <p className="sub">
-            {rows.length}&nbsp;{plural(rows.length, 'семья', 'семьи', 'семей')} на {money(total, rows[0].currency)}
-          </p>
-        )}
+        <p className="sub">Долги, абонементы и полученные деньги</p>
       </div>
 
       <div className="body">
@@ -118,20 +117,25 @@ export default async function DebtsPage() {
           </div>
         )}
 
-        {rows.length === 0 && <p className="hint">Долгов нет.</p>}
-        {rows.map((d) => (
-          <div className="card" key={d.owner_id}>
+        {/* Разбор по семьям живёт на «Оплатах»: там же, где долг и
+            закрывают. Здесь нужна одна цифра — сколько всего не дошло. */}
+        {rows.length === 0 ? (
+          <p className="hint">Долгов нет.</p>
+        ) : (
+          <div className="card">
             <div className="row">
               <div>
-                <div className="what">{d.name ?? d.email}</div>
+                <div className="what">Не оплачено</div>
                 <div className="sub">
-                  {d.who} · {d.lessons}&nbsp;{plural(d.lessons, 'занятие', 'занятия', 'занятий')} с {dayMonth(d.since)}
+                  {rows.length}&nbsp;{plural(rows.length, 'семья', 'семьи', 'семей')} ·{' '}
+                  {lessons}&nbsp;{plural(lessons, 'занятие', 'занятия', 'занятий')} с{' '}
+                  {dayMonth(since)}
                 </div>
               </div>
-              <div className="sum sum-due">{money(d.amount, d.currency)}</div>
+              <div className="sum sum-due">{money(total, rows[0].currency)}</div>
             </div>
           </div>
-        ))}
+        )}
 
         {burning.length > 0 && (
           <div className="note" style={{ marginBottom: 18 }}>
@@ -141,35 +145,35 @@ export default async function DebtsPage() {
           </div>
         )}
 
-        <div className="lbl">Действующие абонементы</div>
-        {passes.length === 0 && <p className="hint">Ни одного не продано.</p>}
-        {passes.map((p) => (
-          <div className="card" key={p.id}>
-            <div className="row">
-              <div>
-                <div className="what">{p.owner_name ?? p.owner_email}</div>
-                <div className="sub">
-                  {p.group_title ? `${p.group_title}: ` : ''}
-                  осталось {p.left} из {p.lessons_total}
-                  {p.valid_to ? ` · до ${dayMonth(p.valid_to)}` : ''}
-                  {` · ${paidWith(p)}`}
+        <Section title="Действующие абонементы" count={passes.length}>
+          {passes.length === 0 && <p className="hint">Ни одного не продано.</p>}
+          {passes.map((p) => (
+            <div className="card" key={p.id}>
+              <div className="row">
+                <div>
+                  <div className="what">{p.owner_name ?? p.owner_email}</div>
+                  <div className="sub">
+                    {p.group_title ? `${p.group_title}: ` : ''}
+                    осталось {p.left} из {p.lessons_total}
+                    {p.valid_to ? ` · до ${dayMonth(p.valid_to)}` : ''}
+                    {` · ${paidWith(p)}`}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {admin && canExtend(p) && (
-                  <ExtendFold>
-                    <ExtendForm pass={p} currency={currency} receipts={receipts} />
-                  </ExtendFold>
-                )}
-          </div>
-        ))}
+              {admin && canExtend(p) && (
+                <ExtendFold>
+                  <ExtendForm pass={p} currency={currency} receipts={receipts} />
+                </ExtendFold>
+              )}
+            </div>
+          ))}
+        </Section>
 
         {/* Только что закончившиеся: в журнале по ним ещё стоит «по
             абонементу», и без этой строки непонятно, чем оплачено. */}
         {spent.length > 0 && (
-          <>
-            <div className="lbl">Закончились</div>
+          <Section title="Закончились" count={spent.length}>
             {spent.map((p) => (
               <div className="card" key={p.id} style={{ opacity: 0.7 }}>
                 <div className="what">{p.owner_name ?? p.owner_email}</div>
@@ -186,14 +190,15 @@ export default async function DebtsPage() {
                 )}
               </div>
             ))}
-          </>
+          </Section>
         )}
 
         {admin && (
           <div className="card-lin" style={{ marginTop: 16 }}>
             <div className="what" style={{ marginBottom: 6 }}>Принять деньги</div>
             <p className="sub" style={{ marginBottom: 14 }}>
-              Наличные и переводы, заявки родителей и продажа абонементов — на «Оплатах».
+              Наличные и переводы, заявки родителей и продажа абонементов — на
+              «Оплатах». Там же видно, кто из семей сколько должен.
             </p>
             <Link className="btn-quiet" href="/admin/studio/pay">Открыть оплаты</Link>
           </div>

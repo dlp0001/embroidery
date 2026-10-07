@@ -72,6 +72,18 @@ export default async function AdminToolsPage({
           </div>
         </div>
 
+        {/* Реестр съехал сюда с «Финансов»: заглядывают в него редко, а
+            место на главной денежной странице занимал каждый день. */}
+        <div className="card">
+          <div className="row">
+            <div>
+              <div className="what">Реестр</div>
+              <div className="sub">Каждое движение денег: что, с кем, когда и по чьей руке</div>
+            </div>
+            <Link className="btn-quiet" href="/admin/studio/ledger">Открыть</Link>
+          </div>
+        </div>
+
         {/* У кого кабинет остался, тот правит своё имя там: две одинаковые
             карточки на одного человека только путают. */}
         {/* Дни своих посещений сюда не выносим: тот, кто занятия ведёт,

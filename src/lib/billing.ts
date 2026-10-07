@@ -887,3 +887,45 @@ export async function paymentHistory(userId: string): Promise<PaymentRow[]> {
     [userId],
   );
 }
+
+export type TakenRow = PaymentRow & {
+  /** Кто заплатил: имя, а если его нет — почта. */
+  who: string;
+  /** Докупленные в пакет дни: такой платёж не абонемент и не занятие. */
+  extra_days: number;
+};
+
+/**
+ * Полученные деньги: всё, что студия действительно получила. Карта,
+ * наличные, переводы, абонементы и докупленные дни.
+ *
+ * Незавершённые попытки картой и неподтверждённые заявки сюда не
+ * попадают: это намерения, а не деньги. Подарок тоже — нулевой платёж
+ * деньгами не был, а проверочные платежи это и вовсе не касса.
+ */
+export async function paymentsTaken(limit = 150): Promise<TakenRow[]> {
+  return query<TakenRow>(
+    `select p.id, p.created_at::text as at, p.provider, p.status, p.purpose,
+            p.amount::text, p.currency, p.invoice_url,
+            p.raw ->> 'pay_method' as pay_method,
+            coalesce(u.name, u.email, 'без плательщика') as who,
+            case when p.raw ? 'extends_pass'
+                 then coalesce((p.raw ->> 'days')::int, 0) else 0 end as extra_days,
+            (select g.title from passes ps
+               join studio_groups g on g.id = ps.group_id
+              where ps.payment_id = p.id) as group_title,
+            coalesce(
+              jsonb_array_length(p.raw -> 'charge_ids'),
+              nullif((select count(*)::int from charges ch where ch.payment_id = p.id), 0),
+              (select ps.lessons_total from passes ps where ps.payment_id = p.id),
+              0) as lessons
+       from payments p
+       left join users u on u.id = p.user_id
+      where p.status = 'paid'
+        and p.provider <> 'gift'
+        and p.purpose is distinct from 'studio_test'
+      order by p.created_at desc
+      limit $1`,
+    [limit],
+  );
+}
