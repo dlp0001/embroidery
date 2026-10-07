@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import { one, query, tx } from './db';
 import {
-  EVENT_CLOSES_AT, plural, providerOf, WAY, type PayMethod,
+  BY_STUDIO, EVENT_CLOSES_AT, plural, WAY, type PayMethod,
 } from './format';
 import { logMoneyIn } from './ledger';
 
@@ -561,13 +561,19 @@ async function dropCashPayment(
   participantId: string,
   actorId: string,
 ): Promise<boolean> {
-  const { rows } = await c.query<{ payment_id: string }>(
-    `select ch.payment_id from charges ch
+  const { rows } = await c.query<{ payment_id: string; covers: number }>(
+    `select ch.payment_id,
+            (select count(*)::int from charges c2 where c2.payment_id = ch.payment_id) as covers
+       from charges ch
        join payments p on p.id = ch.payment_id
       where ch.session_id = $1 and ch.participant_id = $2 and p.provider = 'cash'`,
     [sessionId, participantId],
   );
   if (rows.length === 0) return false;
+  // Одним платежом в «Оплатах» закрывают сразу несколько занятий. Удалить
+  // его отсюда значит снять оплату и с остальных — молча, у чужих дней.
+  // Такие деньги правятся там же, где их приняли.
+  if (rows[0].covers > 1) return false;
   await c.query('update charges set payment_id = null where session_id = $1 and participant_id = $2', [
     sessionId,
     participantId,
@@ -1030,6 +1036,8 @@ export type RosterRow = {
   on_pass: boolean;
   paid: boolean;
   cash: boolean;
+  /** Этот платёж закрыл сразу несколько занятий: из журнала его не правят. */
+  batch: boolean;
   /** Занятие подарено: денег нет и не будет. */
   gift: boolean;
   booked: boolean;
@@ -1092,6 +1100,7 @@ export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
             (c.pass_id is not null) as on_pass,
             (c.payment_id is not null) as paid,
             coalesce((select pay.provider = 'cash' from payments pay where pay.id = c.payment_id), false) as cash,
+            coalesce((select count(*) from charges c2 where c2.payment_id = c.payment_id) > 1, false) as batch,
             coalesce((select pay.provider = 'gift' from payments pay where pay.id = c.payment_id), false) as gift,
             /* Квитанция выписывается уже после ответа страницы, поэтому
                первые секунды её честно ещё нет. Сказать в этот момент
@@ -1821,7 +1830,7 @@ export async function issuePass(
       const pay = await c.query<{ id: string }>(
         `insert into payments (provider, user_id, amount, currency, status, purpose, raw)
          values ($1, $2, $3, $4, 'paid', 'studio_pass', $5) returning id`,
-        [providerOf(input.paid), input.ownerId, total, currency,
+        [BY_STUDIO, input.ownerId, total, currency,
          JSON.stringify({
            issued_by: byUser, lessons: input.lessons,
            group_id: groupId, group_title: groupTitle,
@@ -2019,7 +2028,7 @@ export async function extendPass(
       const pay = await c.query<{ id: string }>(
         `insert into payments (provider, user_id, amount, currency, status, purpose, raw)
          values ($1, $2, $3, $4, 'paid', 'studio_pass', $5) returning id`,
-        [providerOf(input.paid), pass.owner_id, sum, currency,
+        [BY_STUDIO, pass.owner_id, sum, currency,
          JSON.stringify({
            extends_pass: pass.id, days: input.days, issued_by: byUser,
            // Способ нужен чеку: наличные, перевод и приложения —

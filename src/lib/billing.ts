@@ -1,5 +1,5 @@
 import { one, query, tx } from './db';
-import { plural, providerOf, todayISO, WAY, type PayMethod } from './format';
+import { BY_STUDIO, plural, todayISO, WAY, type PayMethod } from './format';
 import {
   ALREADY_ISSUED, createReceipt, ICountError,
   isConfigured as receiptsConfigured,
@@ -740,7 +740,7 @@ export async function takeCash(
     const { rows } = await c.query<{ id: string }>(
       `insert into payments (provider, user_id, amount, currency, status, purpose, raw)
        values ($1, $2, $3, $4, 'paid', 'studio_debt', $5) returning id`,
-      [providerOf(input.method), input.ownerId, amount, currency,
+      [BY_STUDIO, input.ownerId, amount, currency,
        JSON.stringify({
          charge_ids: ids, taken_by: actorId,
          pay_method: input.method,

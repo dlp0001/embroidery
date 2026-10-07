@@ -270,7 +270,9 @@ export default function Journal({
   function line(r: RosterRow) {
     const row = rowFor(r);
     const m = moneyFor(r);
-    const card = r.paid && !r.cash && !r.gift;
+    // Карта и общий платёж из «Оплат» правятся не здесь: первая живёт в
+    // банке, второй закрывает ещё чьи-то занятия, кроме этого.
+    const card = (r.paid && !r.cash && !r.gift) || r.batch;
     const settled = Boolean(card || settledWay(r));
     // Чек выписан — строка закрыта навсегда: бумага уже у родителя и в
     // бухгалтерии, и снять по ней явку или переписать оплату нельзя.
@@ -324,6 +326,10 @@ export default function Journal({
                   ) : (
                     <span className="chip-money money">чек выписан</span>
                   )
+                ) : r.batch ? (
+                  // Чек по общему платежу просят там же, где его приняли:
+                  // отсюда бумага вышла бы сразу на все занятия в нём.
+                  null
                 ) : (
                   <button
                     type="button"
