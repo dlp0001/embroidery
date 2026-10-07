@@ -297,6 +297,14 @@ export default async function CampPage({
             ? ` Не получено ${money(dueRow.lessons.sum + dueRow.passes.sum, cur)}.`
             : ' Всё оплачено.'}
         </p>
+        {/* Строка про старые деньги объясняет себя сама — и только
+            тогда, когда она есть: новые платежи способ называют. */}
+        {stats.rows.some((r) => r.key === 'unknown') && (
+          <p className="hint" style={{ marginTop: 10 }}>
+            «Способ не записан» — деньги, принятые до того, как журнал стал
+            спрашивать, чем заплатили: наличные там вперемешку с переводами.
+          </p>
+        )}
 
         <div className="card-lin" style={{ marginTop: 18 }}>
           <div className="what" style={{ marginBottom: 6 }}>Пакеты смены</div>

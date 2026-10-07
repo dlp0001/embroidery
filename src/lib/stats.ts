@@ -14,7 +14,7 @@ import { lessonPrice, passTypes } from './studio';
  */
 export type Cell = { count: number; sum: number };
 export type StatsRow = { key: PayKind; label: string; lessons: Cell; passes: Cell };
-export type PayKind = 'card' | 'cash' | 'transfer' | 'due';
+export type PayKind = 'card' | 'cash' | 'transfer' | 'unknown' | 'due';
 
 /**
  * Чем закрыты деньги. Наличные и переводы разведены: в руки и на счёт
@@ -22,15 +22,16 @@ export type PayKind = 'card' | 'cash' | 'transfer' | 'due';
  *
  * Способ смотрим в самом платеже, а не в провайдере: деньги, принятые
  * в журнале, все лежат как 'cash', а битком или переводом из них была
- * половина. Провайдер остаётся опорой для старых платежей, у которых
- * способа не записано.
+ * половина. Там, где способа нет вовсе, так и говорим: эти платежи
+ * приняли раньше, чем журнал стал про способ спрашивать, и записать их
+ * в наличные значило бы выдать догадку за запись.
  */
 const BUCKET = (pay: string) => `
   case
     when ${pay}.id is null then 'due'
     when ${pay}.provider = 'gift' then 'gift'
-    when ${pay}.provider = 'cash'
-         and coalesce(${pay}.raw ->> 'pay_method', 'cash') = 'cash' then 'cash'
+    when ${pay}.provider = 'cash' and ${pay}.raw ->> 'pay_method' is null then 'unknown'
+    when ${pay}.raw ->> 'pay_method' = 'cash' then 'cash'
     when ${pay}.provider in ('cash', 'transfer') then 'transfer'
     else 'card'
   end`;
@@ -39,7 +40,8 @@ const BUCKET = (pay: string) => `
 function kindOf(provider: string | null, method: string | null): PayKind | 'gift' {
   if (provider === null) return 'due';
   if (provider === 'gift') return 'gift';
-  if (provider === 'cash' && (method ?? 'cash') === 'cash') return 'cash';
+  if (provider === 'cash' && method === null) return 'unknown';
+  if (method === 'cash') return 'cash';
   if (provider === 'cash' || provider === 'transfer') return 'transfer';
   return 'card';
 }
@@ -49,8 +51,24 @@ const KINDS: { key: PayKind; label: string }[] = [
   { key: 'card', label: 'Картой' },
   { key: 'cash', label: 'Наличными' },
   { key: 'transfer', label: 'Переводом' },
+  { key: 'unknown', label: 'Способ не записан' },
   { key: 'due', label: 'Не оплачено' },
 ];
+
+/**
+ * Строки отчёта. Пустые выкидываем только у «способ не записан»: эта
+ * строка про старые платежи и должна исчезнуть сама, когда таких не
+ * останется. Остальные стоят всегда, даже нулевые: таблица не должна
+ * менять форму от месяца к месяцу.
+ */
+function rowsOf(
+  held: (kind: PayKind) => Cell,
+  passes: (kind: PayKind) => Cell,
+): StatsRow[] {
+  return KINDS
+    .map(({ key, label }) => ({ key, label, lessons: held(key), passes: passes(key) }))
+    .filter((r) => r.key !== 'unknown' || r.lessons.count + r.passes.count > 0);
+}
 
 export type PeriodStats = {
   from: string;
@@ -260,12 +278,7 @@ export async function periodStats(from: string, to: string): Promise<PeriodStats
     onPass: held('pass').count,
     passLessons: passes.reduce((s, p) => s + p.lessons_total, 0)
       + extras.reduce((s, e) => s + e.days, 0),
-    rows: KINDS.map(({ key, label }) => ({
-      key,
-      label,
-      lessons: held(key),
-      passes: cell(key),
-    })),
+    rows: rowsOf(held, cell),
   };
 }
 
@@ -476,12 +489,7 @@ export async function campStats(groupId: string): Promise<CampStats | null> {
       total,
       average: total.count > 0 ? total.sum / total.count : 0,
     },
-    rows: KINDS.map(({ key, label }) => ({
-      key,
-      label,
-      lessons: held(key),
-      passes: cell(key),
-    })),
+    rows: rowsOf(held, cell),
     packs: {
       count: packs.length,
       days: packs.reduce((s, p) => s + p.lessons_total, 0),

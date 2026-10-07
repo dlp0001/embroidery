@@ -198,6 +198,14 @@ export default async function StatsPage({
           {plural(cnt([dueRow.lessons, dueRow.passes]), 'позицию', 'позиции', 'позиций')} пока
           не получено, остальное на руках.
         </p>
+        {/* Строка про старые деньги объясняет себя сама — и только
+            тогда, когда она есть: новые платежи способ называют. */}
+        {stats.rows.some((r) => r.key === 'unknown') && (
+          <p className="hint" style={{ marginTop: 10 }}>
+            «Способ не записан» — деньги, принятые до того, как журнал стал
+            спрашивать, чем заплатили: наличные там вперемешку с переводами.
+          </p>
+        )}
 
         <div className="lbl" style={{ marginTop: 30 }}>Реализация</div>
         <p className="hint" style={{ marginBottom: 14 }}>
