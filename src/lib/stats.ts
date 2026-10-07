@@ -14,7 +14,43 @@ import { lessonPrice, passTypes } from './studio';
  */
 export type Cell = { count: number; sum: number };
 export type StatsRow = { key: PayKind; label: string; lessons: Cell; passes: Cell };
-export type PayKind = 'direct' | 'card' | 'due';
+export type PayKind = 'card' | 'cash' | 'transfer' | 'due';
+
+/**
+ * Чем закрыты деньги. Наличные и переводы разведены: в руки и на счёт
+ * это разные деньги, и сходятся они по-разному.
+ *
+ * Способ смотрим в самом платеже, а не в провайдере: деньги, принятые
+ * в журнале, все лежат как 'cash', а битком или переводом из них была
+ * половина. Провайдер остаётся опорой для старых платежей, у которых
+ * способа не записано.
+ */
+const BUCKET = (pay: string) => `
+  case
+    when ${pay}.id is null then 'due'
+    when ${pay}.provider = 'gift' then 'gift'
+    when ${pay}.provider = 'cash'
+         and coalesce(${pay}.raw ->> 'pay_method', 'cash') = 'cash' then 'cash'
+    when ${pay}.provider in ('cash', 'transfer') then 'transfer'
+    else 'card'
+  end`;
+
+/** Тот же разбор, что в BUCKET, но для строк, уже прочитанных в память. */
+function kindOf(provider: string | null, method: string | null): PayKind | 'gift' {
+  if (provider === null) return 'due';
+  if (provider === 'gift') return 'gift';
+  if (provider === 'cash' && (method ?? 'cash') === 'cash') return 'cash';
+  if (provider === 'cash' || provider === 'transfer') return 'transfer';
+  return 'card';
+}
+
+/** Подписи строк отчёта. Порядок тот же, что в таблице. */
+const KINDS: { key: PayKind; label: string }[] = [
+  { key: 'card', label: 'Картой' },
+  { key: 'cash', label: 'Наличными' },
+  { key: 'transfer', label: 'Переводом' },
+  { key: 'due', label: 'Не оплачено' },
+];
 
 export type PeriodStats = {
   from: string;
@@ -53,17 +89,19 @@ export type Done = {
   average: number;
 };
 
-type LessonAgg = {
-  cash_n: number; cash_sum: string;
-  card_n: number; card_sum: string;
-  due_n: number; due_sum: string;
-  pass_n: number;
+type Extra = {
+  provider: string | null;
+  pay_method: string | null;
+  amount: string;
+  days: number;
 };
 
 type PassRow = {
   id: string;
   lessons_total: number;
   provider: string | null;
+  /** Чем заплатили: наличными, переводом, битом. У старых платежей пусто. */
+  pay_method: string | null;
   amount: string | null;
   /** Цена пакета из его же группы: у лагеря она своя. */
   offer_price: string | null;
@@ -92,23 +130,16 @@ const PASS_PAID = `
 export async function periodStats(from: string, to: string): Promise<PeriodStats> {
   const [price, types] = await Promise.all([lessonPrice(), passTypes()]);
 
-  const lessons = await one<LessonAgg>(
-    `select
-       /* «Нал / перевод» — всё, что Варя приняла сама: наличные, перевод,
-          биток, пейбокс. Картой считается только то, что прошло кассу. */
-       count(*) filter (where pay.provider in ('cash', 'transfer'))::int as cash_n,
-       coalesce(sum(ch.amount) filter (where pay.provider in ('cash', 'transfer')), 0)::text as cash_sum,
-       count(*) filter (where pay.provider is not null
-                          and pay.provider not in ('cash', 'transfer', 'gift'))::int as card_n,
-       coalesce(sum(ch.amount) filter (where pay.provider is not null
-                          and pay.provider not in ('cash', 'transfer', 'gift')), 0)::text as card_sum,
-       count(*) filter (where ch.payment_id is null and ch.pass_id is null)::int as due_n,
-       coalesce(sum(ch.amount) filter (where ch.payment_id is null and ch.pass_id is null), 0)::text as due_sum,
-       count(*) filter (where ch.pass_id is not null)::int as pass_n
-     from charges ch
-     join studio_sessions s on s.id = ch.session_id
-     left join payments pay on pay.id = ch.payment_id
-    where s.held_on between $1::date and $2::date`,
+  // Занятия по способам оплаты. Списанное с абонемента идёт своей
+  // строкой: деньги за него взяли раньше, когда абонемент покупали.
+  const lessons = await query<{ bucket: string; n: number; sum: string }>(
+    `select case when ch.pass_id is not null then 'pass' else ${BUCKET('pay')} end as bucket,
+            count(*)::int as n, coalesce(sum(ch.amount), 0)::text as sum
+       from charges ch
+       join studio_sessions s on s.id = ch.session_id
+       left join payments pay on pay.id = ch.payment_id
+      where s.held_on between $1::date and $2::date
+      group by 1`,
     [from, to],
   );
 
@@ -132,6 +163,7 @@ export async function periodStats(from: string, to: string): Promise<PeriodStats
 
   const passes = await query<PassRow>(
     `select ps.id, ps.lessons_total, pay.provider, pay.amount::text,
+            pay.raw ->> 'pay_method' as pay_method,
             ${OFFER_PRICE}::text as offer_price
        from passes ps
        left join payments pay on pay.id = ps.payment_id
@@ -142,8 +174,9 @@ export async function periodStats(from: string, to: string): Promise<PeriodStats
 
   // Докупленные дни — продажа того месяца, когда за них заплатили, и
   // считаются вместе с абонементами: это и есть пополнение пакета.
-  const extras = await query<{ provider: string | null; amount: string; days: number }>(
-    `select pay.provider, pay.amount::text, coalesce((pay.raw ->> 'days')::int, 0) as days
+  const extras = await query<Extra>(
+    `select pay.provider, pay.amount::text, pay.raw ->> 'pay_method' as pay_method,
+            coalesce((pay.raw ->> 'days')::int, 0) as days
        from payments pay
       where pay.raw ? 'extends_pass'
         and pay.status = 'paid'
@@ -160,15 +193,9 @@ export async function periodStats(from: string, to: string): Promise<PeriodStats
     return t ? t.price : price.amount * p.lessons_total;
   };
 
-  const bucket = (p: PassRow): PayKind =>
-    p.provider === null ? 'due' : p.provider === 'cash' || p.provider === 'transfer' ? 'direct' : 'card';
-
   const cell = (kind: PayKind): Cell => {
-    const mine = passes.filter((p) => bucket(p) === kind);
-    const grown = extras.filter(
-      (e) => (e.provider === null ? 'due'
-        : e.provider === 'cash' || e.provider === 'transfer' ? 'direct' : 'card') === kind,
-    );
+    const mine = passes.filter((p) => kindOf(p.provider, p.pay_method) === kind);
+    const grown = extras.filter((e) => kindOf(e.provider, e.pay_method) === kind);
     return {
       count: mine.length + grown.length,
       sum: mine.reduce((s, p) => s + worth(p), 0)
@@ -176,9 +203,10 @@ export async function periodStats(from: string, to: string): Promise<PeriodStats
     };
   };
 
-  const L = lessons ?? {
-    cash_n: 0, cash_sum: '0', card_n: 0, card_sum: '0',
-    due_n: 0, due_sum: '0', pass_n: 0,
+  /** Занятия этого способа оплаты: то, что посчитал запрос. */
+  const held = (kind: PayKind | 'pass'): Cell => {
+    const r = lessons.find((x) => x.bucket === kind);
+    return { count: r?.n ?? 0, sum: Number(r?.sum ?? 0) };
   };
 
   const single: DoneRow = { count: 0, sum: 0 };
@@ -229,29 +257,15 @@ export async function periodStats(from: string, to: string): Promise<PeriodStats
       total: totalDone,
       average: totalDone.count > 0 ? totalDone.sum / totalDone.count : 0,
     },
-    onPass: L.pass_n,
+    onPass: held('pass').count,
     passLessons: passes.reduce((s, p) => s + p.lessons_total, 0)
       + extras.reduce((s, e) => s + e.days, 0),
-    rows: [
-      {
-        key: 'direct',
-        label: 'Нал / перевод',
-        lessons: { count: L.cash_n, sum: Number(L.cash_sum) },
-        passes: cell('direct'),
-      },
-      {
-        key: 'card',
-        label: 'Картой',
-        lessons: { count: L.card_n, sum: Number(L.card_sum) },
-        passes: cell('card'),
-      },
-      {
-        key: 'due',
-        label: 'Не оплачено',
-        lessons: { count: L.due_n, sum: Number(L.due_sum) },
-        passes: cell('due'),
-      },
-    ],
+    rows: KINDS.map(({ key, label }) => ({
+      key,
+      label,
+      lessons: held(key),
+      passes: cell(key),
+    })),
   };
 }
 
@@ -294,7 +308,7 @@ export type CampStats = {
   days: CampDay[];
   /** Реализация: дни поштучно и дни по пакетам — как на статистике. */
   done: { single: DoneRow; pass: DoneRow; gift: DoneRow; total: DoneRow; average: number };
-  /** Как оплачено: те же три строки, что в месячном отчёте. */
+  /** Как оплачено: те же строки, что в месячном отчёте. */
   rows: StatsRow[];
   /** Проданные пакеты этой смены. */
   packs: { count: number; days: number; sum: number };
@@ -357,14 +371,15 @@ export async function campStats(groupId: string): Promise<CampStats | null> {
     ),
     query<PassRow>(
       `select ps.id, ps.lessons_total, pay.provider, pay.amount::text,
+              pay.raw ->> 'pay_method' as pay_method,
               ${OFFER_PRICE}::text as offer_price
          from passes ps
          left join payments pay on pay.id = ps.payment_id
         where ps.group_id = $1`,
       [groupId],
     ),
-    query<{ provider: string | null; amount: string; days: number }>(
-      `select pay.provider, pay.amount::text,
+    query<Extra>(
+      `select pay.provider, pay.amount::text, pay.raw ->> 'pay_method' as pay_method,
               coalesce((pay.raw ->> 'days')::int, 0) as days
          from payments pay
         where pay.status = 'paid'
@@ -382,22 +397,15 @@ export async function campStats(groupId: string): Promise<CampStats | null> {
     ),
   ]);
 
-  // Как оплачены сами дни: те же три строки, что в месячном отчёте.
-  const money = await one<LessonAgg>(
-    `select
-       count(*) filter (where pay.provider in ('cash', 'transfer'))::int as cash_n,
-       coalesce(sum(ch.amount) filter (where pay.provider in ('cash', 'transfer')), 0)::text as cash_sum,
-       count(*) filter (where pay.provider is not null
-                          and pay.provider not in ('cash', 'transfer', 'gift'))::int as card_n,
-       coalesce(sum(ch.amount) filter (where pay.provider is not null
-                          and pay.provider not in ('cash', 'transfer', 'gift')), 0)::text as card_sum,
-       count(*) filter (where ch.payment_id is null and ch.pass_id is null)::int as due_n,
-       coalesce(sum(ch.amount) filter (where ch.payment_id is null and ch.pass_id is null), 0)::text as due_sum,
-       count(*) filter (where ch.pass_id is not null)::int as pass_n
-     from charges ch
-     join studio_sessions s on s.id = ch.session_id
-     left join payments pay on pay.id = ch.payment_id
-    where s.group_id = $1`,
+  // Как оплачены сами дни: те же строки, что в месячном отчёте.
+  const money = await query<{ bucket: string; n: number; sum: string }>(
+    `select case when ch.pass_id is not null then 'pass' else ${BUCKET('pay')} end as bucket,
+            count(*)::int as n, coalesce(sum(ch.amount), 0)::text as sum
+       from charges ch
+       join studio_sessions s on s.id = ch.session_id
+       left join payments pay on pay.id = ch.payment_id
+      where s.group_id = $1
+      group by 1`,
     [groupId],
   );
 
@@ -430,12 +438,8 @@ export async function campStats(groupId: string): Promise<CampStats | null> {
   };
 
   const cell = (kind: PayKind): Cell => {
-    const mine = packs.filter((p) => (
-      p.provider === null ? 'due' : p.provider === 'cash' || p.provider === 'transfer' ? 'direct' : 'card'
-    ) === kind);
-    const grown = extras.filter((e) => (
-      e.provider === null ? 'due' : e.provider === 'cash' || e.provider === 'transfer' ? 'direct' : 'card'
-    ) === kind);
+    const mine = packs.filter((p) => kindOf(p.provider, p.pay_method) === kind);
+    const grown = extras.filter((e) => kindOf(e.provider, e.pay_method) === kind);
     return {
       count: mine.length + grown.length,
       sum: mine.reduce((s, p) => s + worth(p), 0)
@@ -443,9 +447,10 @@ export async function campStats(groupId: string): Promise<CampStats | null> {
     };
   };
 
-  const L = money ?? {
-    cash_n: 0, cash_sum: '0', card_n: 0, card_sum: '0',
-    due_n: 0, due_sum: '0', pass_n: 0,
+  /** Дни этого способа оплаты: то, что посчитал запрос. */
+  const held = (kind: PayKind): Cell => {
+    const r = money.find((x) => x.bucket === kind);
+    return { count: r?.n ?? 0, sum: Number(r?.sum ?? 0) };
   };
   const visits = kids.reduce((s, k) => s + k.n, 0);
 
@@ -471,26 +476,12 @@ export async function campStats(groupId: string): Promise<CampStats | null> {
       total,
       average: total.count > 0 ? total.sum / total.count : 0,
     },
-    rows: [
-      {
-        key: 'direct',
-        label: 'Нал / перевод',
-        lessons: { count: L.cash_n, sum: Number(L.cash_sum) },
-        passes: cell('direct'),
-      },
-      {
-        key: 'card',
-        label: 'Картой',
-        lessons: { count: L.card_n, sum: Number(L.card_sum) },
-        passes: cell('card'),
-      },
-      {
-        key: 'due',
-        label: 'Не оплачено',
-        lessons: { count: L.due_n, sum: Number(L.due_sum) },
-        passes: cell('due'),
-      },
-    ],
+    rows: KINDS.map(({ key, label }) => ({
+      key,
+      label,
+      lessons: held(key),
+      passes: cell(key),
+    })),
     packs: {
       count: packs.length,
       days: packs.reduce((s, p) => s + p.lessons_total, 0),
