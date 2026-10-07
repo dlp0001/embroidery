@@ -142,14 +142,18 @@ export async function familyParticipants(userId: string): Promise<Participant[]>
 export type PayWay = 'none' | 'cash' | 'pass' | 'gift';
 
 /**
- * Отметка в журнале. Чек — необязательная просьба: если он назван, то
- * при сохранении выписывается квитанция, и способ оплаты в ней тот, что
- * выбрала Варя. Бит и пейбокс для iCount разные вещи, поэтому спрашиваем.
+ * Отметка в журнале. Способ оплаты говорит, куда делись деньги: в руки
+ * или на счёт, — и записывается всегда, чтобы отчёт не выдавал догадку
+ * за запись. Чек — необязательная просьба поверх: если он назван, при
+ * сохранении выписывается квитанция, и способ в ней точнее — бит и
+ * пейбокс для iCount разные вещи, поэтому про них спрашиваем отдельно.
  */
 export type Mark = {
   participantId: string;
   status: AttendanceStatus;
   pay?: PayWay;
+  /** Куда делись деньги. Пусто — способа не назвали: у старого платежа его нет. */
+  took?: 'cash' | 'transfer' | null;
   receipt?: PayMethod | null;
 };
 
@@ -416,18 +420,21 @@ export async function saveAttendance(
         continue;
       }
 
-      // Наличные: заводим платёж. Просьбу о чеке и способ оплаты кладём
-      // в сам платёж: по ним квитанция выпишется уже после транзакции, а
-      // если iCount откажет, пометка останется и следующая попытка
-      // подхватит её сама.
+      // Деньги приняли сами: заводим платёж. Способ и просьбу о чеке
+      // кладём в сам платёж: по ним квитанция выпишется уже после
+      // транзакции, а если iCount откажет, пометка останется и следующая
+      // попытка подхватит её сама.
       if (way === 'cash') {
         const want = mark.receipt ?? null;
+        // Способ чека точнее: «переводом» в отчёте и «битом» в квитанции
+        // — это одни и те же деньги, просто бухгалтерии нужно подробнее.
+        const method = want ?? mark.took ?? null;
         // Время просьбы нужно журналу: по нему он отличает «выписывается
         // прямо сейчас» от «просили давно, а чека нет».
-        const detail = want
+        const detail = method
           ? JSON.stringify({
-              pay_method: want, receipt_wanted: 'yes',
-              receipt_asked_at: new Date().toISOString(),
+              pay_method: method,
+              ...(want ? { receipt_wanted: 'yes', receipt_asked_at: new Date().toISOString() } : {}),
             })
           : null;
         if (!charge.payment_id) {
@@ -444,23 +451,36 @@ export async function saveAttendance(
             paymentId: pay.rows[0].id, amount, currency,
             note: want
               ? `оплачено ${WAY[want]}, 1 занятие, с чеком`
-              : 'оплачено наличными или переводом, 1 занятие',
-            details: want ? { pay_method: want, receipt: true } : undefined,
+              : method
+                ? `оплачено ${WAY[method]}, 1 занятие`
+                : 'оплачено наличными или переводом, 1 занятие',
+            details: want
+              ? { pay_method: want, receipt: true }
+              : method ? { pay_method: method } : undefined,
           });
         } else if (detail && charge.provider === 'cash') {
           // Деньги взяли раньше, чек попросили теперь — или он не вышел с
           // первого раза. Способ мог и поменяться: пишем тот, что назвали.
-          await c.query(
-            `update payments set raw = coalesce(raw, '{}'::jsonb) || $2::jsonb where id = $1`,
-            [charge.payment_id, detail],
+          // Молчим только тогда, когда ничего нового не сказали: иначе
+          // каждое сохранение журнала писало бы в ленту денег пустую
+          // строку про каждого, кто когда-то заплатил.
+          const seen = await c.query<{ method: string | null }>(
+            `select raw ->> 'pay_method' as method from payments where id = $1`,
+            [charge.payment_id],
           );
-          await logMoneyIn(c, {
-            kind: 'cash_taken', actorId: actor.id, ownerId: charge.owner_id,
-            participantId: mark.participantId, sessionId, chargeId: charge.id,
-            paymentId: charge.payment_id, amount, currency,
-            note: `запрошен чек, ${WAY[want!]}`,
-            details: { pay_method: want, receipt: true },
-          });
+          if (want || seen.rows[0]?.method !== method) {
+            await c.query(
+              `update payments set raw = coalesce(raw, '{}'::jsonb) || $2::jsonb where id = $1`,
+              [charge.payment_id, detail],
+            );
+            await logMoneyIn(c, {
+              kind: 'cash_taken', actorId: actor.id, ownerId: charge.owner_id,
+              participantId: mark.participantId, sessionId, chargeId: charge.id,
+              paymentId: charge.payment_id, amount, currency,
+              note: want ? `запрошен чек, ${WAY[want]}` : `способ оплаты — ${WAY[method!]}`,
+              details: want ? { pay_method: want, receipt: true } : { pay_method: method },
+            });
+          }
         }
         if (want && charge.payment_id && charge.provider === 'cash') {
           stat.bill.push(charge.payment_id);

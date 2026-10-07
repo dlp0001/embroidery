@@ -63,10 +63,12 @@ export async function saveJournal(formData: FormData): Promise<void> {
     const participantId = key.slice(5);
     const way = String(formData.get(`pay:${participantId}`) ?? 'none') as PayWay;
     const want = String(formData.get(`receipt:${participantId}`) ?? '') as PayMethod;
+    const took = String(formData.get(`took:${participantId}`) ?? '');
     seen.set(participantId, {
       participantId,
       status,
       pay: WAYS.includes(way) ? way : 'none',
+      took: took === 'cash' || took === 'transfer' ? took : null,
       receipt: METHODS.includes(want) ? want : null,
     });
   }

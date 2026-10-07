@@ -11,7 +11,7 @@ const KIND: Record<MoneyKind, { text: string; good: boolean }> = {
   charge_removed: { text: 'начисление снято', good: true },
   charge_on_pass: { text: 'списано с абонемента', good: true },
   charge_off_pass: { text: 'возвращено в абонемент', good: true },
-  cash_taken: { text: 'оплачено наличными или переводом', good: true },
+  cash_taken: { text: 'деньги приняла студия', good: true },
   cash_reverted: { text: 'оплата отменена', good: false },
   gift: { text: 'занятие подарено', good: true },
   gift_reverted: { text: 'подарок снят', good: false },

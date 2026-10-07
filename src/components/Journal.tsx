@@ -9,22 +9,36 @@ import type { PayWay, RosterRow } from '@/lib/studio';
 /** Чек: не нужен или нужен, и тогда с тем способом, который назвала Варя. */
 type Want = '' | PayMethod;
 
-type Row = { present: boolean; pay: PayWay; receipt: Want };
+/**
+ * Куда делись деньги: в руки или на счёт. Пусто — способа не записано:
+ * так лежат платежи, принятые до того, как про способ стали спрашивать.
+ */
+type Took = '' | 'cash' | 'transfer';
+
+type Row = { present: boolean; pay: PayWay; took: Took; receipt: Want };
 
 /**
- * Способы по кругу, начиная с «без чека». Названия короткие и такие же,
- * как их произносят вслух: «битом», «пейбоксом», «переводом».
+ * Чек по кругу, начиная с «без чека». У наличных выбирать нечего: касса
+ * и есть касса. У денег на счёт iCount различает три способа — биток и
+ * пейбокс идут как оплата приложением, банковский перевод просит номер
+ * счёта, — и спросить про них нужно ровно тогда, когда выписывается
+ * бумага. Первым в списке биток: им платят чаще остальных.
  */
-const RECEIPTS: { key: Want; text: string }[] = [
-  { key: '', text: 'без чека' },
-  { key: 'cash', text: 'чек: наличные' },
-  { key: 'bit', text: 'чек: bit' },
-  { key: 'paybox', text: 'чек: paybox' },
-  { key: 'transfer', text: 'чек: перевод' },
-];
+function receiptCycle(took: Took): { key: Want; text: string }[] {
+  const none = { key: '' as Want, text: 'без чека' };
+  const app: { key: Want; text: string }[] = [
+    { key: 'bit', text: 'чек: bit' },
+    { key: 'paybox', text: 'чек: paybox' },
+    { key: 'transfer', text: 'чек: банк' },
+  ];
+  if (took === 'cash') return [none, { key: 'cash', text: 'чек' }];
+  if (took === 'transfer') return [none, ...app];
+  // Способ не назван: пусть его назовёт сам чек.
+  return [none, { key: 'cash', text: 'чек: наличные' }, ...app];
+}
 
-function receiptText(want: Want): string {
-  return RECEIPTS.find((r) => r.key === want)?.text ?? 'без чека';
+function receiptText(took: Took, want: Want): string {
+  return receiptCycle(took).find((r) => r.key === want)?.text ?? 'без чека';
 }
 
 /**
@@ -45,13 +59,22 @@ function Booked({ on }: { on: boolean }) {
 }
 
 /**
- * Абонемент можно выбрать, только если он есть или занятие уже на нём.
- * Подарок есть всегда: он ни от чего не зависит, кроме решения Вари.
+ * Оплата по кругу: не оплачено → наличными → переводом → абонемент →
+ * подарок. Наличные и перевод стоят отдельными положениями, а не прячутся
+ * в одно «оплачено»: пока способ записывался заодно с чеком, у половины
+ * денег его просто не было, и в отчёте они все считались наличными.
+ *
+ * Абонемент в круге есть, только если он есть у человека. Подарок есть
+ * всегда: он ни от чего не зависит, кроме решения Вари.
  */
-function ways(r: RosterRow): PayWay[] {
-  return r.has_pass || r.on_pass
-    ? ['none', 'cash', 'pass', 'gift']
-    : ['none', 'cash', 'gift'];
+function states(r: RosterRow): { pay: PayWay; took: Took }[] {
+  return [
+    { pay: 'none', took: '' },
+    { pay: 'cash', took: 'cash' },
+    { pay: 'cash', took: 'transfer' },
+    ...(r.has_pass || r.on_pass ? [{ pay: 'pass' as PayWay, took: '' as Took }] : []),
+    { pay: 'gift', took: '' },
+  ];
 }
 
 /** Ребёнка привели, а родителя у него ещё нет: платить пока некому. */
@@ -80,6 +103,12 @@ function defaults(r: RosterRow): Row {
     // деньги действительно взяты на месте: чек ездит на таком платеже и
     // сам по себе, без него, не существует.
     receipt: r.cash && r.receipt !== 'none' ? (r.pay_method ?? '') : '',
+    // Способ берём из самого платежа. У старых его нет, и там, где деньги
+    // приняли до того, как про способ стали спрашивать, честнее промолчать,
+    // чем подставить наличные и выдать догадку за запись.
+    took: r.cash && r.pay_method !== null
+      ? (r.pay_method === 'cash' ? 'cash' : 'transfer')
+      : '',
     // Абонемент предлагаем только тем, кого сейчас отмечают впервые.
     // Занятие с уже проставленной отметкой — прошлое: подставлять ему
     // абонемент нельзя, иначе экран обещает списание, которого не было.
@@ -178,7 +207,14 @@ export default function Journal({
     // Оплату картой из журнала не снять: деньги пришли через банк.
     if (r.paid && !r.cash && !r.gift) return { text: 'оплачено картой', cls: 'money' };
     if (row.pay === 'gift') return { text: 'подарок', cls: 'money' };
-    if (row.pay === 'cash') return { text: 'оплачено наличными или переводом', cls: 'money' };
+    if (row.pay === 'cash') {
+      return {
+        text: row.took === 'cash' ? 'оплачено наличными'
+          : row.took === 'transfer' ? 'оплачено переводом'
+          : 'оплачено',
+        cls: 'money',
+      };
+    }
     if (row.pay === 'pass') return { text: passWord, cls: 'money' };
     return { text: `не оплачено · ${price}`, cls: 'money-due' };
   }
@@ -188,27 +224,46 @@ export default function Journal({
     setEdits((p) => ({ ...p, [r.participant_id]: { ...row, present: !row.present } }));
   }
 
-  /** Клик по статусу оплаты гоняет его по кругу: три варианта или два. */
+  /** Клик по статусу оплаты гоняет его по кругу: наличные и перевод — разные шаги. */
   function nextWay(r: RosterRow) {
-    const list = ways(r);
+    const list = states(r);
     const row = rowFor(r);
-    const at = list.indexOf(row.pay);
-    const pay = list[(at + 1) % list.length];
-    // Чек бывает только у денег, отданных в руки: ушли с наличных —
-    // просьба о чеке уходит вместе с ними.
+    const at = list.findIndex(
+      (x) => x.pay === row.pay && (row.pay !== 'cash' || x.took === row.took),
+    );
+    // Старый платёж без способа в круге не стоит, и первое нажатие на нём
+    // способ называет, а не снимает оплату: снять её можно и следующим.
+    const next = list[at < 0 ? 1 : (at + 1) % list.length];
+    // Чек бывает только у денег, принятых студией, и способ у него тот же,
+    // что у самих денег: перешли на перевод — просьба едет следом, но уже
+    // как «чек: bit», а не как касса.
     setEdits((p) => ({
       ...p,
-      [r.participant_id]: { ...row, pay, receipt: pay === 'cash' ? row.receipt : '' },
+      [r.participant_id]: {
+        ...row,
+        pay: next.pay,
+        took: next.took,
+        receipt: next.pay === 'cash' && row.receipt
+          ? (next.took === 'transfer' ? 'bit' : 'cash')
+          : '',
+      },
     }));
   }
 
-  /** Клик по чеку перебирает способы: без чека, наличные, бит, пейбокс, перевод. */
+  /** Клик по чеку перебирает способы — те, что возможны при этих деньгах. */
   function nextReceipt(r: RosterRow) {
     const row = rowFor(r);
-    const at = RECEIPTS.findIndex((x) => x.key === row.receipt);
+    const list = receiptCycle(row.took);
+    const at = list.findIndex((x) => x.key === row.receipt);
+    const want = list[(at + 1) % list.length].key;
     setEdits((p) => ({
       ...p,
-      [r.participant_id]: { ...row, receipt: RECEIPTS[(at + 1) % RECEIPTS.length].key },
+      [r.participant_id]: {
+        ...row,
+        receipt: want,
+        // У старого платежа способа не было: чек его и назвал.
+        took: row.took === '' && want ? (want === 'cash' ? 'cash' : 'transfer') : row.took,
+      },
     }));
   }
 
@@ -235,6 +290,7 @@ export default function Journal({
         <div className="mark">
           <input type="hidden" name={`mark:${r.participant_id}`} value={row.present ? 'present' : 'absent'} />
           <input type="hidden" name={`pay:${r.participant_id}`} value={row.pay} />
+          <input type="hidden" name={`took:${r.participant_id}`} value={row.took} />
           <input type="hidden" name={`receipt:${r.participant_id}`} value={row.receipt} />
 
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -274,7 +330,7 @@ export default function Journal({
                     className={`chip-money ${row.receipt ? 'money' : 'money-off'}`}
                     onClick={() => nextReceipt(r)}
                   >
-                    {receiptText(row.receipt)}
+                    {receiptText(row.took, row.receipt)}
                     {r.receipt === 'sending' && ' · выписываем'}
                     {r.receipt === 'wanted' && ' · не вышел'}
                   </button>
