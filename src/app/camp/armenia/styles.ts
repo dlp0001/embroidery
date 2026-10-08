@@ -42,14 +42,6 @@ export const ARMENIA_CSS = `
   .lp .sched-what { font-size: 15px; color: var(--charcoal); }
   .lp .sched-what span { display: block; font-size: 13px; color: var(--warm-gray); margin-top: 2px; }
 
-  /* Ход смены: от первого дня к последнему */
-  .lp .arc { list-style: none; margin-top: 44px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-top: 2px solid var(--rose-light); }
-  .lp .arc li { padding: 26px 22px 0 0; position: relative; }
-  .lp .arc li::before { content: ''; position: absolute; top: -7px; left: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--rose); }
-  .lp .arc li:last-child::before { background: var(--apricot); }
-  .lp .arc-when { font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--warm-gray); margin-bottom: 8px; }
-  .lp .arc-t { font-family: 'Cormorant Garamond', serif; font-size: 22px; line-height: 1.2; margin-bottom: 8px; }
-  .lp .arc-d { font-size: 14px; color: var(--warm-gray); line-height: 1.8; }
 
   /* Про Варю: фото слева, текст справа */
   .lp .host { display: grid; grid-template-columns: 5fr 6fr; gap: 64px; align-items: center; }
@@ -81,6 +73,60 @@ export const ARMENIA_CSS = `
   .lp .incl-off li::before { background: var(--warm-gray); }
   .lp .incl-cols { columns: 2; column-gap: 32px; }
   .lp .incl-cols li { break-inside: avoid; }
+
+  /* Карта смены */
+  .lp .sm { margin-top: 36px; }
+  .lp .sm-chips { display: flex; gap: 22px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
+  .lp .sm-chips::-webkit-scrollbar { display: none; }
+  .lp .sm-group { flex: none; }
+  .lp .sm-phase { font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--warm-gray); margin-bottom: 8px; white-space: nowrap; }
+  .lp .sm-row { display: flex; gap: 5px; }
+  .lp .sm-chip { width: 38px; height: 38px; border: 1px solid rgba(26,26,46,0.15); background: #fff; color: var(--charcoal); font-family: 'Cormorant Garamond', serif; font-size: 18px; font-variant-numeric: lining-nums; cursor: pointer; transition: background 0.2s, border-color 0.2s, color 0.2s; }
+  .lp .sm-chip:hover { border-color: var(--rose); }
+  .lp .sm-chip.is-past { background: rgba(233,30,140,0.06); border-color: var(--rose-light); }
+  .lp .sm-chip.is-on { background: var(--rose); border-color: var(--rose); color: #fff; }
+
+  .lp .sm-grid { display: grid; grid-template-columns: 1.7fr 1fr; gap: 32px; margin-top: 22px; align-items: start; }
+  .lp .sm-map { position: relative; }
+  .lp .sm-map svg { display: block; width: 100%; height: auto; border: 1px solid var(--line); background: #fffaf4; }
+  .lp .sm-now { position: absolute; top: 12px; left: 12px; z-index: 1; background: rgba(255,255,255,0.94); border: 1px solid var(--line); padding: 6px 12px; font-size: 13px; color: var(--warm-gray); pointer-events: none; }
+  .lp .sm-now b { font-weight: 500; color: var(--rose); margin-right: 6px; font-variant-numeric: tabular-nums; }
+  .lp .sm-label { font-family: 'Cormorant Garamond', serif; font-size: 21px; fill: var(--charcoal); paint-order: stroke; stroke: #fffaf4; stroke-width: 5px; stroke-linejoin: round; }
+  .lp .sm-area { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 17px; fill: var(--warm-gray); }
+  .lp .sm-dot { fill: #fff; stroke: rgba(26,26,46,0.25); stroke-width: 1.5; transition: fill 0.3s, stroke 0.3s; }
+  .lp .sm-ico { stroke: rgba(26,26,46,0.55); }
+  .lp .is-today .sm-dot { fill: #fde4f1; stroke: var(--rose); }
+  .lp .is-today .sm-ico { stroke: var(--rose-dark); }
+  .lp .is-here .sm-dot { fill: var(--rose); stroke: var(--rose); }
+  .lp .is-here .sm-ico { stroke: #fff; }
+  .lp .is-here .sm-label { fill: var(--rose-dark); }
+  .lp .sm-pulse { fill: var(--rose); opacity: 0.5; transform-box: fill-box; transform-origin: center; animation: sm-pulse 1.4s ease-out infinite; }
+  @keyframes sm-pulse { from { transform: scale(1); opacity: 0.5; } to { transform: scale(2); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .lp .sm-pulse { animation: none; opacity: 0; } }
+  .lp .sm-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12px; color: var(--warm-gray); margin-top: 10px; }
+  .lp .sm-key { display: inline-block; width: 26px; height: 0; border-top: 3px dashed var(--rose); }
+  .lp .sm-key-old { border-top: 1.5px dashed rgba(244,162,89,0.8); margin-left: 8px; }
+  .lp .sm-aside { margin-left: auto; font-style: italic; }
+
+  .lp .sm-day { font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--warm-gray); }
+  .lp .sm-title { font-family: 'Cormorant Garamond', serif; font-style: italic; font-size: 30px; line-height: 1.15; color: var(--rose); margin: 4px 0 10px; }
+  .lp .sm-note { font-size: 13px; color: var(--warm-gray); line-height: 1.7; }
+  .lp .sm-note b { font-weight: 400; color: var(--charcoal); }
+  .lp .sm-stops { list-style: none; margin-top: 18px; border-top: 1px solid var(--line); }
+  .lp .sm-stop { width: 100%; display: grid; grid-template-columns: 52px 1fr; gap: 12px; text-align: left; background: none; border: none; border-bottom: 1px solid var(--line); border-left: 2px solid transparent; padding: 11px 8px 11px 10px; cursor: pointer; transition: background 0.25s, opacity 0.25s, border-color 0.25s; font: inherit; color: inherit; }
+  .lp .sm-stop:hover { background: rgba(255,255,255,0.6); }
+  .lp .sm-stop.is-now { background: #fff; border-left-color: var(--rose); }
+  .lp .sm-stop.is-next { opacity: 0.45; }
+  .lp .sm-at { font-size: 13px; color: var(--rose); font-variant-numeric: tabular-nums; padding-top: 1px; }
+  .lp .sm-what { font-size: 13.5px; color: var(--warm-gray); line-height: 1.6; }
+  .lp .sm-what b { display: block; font-weight: 400; color: var(--charcoal); font-size: 14px; }
+  .lp .sm-ctrl { display: flex; gap: 6px; margin-top: 18px; flex-wrap: wrap; }
+  .lp .sm-btn { min-height: 40px; padding: 0 14px; border: 1px solid rgba(26,26,46,0.15); background: #fff; color: var(--charcoal); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; cursor: pointer; }
+  .lp .sm-btn:hover:not(:disabled) { border-color: var(--rose); }
+  .lp .sm-btn:disabled { opacity: 0.35; cursor: default; }
+  .lp .sm-btn-main { background: var(--charcoal); border-color: var(--charcoal); color: #fff; flex: 1; }
+  .lp .sm-btn-main:hover:not(:disabled) { background: var(--rose); border-color: var(--rose); }
+  .lp .sm-btn-all.is-on { background: var(--rose); border-color: var(--rose); color: #fff; }
 
   /* Фишки смены: свой тёплый фон, чтобы блок читался отдельно от программы */
   .lp .ideas { max-width: none; background: #fff6ee; }
@@ -140,6 +186,15 @@ export const ARMENIA_CSS = `
   @media (max-width: 900px) {
     .lp .shifts, .lp .incl, .lp .host, .lp .parents { grid-template-columns: 1fr; }
     .lp .parents { gap: 40px; }
+    .lp .sm-grid { grid-template-columns: 1fr; gap: 24px; }
+    /* Этапы смены переносятся по два в строку: так видны все дни сразу, без прокрутки вбок */
+    .lp .sm-chips { flex-wrap: wrap; overflow: visible; gap: 14px 16px; padding-bottom: 0; }
+    .lp .sm-chip { width: 36px; height: 36px; }
+    /* Карта на телефоне в два-три раза мельче — подписи крупнее в единицах карты */
+    .lp .sm-label { font-size: 34px; stroke-width: 7px; }
+    .lp .sm-area { font-size: 26px; }
+    .lp .sm-now { top: 8px; left: 8px; font-size: 12px; padding: 4px 10px; }
+    .lp .sm-aside { margin-left: 0; flex-basis: 100%; }
     .lp .duo { grid-template-columns: 1fr; }
     .lp .duo-art { min-height: 180px; }
     .lp .idea-cols { grid-template-columns: 1fr; gap: 32px; margin-top: 48px; }
@@ -150,9 +205,6 @@ export const ARMENIA_CSS = `
     .lp .host { gap: 32px; }
     .lp .host img { aspect-ratio: 1/1; }
     .lp .crafts { grid-template-columns: 1fr; gap: 28px; }
-    .lp .arc { grid-template-columns: 1fr; border-top: none; border-left: 2px solid var(--rose-light); margin-left: 6px; }
-    .lp .arc li { padding: 0 0 28px 26px; }
-    .lp .arc li::before { top: 6px; left: -7px; }
     .lp .sched-row { grid-template-columns: 64px 1fr; gap: 14px; }
     .lp .shots-6 { grid-template-columns: 1fr 1fr; }
     .lp .incl-cols { columns: 1; }
