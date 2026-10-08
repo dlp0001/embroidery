@@ -82,6 +82,28 @@ export const ARMENIA_CSS = `
   .lp .incl-cols { columns: 2; column-gap: 32px; }
   .lp .incl-cols li { break-inside: avoid; }
 
+  /* Фишки смены: свой тёплый фон, чтобы блок читался отдельно от программы */
+  .lp .ideas { max-width: none; background: #fff6ee; }
+  .lp .ideas > .inner { max-width: 1020px; margin: 0 auto; }
+  .lp .duo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 44px; }
+  .lp .duo-card { background: #fff; border: 1px solid rgba(244,162,89,0.35); padding: 26px 24px 24px; }
+  .lp .duo-tag { display: inline-block; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #b8651f; background: var(--apricot-soft); padding: 4px 10px; margin-bottom: 14px; }
+  .lp .duo-t { font-family: 'Cormorant Garamond', serif; font-size: 24px; line-height: 1.2; margin-bottom: 8px; }
+  .lp .duo-d { font-size: 14px; color: var(--warm-gray); line-height: 1.8; }
+  .lp .duo-art { background: var(--rose); display: flex; align-items: center; justify-content: center; min-height: 220px; }
+  .lp .duo-art svg { width: 70%; max-width: 220px; height: auto; display: block; }
+  .lp .idea-cols { display: grid; grid-template-columns: repeat(4, 1fr); gap: 36px; margin-top: 64px; }
+  .lp .idea-h { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-style: italic; color: var(--rose); padding-bottom: 12px; border-bottom: 1px solid rgba(244,162,89,0.45); }
+  .lp .idea-list { list-style: none; }
+  .lp .idea-list li { font-size: 14px; color: var(--warm-gray); line-height: 1.7; padding: 12px 0; border-bottom: 1px solid rgba(244,162,89,0.2); }
+  .lp .idea-list b { font-weight: 400; color: var(--charcoal); }
+
+  /* Гриша: рисунок справа, текст слева — зеркально Варе */
+  .lp .host-alt { margin-top: 96px; grid-template-columns: 6fr 5fr; }
+  .lp .host-alt .host-art { order: 2; }
+  .lp .host-art { background: #fff; aspect-ratio: 4/5; display: flex; align-items: center; justify-content: center; }
+  .lp .host-art svg { width: 62%; height: auto; display: block; }
+
   /* Родителям: список слева, пример из бота справа */
   .lp .parents { display: grid; grid-template-columns: 1fr 340px; gap: 64px; align-items: start; margin-top: 44px; }
   .lp .feats { display: grid; gap: 22px; }
@@ -112,9 +134,18 @@ export const ARMENIA_CSS = `
   .lp .apply-ask li { font-size: 12px; letter-spacing: 0.06em; border: 1px solid rgba(255,255,255,0.22); color: rgba(255,255,255,0.8); padding: 7px 14px; }
   .lp .apply + footer { border-top: 1px solid rgba(255,255,255,0.08); }
 
+  @media (max-width: 1100px) {
+    .lp .idea-cols { grid-template-columns: 1fr 1fr; gap: 40px 48px; }
+  }
   @media (max-width: 900px) {
     .lp .shifts, .lp .incl, .lp .host, .lp .parents { grid-template-columns: 1fr; }
     .lp .parents { gap: 40px; }
+    .lp .duo { grid-template-columns: 1fr; }
+    .lp .duo-art { min-height: 180px; }
+    .lp .idea-cols { grid-template-columns: 1fr; gap: 32px; margin-top: 48px; }
+    .lp .host-alt { margin-top: 64px; grid-template-columns: 1fr; }
+    .lp .host-alt .host-art { order: 0; }
+    .lp .host-art { aspect-ratio: 1/1; }
     .lp .phone { position: static; max-width: 340px; width: 100%; margin: 0 auto; }
     .lp .host { gap: 32px; }
     .lp .host img { aspect-ratio: 1/1; }
