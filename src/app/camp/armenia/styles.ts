@@ -82,6 +82,22 @@ export const ARMENIA_CSS = `
   .lp .incl-cols { columns: 2; column-gap: 32px; }
   .lp .incl-cols li { break-inside: avoid; }
 
+  /* Родителям: список слева, пример из бота справа */
+  .lp .parents { display: grid; grid-template-columns: 1fr 340px; gap: 64px; align-items: start; margin-top: 44px; }
+  .lp .feats { display: grid; gap: 22px; }
+  .lp .phone { position: sticky; top: 100px; border: 1px solid var(--edge); border-radius: 30px; padding: 12px; background: #fff; box-shadow: 0 24px 60px rgba(26,26,46,0.08); }
+  .lp .phone-top { text-align: center; font-size: 13px; font-weight: 400; padding: 8px 0 12px; }
+  .lp .phone-top span { display: block; font-size: 11px; font-weight: 300; color: var(--warm-gray); }
+  .lp .chat { background: var(--linen); border-radius: 20px; padding: 14px 12px; display: flex; flex-direction: column; gap: 10px; }
+  .lp .msg { background: #fff; border-radius: 16px 16px 16px 4px; padding: 10px 12px 6px; font-size: 13px; line-height: 1.5; color: var(--charcoal); max-width: 94%; }
+  .lp .msg q { display: block; font-style: italic; color: var(--warm-gray); margin-top: 4px; quotes: '«' '»'; }
+  .lp .msg-meta { font-size: 10px; color: rgba(26,26,46,0.35); text-align: right; margin-top: 4px; }
+  .lp .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 8px; }
+  .lp .tiles svg, .lp .tiles i { width: 100%; aspect-ratio: 1; border-radius: 6px; display: block; }
+  .lp .tiles i { display: flex; align-items: center; justify-content: center; font-style: normal; font-size: 15px; color: #fff; background: rgba(26,26,46,0.55); }
+  .lp .postcard { display: block; width: 100%; height: auto; margin-top: 8px; }
+  .lp .chat-btn { text-align: center; font-size: 12px; letter-spacing: 0.04em; color: var(--rose-dark); background: rgba(255,255,255,0.75); border-radius: 10px; padding: 9px; }
+
   /* Последний экран: заявка на тёмном */
   .lp .apply { background: var(--charcoal); color: #fff; max-width: none; }
   .lp .apply .inner { max-width: 1020px; margin: 0 auto; }
@@ -97,7 +113,9 @@ export const ARMENIA_CSS = `
   .lp .apply + footer { border-top: 1px solid rgba(255,255,255,0.08); }
 
   @media (max-width: 900px) {
-    .lp .shifts, .lp .incl, .lp .host { grid-template-columns: 1fr; }
+    .lp .shifts, .lp .incl, .lp .host, .lp .parents { grid-template-columns: 1fr; }
+    .lp .parents { gap: 40px; }
+    .lp .phone { position: static; max-width: 340px; width: 100%; margin: 0 auto; }
     .lp .host { gap: 32px; }
     .lp .host img { aspect-ratio: 1/1; }
     .lp .crafts { grid-template-columns: 1fr; gap: 28px; }
