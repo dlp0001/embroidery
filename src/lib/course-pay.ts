@@ -30,8 +30,13 @@ type Offer = {
   rub: number;
   /** Товар в Polar. Цену в долларах Polar берёт из него, а не от нас. */
   polarProduct: string | null;
-  /** Строка в квитанции и на странице кассы. */
+  /** Строка на странице кассы и в чеке ЮKassa. */
   item: string;
+  /**
+   * Строка в квитанции iCount. Как у студии: «русский | иврит», потому что
+   * квитанцию читает бухгалтерия.
+   */
+  receipt: string;
 };
 
 const OFFERS: Record<string, Offer> = {
@@ -41,6 +46,7 @@ const OFFERS: Record<string, Offer> = {
     rub: 6800,
     polarProduct: null,
     item: 'Видеокурс по вышивке «Как вышить в современном мире», доступ на 6 месяцев',
+    receipt: 'Видеокурс по вышивке, доступ на 6 месяцев | קורס רקמה מוקלט, גישה ל-6 חודשים',
   },
 };
 
@@ -300,7 +306,7 @@ export async function issueCourseReceipt(providerId: string, card: Card | null):
       userId: row.access_id,
       customerName: row.name || row.email,
       email: row.email,
-      items: [{ description: offer?.item ?? 'Видеокурс', quantity: 1, price: Number(row.amount) }],
+      items: [{ description: offer?.receipt ?? 'Видеокурс | קורס מוקלט', quantity: 1, price: Number(row.amount) }],
       amount: Number(row.amount),
       currency: row.currency,
       method: 'cc',
