@@ -6,7 +6,7 @@
 // статика молча побеждает. Так случилось с /camp.
 const legacy = [
   'embroidery', 'register', 'video', 'materials', 'materials2',
-  'portfolio', 'israeli-hints', 'studio',
+  'portfolio', 'israeli-hints', 'studio', 'shop',
   'agreement', 'privacy-ru', 'consent-data', 'consent-marketing',
   'terms', 'refunds', 'privacy',
   // Черновик лендинга видеокурса — Варе на вычитку. В день запуска он

@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Re.Create.Art · Варя Перлина</title>
-<meta name="description" content="Варя Перлина — художница и педагог визуальных искусств. Онлайн-курсы, студия свободного творчества в Тель-Авиве, творческие лагеря.">
+<title>Магазин · Re.Create.Art</title>
+<meta name="description" content="Магазин Вари Перлиной: онлайн-курсы, которые можно купить и пройти дома.">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="shortcut icon" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -31,9 +31,9 @@
   .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 17px; color: var(--charcoal); letter-spacing: 0.06em; text-decoration: none; }
   .nav-logo span { color: var(--rose); }
   .nav-right { display: flex; align-items: center; gap: 24px; }
-  /* Ссылки в шапке должны быть заметны. Подсветка сделана цветом и
-     подчёркиванием: коробку ссылки это не меняет, поэтому высота шапки
-     остаётся прежней. */
+  /* Единственная ссылка в шапке, и она должна быть заметна. Подсветка
+     сделана цветом и подчёркиванием: коробку ссылки это не меняет,
+     поэтому высота шапки остаётся прежней. */
   .nav-link {
     font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
     color: var(--rose); text-decoration: underline;
@@ -113,6 +113,30 @@
     footer { padding: 36px 28px; }
     .footer-links-wrap { flex-direction: column; gap: 24px; }
   }
+  /* ── Магазин ── */
+  .shop-head { margin-top: 72px; }
+  .shop-intro { font-size: 15px; color: var(--warm-gray); max-width: 560px; line-height: 1.9; margin: -32px 0 56px; }
+  /* Товар пока один, поэтому карточка широкая: фото слева, всё о товаре
+     справа. Когда товаров станет больше, сетка сама перейдёт в колонки. */
+  .shop-grid { display: grid; grid-template-columns: 1fr; gap: 56px; }
+  .product { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; color: inherit; text-decoration: none; }
+  .product-media { overflow: hidden; aspect-ratio: 4/3; background: var(--linen); }
+  .product-media img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.6s ease; }
+  a.product:hover .product-media img { transform: scale(1.04); }
+  .product-list { list-style: none; margin: 0 0 26px; display: flex; flex-direction: column; gap: 8px; }
+  .product-list li { font-size: 14px; color: var(--charcoal); padding-left: 22px; position: relative; line-height: 1.6; }
+  .product-list li::before { content: ''; position: absolute; left: 0; top: 0.62em; width: 10px; height: 1px; background: var(--rose); }
+  .product-price { font-family: 'Cormorant Garamond', serif; font-size: 30px; font-weight: 400; color: var(--charcoal); margin-bottom: 22px; }
+  .product-btn { align-self: flex-start; display: inline-block; padding: 16px 40px; background: var(--charcoal); color: #fff; font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; transition: background 0.3s; }
+  a.product:hover .product-btn { background: var(--rose); }
+  .product-info { display: flex; flex-direction: column; }
+
+  @media (max-width: 900px) {
+    .shop-head { margin-top: 56px; }
+    .shop-intro { margin: -32px 0 40px; }
+    .product { grid-template-columns: 1fr; gap: 24px; }
+    .product-btn { align-self: stretch; text-align: center; }
+  }
 </style>
 </head>
 <body>
@@ -121,73 +145,34 @@
   <a href="/" class="nav-logo">Re.Create.Art<span> · Варя Перлина</span></a>
   <div class="nav-right">
     <a href="/studio" class="nav-link">Студия</a>
-    <a href="/shop" class="nav-link">Магазин</a>
     <a href="/account" class="nav-cta">Кабинет</a>
   </div>
 </nav>
 
-<section class="hero">
-  <div class="hero-left">
-    <div class="hero-pretitle">Re.Create.Art</div>
-    <h1 class="hero-title">Варя</h1>
-    <div class="hero-title-italic">Перлина</div>
-    <p class="hero-desc">«Адвокат детской креативности» — графический дизайнер, иллюстратор, художница и педагог визуальных искусств. И принимающая мама троих творческих детей.</p>
-    <a href="/portfolio" class="hero-link">Портфолио →</a>
-  </div>
-  <div class="hero-right">
-    <img src="varya.jpg" alt="Варя Перлина">
-  </div>
-</section>
+<!-- Товар пока один. Цены здесь же, что на лендинге курса и в
+     src/lib/course-pay.ts: меняются все три места вместе. -->
+<section class="section shop-head">
+  <div class="section-label">Магазин</div>
+  <h1 class="section-title">То, что можно купить<br>и пройти дома</h1>
+  <p class="shop-intro">Курсы Вари в записи: смотрите в своём темпе, а ссылка на курс приходит на почту сразу после оплаты.</p>
 
-<section class="section">
-  <div class="section-label">Направления</div>
-  <h2 class="section-title">Куда можно прийти</h2>
-
-  <div class="dir-grid">
-
-    <a href="/studio" class="dir-card">
-      <div class="dir-media"><img src="studio.jpg" alt="Студия Свободного Творчества — занятие с детьми"></div>
-      <div class="dir-label">Студия · Старый Север, Тель-Авив</div>
-      <div class="dir-title">Студия свободного творчества</div>
-      <p class="dir-desc">Авторское пространство, где можно творить во все стороны и во всех техниках сразу — ради того, чтобы дать идее жить.</p>
-      <div class="dir-go">О студии →</div>
+  <div class="shop-grid">
+    <a href="/embroidery-new" class="product">
+      <div class="product-media"><img src="embroidery-skirt.jpg" alt="Вышивка Вари — юбка с радугой и солнцем"></div>
+      <div class="product-info">
+        <div class="dir-label">Видеокурс · Взрослым</div>
+        <div class="dir-title">Как вышить в современном мире</div>
+        <p class="dir-desc">Авторский курс по вышивке — от первого стежка до готового проекта. Про удовольствие, отдых для головы и способ замедляться через стежки.</p>
+        <ul class="product-list">
+          <li>4 видеоурока по 60–120 минут</li>
+          <li>Полный список материалов с ссылками для разных стран</li>
+          <li>Доступ на 6 месяцев</li>
+        </ul>
+        <div class="product-price">₪180 · $60 · 5 000 ₽</div>
+        <span class="product-btn">Подробнее и купить</span>
+      </div>
     </a>
-
-    <!-- Лагерь убран с главной до следующей смены: звать на страницу,
-         где написано «смена ещё не объявлена», незачем. Когда даты будут,
-         карточку вернуть целиком, вместе со ссылкой в шапке.
-    <a href="/camp" class="dir-card">
-      <div class="dir-media"><img src="camp.jpg" style="object-position: 50% 80%" alt="Дети рисуют, устроившись на полу в зале музея"></div>
-      <div class="dir-label">Лагерь · Детям</div>
-      <div class="dir-title">Творческий лагерь</div>
-      <p class="dir-desc">Смена на школьных каникулах: пять часов в день на то, чтобы делать невероятные штуки, ходить в музей и осваивать полезное руками.</p>
-      <div class="dir-go">Про лагерь →</div>
-    </a>
-    -->
-
-    <a href="/embroidery" class="dir-card">
-      <div class="dir-media"><img src="embroidery-skirt.jpg" alt="Вышивка Вари — юбка с радугой и солнцем"></div>
-      <div class="dir-label">Онлайн-курс · Взрослым</div>
-      <div class="dir-title">Как вышить в современном мире</div>
-      <p class="dir-desc">Авторский курс по вышивке — про удовольствие, отдых для головы и способ замедляться через стежки. Записи уроков, материалы и поддержка.</p>
-      <div class="dir-go">Открыть курс →</div>
-    </a>
-
-    <div class="dir-card">
-      <div class="dir-media"><img src="knitting.jpg" alt="Вязаное полотно со словом CREATE, спицы и клубки на столе"></div>
-      <div class="dir-label">Онлайн-курс · Взрослым</div>
-      <div class="dir-title">Курс вязания</div>
-      <p class="dir-desc">Второй курс в той же логике, что и вышивка: спокойный темп, записи уроков и понятный список материалов.</p>
-      <div class="dir-badge">Скоро</div>
-    </div>
-
   </div>
-</section>
-
-<section class="quote-section">
-  <span class="quote-mark">&ldquo;</span>
-  <p class="quote-text">Я верю, что даже если ты не нарисуешь, не сделаешь, как кто-то, то никто никогда не сделает, как <em>ты</em>. Каждый из нас уникален, и может свободно проявляться.</p>
-  <div class="quote-author">Варя Перлина</div>
 </section>
 
 <footer>
