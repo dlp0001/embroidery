@@ -115,6 +115,7 @@ export default async function DebtsPage() {
             <Link className="btn-quiet" href="/admin/studio/camp">Лагерь</Link>
             <Link className="btn-quiet" href="/admin/studio/stats">Статистика</Link>
             <Link className="btn-quiet" href="/admin/studio/payments">Платежи</Link>
+            <Link className="btn-quiet" href="/admin/studio/receipts">Чеки</Link>
           </div>
         )}
 

@@ -26,7 +26,7 @@ export type PayKind = 'card' | 'cash' | 'transfer' | 'unknown' | 'due';
  * приняли раньше, чем журнал стал про способ спрашивать, и записать их
  * в наличные значило бы выдать догадку за запись.
  */
-const BUCKET = (pay: string) => `
+export const PAY_BUCKET = (pay: string) => `
   case
     when ${pay}.id is null then 'due'
     when ${pay}.provider = 'gift' then 'gift'
@@ -151,7 +151,7 @@ export async function periodStats(from: string, to: string): Promise<PeriodStats
   // Занятия по способам оплаты. Списанное с абонемента идёт своей
   // строкой: деньги за него взяли раньше, когда абонемент покупали.
   const lessons = await query<{ bucket: string; n: number; sum: string }>(
-    `select case when ch.pass_id is not null then 'pass' else ${BUCKET('pay')} end as bucket,
+    `select case when ch.pass_id is not null then 'pass' else ${PAY_BUCKET('pay')} end as bucket,
             count(*)::int as n, coalesce(sum(ch.amount), 0)::text as sum
        from charges ch
        join studio_sessions s on s.id = ch.session_id
@@ -412,7 +412,7 @@ export async function campStats(groupId: string): Promise<CampStats | null> {
 
   // Как оплачены сами дни: те же строки, что в месячном отчёте.
   const money = await query<{ bucket: string; n: number; sum: string }>(
-    `select case when ch.pass_id is not null then 'pass' else ${BUCKET('pay')} end as bucket,
+    `select case when ch.pass_id is not null then 'pass' else ${PAY_BUCKET('pay')} end as bucket,
             count(*)::int as n, coalesce(sum(ch.amount), 0)::text as sum
        from charges ch
        join studio_sessions s on s.id = ch.session_id
