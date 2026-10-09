@@ -13,6 +13,13 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": ["-lc", "ICOUNT_TOKEN=demo-not-a-real-token npm run dev"],
       "port": 4321
+    },
+    {
+      "_": "Для проверки вебхука Polar на курсе: известный тестовый секрет, чтобы подписать вызов руками (см. scripts/polar-webhook-test.mjs).",
+      "name": "site-polar-test",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-lc", "POLAR_WEBHOOK_SECRET=local-test-secret npm run dev"],
+      "port": 4321
     }
   ]
 }

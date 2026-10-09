@@ -1,4 +1,5 @@
 import { applyPayment, issueReceipt } from '@/lib/billing';
+import { fulfil, issueCourseReceipt } from '@/lib/course-pay';
 import { one } from '@/lib/db';
 import { fetchTransaction } from '@/lib/payplus';
 
@@ -37,8 +38,24 @@ async function handle(params: {
     return Response.json({ received: true });
   }
 
-  // Ищем наш платёж: сначала по нашему же идентификатору, потом по uid страницы.
   const reference = check.reference ?? params.reference ?? null;
+
+  // Курс: его деньги живут отдельно от студии, см. lib/course-pay.
+  if (reference?.startsWith('course:')) {
+    const providerId = check.transactionUid ?? params.transactionUid ?? params.pageRequestUid!;
+    const done = await fulfil({
+      provider: 'payplus',
+      providerId,
+      checkoutId: reference.slice('course:'.length),
+      amount: check.amount,
+      currency: 'ILS',
+      raw: check,
+    });
+    if (done.ok) await issueCourseReceipt(providerId, check.card);
+    return Response.json({ received: true });
+  }
+
+  // Ищем наш платёж: сначала по нашему же идентификатору, потом по uid страницы.
   const payment =
     (reference
       ? await one<{ id: string; amount: string }>(

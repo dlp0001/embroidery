@@ -84,6 +84,18 @@ export default async function AdminToolsPage({
           </div>
         </div>
 
+        {/* Курс — не студия: его покупатели живут отдельно, и их список
+            тоже отдельный. */}
+        <div className="card">
+          <div className="row">
+            <div>
+              <div className="what">Курс вышивки</div>
+              <div className="sub">Покупатели видеокурса, сроки доступа, ссылки</div>
+            </div>
+            <Link className="btn-quiet" href="/admin/courses">Открыть</Link>
+          </div>
+        </div>
+
         {/* У кого кабинет остался, тот правит своё имя там: две одинаковые
             карточки на одного человека только путают. */}
         {/* Дни своих посещений сюда не выносим: тот, кто занятия ведёт,

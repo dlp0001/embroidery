@@ -251,6 +251,8 @@ export type Order = {
   providerId: string;
   amount: number | null;
   currency: string | null;
+  /** Начатая оплата из course_checkouts, если покупали через форму. */
+  checkoutId?: string | null;
   raw?: unknown;
 };
 
@@ -296,11 +298,11 @@ export async function grantAccess(input: {
       if (input.order) {
         const o = input.order;
         const saved = await c.query(
-          `insert into course_orders (access_id, provider, provider_id, amount, currency, raw)
-           values ($1, $2, $3, $4, $5, $6)
+          `insert into course_orders (access_id, provider, provider_id, amount, currency, checkout_id, raw)
+           values ($1, $2, $3, $4, $5, $6, $7)
            on conflict (provider, provider_id) do nothing
            returning id`,
-          [access.id, o.provider, o.providerId, o.amount, o.currency,
+          [access.id, o.provider, o.providerId, o.amount, o.currency, o.checkoutId ?? null,
            o.raw === undefined ? null : JSON.stringify(o.raw)],
         );
         // Откатываем продление: этот платёж уже продлевал доступ.
