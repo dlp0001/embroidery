@@ -329,8 +329,11 @@ export async function grantAccess(input: {
  *
  * false — письмо не ушло. Тогда старая ссылка уже заменена, и человеку
  * нужно сказать об этом, а не делать вид, что всё отправлено.
+ *
+ * moved — письмо покупателям первого потока: курс у них уже был, поэтому
+ * не «открыт», а «переехал».
  */
-export async function sendLink(accessId: string): Promise<boolean> {
+export async function sendLink(accessId: string, kind: 'access' | 'moved' = 'access'): Promise<boolean> {
   const token = secret();
   const row = await one<{ email: string; name: string | null; title: string; until: string }>(
     `update course_access a
@@ -342,7 +345,10 @@ export async function sendLink(accessId: string): Promise<boolean> {
   );
   if (!row) return false;
   const url = `${await siteOrigin()}/learn/k/${token}`;
-  return sendMail(row.email, `Доступ к курсу «${row.title}»`, linkLetter({ ...row, url }));
+  const subject = kind === 'moved'
+    ? `Записи курса «${row.title}» переехали`
+    : `Доступ к курсу «${row.title}»`;
+  return sendMail(row.email, subject, linkLetter({ ...row, url, kind }));
 }
 
 /**
@@ -402,8 +408,13 @@ function esc(s: string): string {
   return s.replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
 }
 
-function linkLetter(p: { name: string | null; title: string; until: string; url: string }): string {
+function linkLetter(p: {
+  name: string | null; title: string; until: string; url: string; kind: 'access' | 'moved';
+}): string {
   const hello = p.name ? `Привет, ${esc(p.name)}!` : 'Привет!';
+  const intro = p.kind === 'moved'
+    ? `Записи уроков курса «${esc(p.title)}» и список материалов переехали на новую страницу. Старый адрес re-create.art/video скоро перестанет работать, поэтому сохраните это письмо: кнопка ниже — ваш личный вход.`
+    : `Курс «${esc(p.title)}» открыт: четыре урока и полный список материалов с ссылками, где их купить.`;
   return `
   <div style="font-family:Georgia,'Times New Roman',serif;max-width:560px;margin:0 auto;color:#1a1a2e;background:#ffffff;">
     <div style="background:#1a1a2e;padding:32px 48px;text-align:center;">
@@ -412,7 +423,7 @@ function linkLetter(p: { name: string | null; title: string; until: string; url:
     </div>
     <div style="padding:40px 48px 28px;">
       <p style="font-size:24px;font-weight:300;margin:0 0 24px;line-height:1.3;">${hello}</p>
-      <p style="font-size:15px;color:#444;line-height:1.85;margin:0 0 24px;">Курс «${esc(p.title)}» открыт: четыре урока и полный список материалов с ссылками, где их купить.</p>
+      <p style="font-size:15px;color:#444;line-height:1.85;margin:0 0 24px;">${intro}</p>
       <p style="margin:0 0 28px;">
         <a href="${p.url}" style="display:inline-block;background:#e91e8c;color:#ffffff;text-decoration:none;font-family:sans-serif;font-size:13px;letter-spacing:0.15em;text-transform:uppercase;padding:16px 36px;">Открыть курс</a>
       </p>

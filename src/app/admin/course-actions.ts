@@ -5,7 +5,8 @@ import { revalidatePath } from 'next/cache';
 import { grantAccess, sendLink } from '@/lib/course';
 import { issueCourseReceipt } from '@/lib/course-pay';
 import { payplusCard, resetDevices, restore, revoke } from '@/lib/course-admin';
-import { currentUser, isAdmin } from '@/lib/session';
+import { legacyBuyers } from '@/lib/course-legacy';
+import { currentUser, isAdmin, isSuperadmin } from '@/lib/session';
 
 const PAGE = '/admin/courses';
 
@@ -59,6 +60,38 @@ export async function restoreAction(form: FormData): Promise<void> {
   await restore(String(form.get('id') ?? ''));
   revalidatePath(PAGE);
   back({ note: 'Доступ возвращён. Отправьте ссылку: прежняя была погашена при отзыве.' });
+}
+
+/** Сколько старых покупателей переносим за одно нажатие: время запроса ограничено. */
+const LEGACY_BATCH = 20;
+
+/**
+ * Покупатели первого потока из Sheets: открыть доступ на 6 месяцев и
+ * написать, что записи переехали. Только суперадмин — это рассылка всем
+ * сразу. Повторное нажатие берёт следующих: у перенесённых доступ уже есть.
+ */
+export async function importLegacyAction(): Promise<void> {
+  const user = await currentUser();
+  if (!user || !isSuperadmin(user)) redirect(PAGE);
+
+  const { buyers } = await legacyBuyers('embroidery');
+  const todo = buyers.filter((b) => !b.hasAccess);
+  const batch = todo.slice(0, LEGACY_BATCH);
+  const failed: string[] = [];
+  for (const b of batch) {
+    const grant = await grantAccess({ slug: 'embroidery', email: b.email, name: b.name, source: 'legacy' });
+    if (!(await sendLink(grant.accessId, 'moved'))) failed.push(b.email);
+    // Resend принимает не больше двух писем в секунду.
+    await new Promise((r) => setTimeout(r, 600));
+  }
+  revalidatePath(PAGE);
+  const left = todo.length - batch.length;
+  back({
+    legacy: '1',
+    ...(failed.length
+      ? { error: `Доступ открыт ${batch.length}, письма не ушли: ${failed.join(', ')}. Им — «Прислать ссылку». Осталось ${left}.` }
+      : { note: `Доступ открыт и письма ушли: ${batch.length}. Осталось ${left}.` }),
+  });
 }
 
 export async function retryReceiptAction(form: FormData): Promise<void> {

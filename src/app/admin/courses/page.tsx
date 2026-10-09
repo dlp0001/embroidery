@@ -1,14 +1,18 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { currentUser, isAdmin } from '@/lib/session';
+import { currentUser, isAdmin, isSuperadmin } from '@/lib/session';
 import { abandoned, buyers, type Buyer } from '@/lib/course-admin';
+import { legacyBuyers, type LegacySheet } from '@/lib/course-legacy';
 import { MAX_DEVICES } from '@/lib/course-limits';
 import { money, shortDate } from '@/lib/format';
 import {
-  grantCourseAction, resendLinkAction, resetDevicesAction, restoreAction, revokeAction, retryReceiptAction,
+  grantCourseAction, importLegacyAction, resendLinkAction, resetDevicesAction, restoreAction, revokeAction,
+  retryReceiptAction,
 } from '@/app/admin/course-actions';
 
 export const dynamic = 'force-dynamic';
+// Перенос первого потока пишет письма по одному, с паузой: ему нужно время.
+export const maxDuration = 60;
 
 const SOURCE: Record<Buyer['source'], string> = {
   purchase: 'купил',
@@ -29,13 +33,26 @@ const PROVIDER: Record<string, string> = {
 export default async function CoursesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ note?: string; error?: string }>;
+  searchParams: Promise<{ note?: string; error?: string; legacy?: string }>;
 }) {
   const user = await currentUser();
   if (!user || !isAdmin(user)) redirect('/admin/studio');
-  const { note, error } = await searchParams;
+  const { note, error, legacy } = await searchParams;
+  const boss = isSuperadmin(user);
 
   const [list, lost] = await Promise.all([buyers('embroidery'), abandoned('embroidery')]);
+
+  // Таблицу читаем только по просьбе: это поход в Google на каждый заход.
+  let sheet: LegacySheet | null = null;
+  let sheetError: string | null = null;
+  if (boss && legacy) {
+    try {
+      sheet = await legacyBuyers('embroidery');
+    } catch (err) {
+      sheetError = err instanceof Error ? err.message : 'таблица не открылась';
+    }
+  }
+  const todo = sheet?.buyers.filter((b) => !b.hasAccess) ?? [];
   const active = list.filter((b) => !b.expired && !b.revoked);
 
   return (
@@ -73,6 +90,45 @@ export default async function CoursesPage({
             <button className="btn-wide" type="submit">Открыть и отправить ссылку</button>
           </form>
         </div>
+
+        {boss && (
+          <div className="card" style={{ borderStyle: 'dashed' }}>
+            <div className="what" style={{ marginBottom: 6 }}>Первый поток из таблицы</div>
+            <p className="hint" style={{ marginBottom: 14 }}>
+              Оплатившие из Google Sheets получают доступ на 6 месяцев и письмо «записи переехали»
+              со ссылкой. У кого доступ уже есть, того не трогаем. Делать в день, когда закрывается
+              /video.
+            </p>
+            {!legacy ? (
+              <Link className="btn-quiet" href="/admin/courses?legacy=1">Проверить таблицу</Link>
+            ) : sheetError ? (
+              <p className="err">Таблица не открылась: {sheetError}</p>
+            ) : sheet && (
+              <>
+                <p className="hint" style={{ marginBottom: 10 }}>
+                  Оплатили {sheet.buyers.length}, доступ уже есть у {sheet.buyers.length - todo.length},
+                  перенести {todo.length}.
+                  {Object.keys(sheet.skipped).length > 0 && (
+                    <> Не взяты: {Object.entries(sheet.skipped).map(([s, n]) => `«${s}» — ${n}`).join(', ')}.</>
+                  )}
+                </p>
+                {todo.slice(0, 50).map((b) => (
+                  <div className="money" key={b.email} style={{ overflowWrap: 'anywhere' }}>
+                    {b.email}{b.name ? ` · ${b.name}` : ''} · {b.date.split(',')[0]} · {b.amount} {b.currency}
+                  </div>
+                ))}
+                {todo.length > 50 && <div className="money">…и ещё {todo.length - 50}</div>}
+                {todo.length > 0 && (
+                  <form action={importLegacyAction} style={{ marginTop: 14 }}>
+                    <button className="btn-wide" type="submit">
+                      Открыть доступ и написать {Math.min(todo.length, 20)}
+                    </button>
+                  </form>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         <div className="lbl">Покупатели</div>
         {list.length === 0 && <p className="hint">Пока никого.</p>}
