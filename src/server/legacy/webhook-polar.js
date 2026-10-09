@@ -4,7 +4,6 @@ const crypto = require('crypto');
 const SHEET_ID = process.env.GOOGLE_SHEET_ID;
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const POLAR_WEBHOOK_SECRET = process.env.POLAR_WEBHOOK_SECRET;
-const ICOUNT_TOKEN = process.env.ICOUNT_TOKEN;
 const FROM_EMAIL = 'info@re-create.art';
 
 // ── Verify webhook signature ──────────────────────────────
@@ -55,37 +54,9 @@ async function updateSheetByEmail(email) {
   }
 }
 
-// ── iCount receipt ────────────────────────────────────────
-
-async function createICountReceipt({ clientName, clientEmail, amount, currency, description }) {
-  if (!ICOUNT_TOKEN) { console.log('iCount token not set, skipping'); return; }
-  const res = await fetch('https://api.icount.co.il/api/v3.php/doc/create', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${ICOUNT_TOKEN}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      doc_type: 320,
-      client_name: clientName,
-      client_email: clientEmail,
-      send_client: true,
-      currency_code: currency,
-      items: [{
-        description,
-        amount: 1,
-        unit_price: parseFloat(amount),
-        vat: 0,
-      }],
-      payment: [{
-        payment_type: 5,
-        payment_sum: parseFloat(amount),
-      }],
-    }),
-  });
-  const data = await res.json();
-  console.log('iCount receipt:', JSON.stringify(data));
-}
+// Чеков iCount на продажи через Polar не выписываем: продавец перед
+// покупателем здесь Polar (Merchant of Record), и квитанцию покупателю
+// отправляет он сам.
 
 // ── Email ─────────────────────────────────────────────────
 
@@ -119,7 +90,6 @@ function emailHtml() {
       </div>
       <div style="background:#f5f0fa;padding:18px 48px;text-align:center;">
         <p style="font-size:11px;color:#aaa;margin:0;line-height:1.7;font-family:sans-serif;">
-          Квитанция об оплате отправлена отдельным письмом.<br>
           Вопросы: <a href="mailto:info@re-create.art" style="color:#e91e8c;text-decoration:none;">info@re-create.art</a>
         </p>
       </div>
@@ -183,16 +153,7 @@ module.exports = async function handler(req, res) {
     // 1. Update Google Sheets
     await updateSheetByEmail(email);
 
-    // 2. Create iCount receipt
-    await createICountReceipt({
-      clientName: name,
-      clientEmail: email,
-      amount,
-      currency,
-      description: 'Онлайн курс по вышивке «Как вышить в современном мире»',
-    });
-
-    // 3. Send welcome email
+    // 2. Send welcome email
     await sendEmail(email);
 
     return res.status(200).json({ success: true });
