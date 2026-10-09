@@ -12,8 +12,10 @@ import { money, plural } from '@/lib/format';
  * iCount уйдёт одна бумага.
  */
 export type Row = {
-  /** Платёж, на который выпишется квитанция. */
+  /** Платёж: строки одного платежа отмечаются вместе. */
   pay: string;
+  /** Бумага: платежи одного плательщика и способа уходят одной. */
+  group: string;
   who: string;
   /** «1 сентября · Отто» или «абонемент на 8 занятий». */
   label: string;
@@ -97,6 +99,9 @@ export default function Panel({
   const list = rows ?? [];
   const mine = list.filter((r) => picked.has(r.pay));
   const chosen = mine.reduce((s, r) => s + r.amount, 0);
+  // Бумаг меньше, чем платежей: за родителя, заплатившего трижды
+  // наличными, уйдёт один чек с тремя строками внутри.
+  const papers = new Set(mine.map((r) => r.group)).size;
 
   function toggle(pay: string) {
     setPicked((prev) => {
@@ -169,7 +174,7 @@ export default function Panel({
                                          borderTop: '1px solid var(--line-soft)' }}>
             Отмечено {mine.length}&nbsp;{plural(mine.length, 'занятие', 'занятия', 'занятий')} на{' '}
             <b style={{ fontWeight: 400, color: 'var(--charcoal)' }}>{money(chosen, currency)}</b>
-            {' '}— выпишется {picked.size}&nbsp;{plural(picked.size, 'чек', 'чека', 'чеков')}
+            {' '}— выпишется {papers}&nbsp;{plural(papers, 'чек', 'чека', 'чеков')}
           </div>
         )}
       </div>
@@ -198,10 +203,10 @@ export default function Panel({
             )}
           </div>
 
-          {[...byWho.entries()].map(([who, group]) => (
+          {[...byWho.entries()].map(([who, theirs]) => (
             <div key={who}>
               <div className="when visit-day">{who}</div>
-              {group.map((r, i) => {
+              {theirs.map((r, i) => {
                 const on = picked.has(r.pay);
                 return (
                   <button type="button" className="visit debt" key={`${r.pay}-${i}`}
@@ -231,8 +236,8 @@ export default function Panel({
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap',
                         padding: '18px 2px 0', borderTop: '1px solid var(--line)',
                         marginTop: 12 }}>
-            <Submit n={picked.size} />
-            {picked.size > AT_ONCE && (
+            <Submit n={papers} />
+            {papers > AT_ONCE && (
               <span className="hint" style={{ color: 'var(--rose-dark)' }}>
                 За раз — не больше {AT_ONCE}: iCount отвечает не мгновенно, и
                 страница не дождётся. Снимите лишние и повторите.
@@ -241,10 +246,13 @@ export default function Panel({
           </div>
 
           <p className="hint" style={{ marginTop: 14 }}>
-            Квитанция выписывается на платёж целиком: занятия, оплаченные
-            вместе, помечены «общий чек» и отмечаются разом. Бумага уходит на
-            почту плательщика и в бухгалтерию, а отменяется только в iCount —
-            и там это отдельная, обратная квитанция.
+            Занятия одного родителя, оплаченные одним способом, уйдут одной
+            бумагой: внутри будет строка «занятие ×3». Разные способы не
+            смешиваются — чек утверждает, как именно пришли деньги. Пометка
+            «общий чек» значит, что занятия закрыты одним платежом и
+            отмечаются разом. Бумага уходит на почту плательщика и в
+            бухгалтерию, а отменяется только в iCount — и там это отдельная,
+            обратная квитанция.
           </p>
         </form>
       )}

@@ -436,39 +436,72 @@ const UNBILLED = `select p.id, p.provider, p.amount::text, p.currency, p.purpose
         and coalesce(p.raw ->> 'receipt_wanted', '') <> 'no'`;
 
 /**
- * Выписывает квитанцию на оплаченный платёж и запоминает ссылку на неё.
+ * Подпись способа оплаты: по ней решаем, какие платежи лягут в одну
+ * бумагу. Биток и пейбокс для iCount разные способы, и складывать их
+ * в один чек нельзя, даже если платил один человек.
+ */
+function methodKey(p: ToBill): string {
+  const w = receiptMethod(p);
+  return `${w.method}:${w.app ?? ''}`;
+}
+
+/** Складывает одинаковые позиции: три чека по сотне дают «занятие ×3». */
+function mergeItems(lists: ReceiptItem[][], total: number): ReceiptItem[] {
+  const by = new Map<string, ReceiptItem>();
+  for (const items of lists) {
+    for (const i of items) {
+      const key = `${i.description}|${i.price}`;
+      const had = by.get(key);
+      if (had) had.quantity += i.quantity;
+      else by.set(key, { ...i });
+    }
+  }
+  const items = [...by.values()];
+  const sum = items.reduce((s, i) => s + i.price * i.quantity, 0);
+  // Позиции обязаны сходиться с суммой документа. Не сошлись — одна
+  // строка на всё: красивая разбивка, которая врёт в итоге, хуже.
+  return Math.abs(sum - total) < 0.01
+    ? items
+    : [{ description: LESSON, quantity: 1, price: total }];
+}
+
+/**
+ * Одна квитанция на набор платежей. Набор должен быть однородным:
+ * один плательщик, один способ, одна валюта — это и есть то, что
+ * бумага утверждает про деньги.
  *
  * Ошибка iCount не должна ронять зачёт денег: занятия важнее бумажки,
- * поэтому здесь мы только пишем в журнал, а следующий заход родителя
- * на страницу оплаты попробует ещё раз. Второй квитанции не будет —
- * iCount отбивает повтор сам.
+ * поэтому здесь мы только пишем в журнал, а следующая попытка выпишет
+ * ещё раз. Второй квитанции не будет — iCount отбивает повтор сам по
+ * нашему же идентификатору.
  */
-export async function issueReceipt(paymentId: string, card?: Card | null): Promise<void> {
-  if (!receiptsConfigured()) return;
-  const p = await one<ToBill>(`${UNBILLED} and p.id = $1`, [paymentId]);
-  if (!p) return;
+async function issueOne(group: ToBill[], card?: Card | null): Promise<boolean> {
+  const head = group[0];
+  if (!head) return false;
+  const ids = group.map((p) => p.id);
+  const total = group.reduce((s, p) => s + Number(p.amount), 0);
 
-  const way = receiptMethod(p);
+  const way = receiptMethod(head);
   const account = way.method === 'transfer' ? transferAccount() : null;
   if (way.method === 'transfer' && account === null) {
     // Лучше не выписать бумагу, чем выписать неверную: перевод, поданный
     // как наличные, расходится с банковской выпиской.
     console.error(
-      'icount: перевод не оформить, не задан ICOUNT_BANK_ACCOUNT. Платёж', p.id);
-    return;
+      'icount: перевод не оформить, не задан ICOUNT_BANK_ACCOUNT. Платёж', head.id);
+    return false;
   }
 
   try {
     const doc = await createReceipt({
-      paymentId: p.id,
-      userId: p.user_id,
+      paymentId: head.id,
+      userId: head.user_id,
       // В квитанции человек назван так, как его завёл админ: имена в
       // отчётности должны сходиться между собой, а не с кабинетом.
-      customerName: p.billing_name ?? p.name ?? p.email,
-      email: p.email,
-      items: await receiptItems(p),
-      amount: Number(p.amount),
-      currency: p.currency,
+      customerName: head.billing_name ?? head.name ?? head.email,
+      email: head.email,
+      items: mergeItems(await Promise.all(group.map(receiptItems)), total),
+      amount: total,
+      currency: head.currency,
       ...way,
       transfer: account === null ? null : { account, date: todayISO() },
       card,
@@ -476,23 +509,64 @@ export async function issueReceipt(paymentId: string, card?: Card | null): Promi
     await query(
       `update payments set invoice_url = $2,
               raw = coalesce(raw, '{}'::jsonb) || jsonb_build_object('receipt', $3::jsonb)
-        where id = $1`,
-      [p.id, doc.url, JSON.stringify({ docnum: doc.docnum })],
+        where id = any($1::uuid[])`,
+      [ids, doc.url, JSON.stringify({ docnum: doc.docnum })],
     );
-    console.log('icount: выписана квитанция', doc.docnum, 'на платёж', p.id);
+    console.log('icount: выписана квитанция', doc.docnum, 'на платежи', ids.join(', '));
+    return true;
   } catch (err) {
     // Квитанция уже выписана, но ссылку на неё iCount в отказе не вернул.
-    // Помечаем платёж, иначе будем проситься за ней каждый раз.
+    // Помечаем платежи, иначе будем проситься за ней каждый раз.
     if (err instanceof ICountError && err.reason === ALREADY_ISSUED) {
       await query(
         `update payments set raw = coalesce(raw, '{}'::jsonb) || '{"receipt":{"exists":true}}'::jsonb
-          where id = $1`,
-        [p.id],
+          where id = any($1::uuid[])`,
+        [ids],
       );
-      return;
+      return true;
     }
-    console.error('icount: квитанция не выписана', p.id, err);
+    console.error('icount: квитанция не выписана', ids.join(', '), err);
+    return false;
   }
+}
+
+/** Выписывает квитанцию на один платёж: так ходит автоматическая выписка. */
+export async function issueReceipt(paymentId: string, card?: Card | null): Promise<void> {
+  if (!receiptsConfigured()) return;
+  const p = await one<ToBill>(`${UNBILLED} and p.id = $1`, [paymentId]);
+  if (!p) return;
+  await issueOne([p], card);
+}
+
+export type Issued = { docs: number; failed: number };
+
+/**
+ * Выписывает бумаги по набору платежей, складывая в одну те, что
+ * принадлежат одному плательщику и пришли одним способом.
+ *
+ * Родитель, отдавший три сотни за три занятия, получает один чек с
+ * строкой «занятие ×3», а не три бумаги по сотне: в журнале это три
+ * отметки, но деньги он доставал из кармана один раз. Разные способы не
+ * смешиваем — чек утверждает, как именно пришли деньги.
+ */
+export async function issueReceiptFor(ids: string[], limit = 10): Promise<Issued> {
+  const out: Issued = { docs: 0, failed: 0 };
+  if (!receiptsConfigured() || ids.length === 0) return out;
+
+  const rows = await query<ToBill>(
+    `${UNBILLED} and p.id = any($1::uuid[]) order by p.created_at`, [ids]);
+
+  const groups = new Map<string, ToBill[]>();
+  for (const p of rows) {
+    const key = `${p.user_id}|${p.currency}|${methodKey(p)}`;
+    groups.set(key, [...(groups.get(key) ?? []), p]);
+  }
+
+  for (const group of [...groups.values()].slice(0, limit)) {
+    if (await issueOne(group)) out.docs++;
+    else out.failed++;
+  }
+  return out;
 }
 
 /** Догоняет квитанции, которые в свой час не выписались. */

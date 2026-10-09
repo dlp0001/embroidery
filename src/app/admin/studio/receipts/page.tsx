@@ -83,7 +83,17 @@ function what(p: Unbilled): string {
  * дробить там нечего.
  */
 function rowsOf(p: Unbilled): PickerRow[] {
-  const common = { pay: p.id, who: p.who, how: how(p), declined: p.declined };
+  // Та же подпись, по которой платежи складываются в одну бумагу на
+  // сервере: плательщик, валюта и способ, каким iCount знает оплату.
+  const way = p.pay_method
+    ?? (p.provider === 'transfer' ? 'transfer' : p.provider === 'cash' ? 'cash' : 'cc');
+  const common = {
+    pay: p.id,
+    group: `${p.owner_id}|${p.currency}|${way}`,
+    who: p.who,
+    how: how(p),
+    declined: p.declined,
+  };
   if (p.items.length === 0) {
     return [{ ...common, label: what(p), amount: Number(p.amount), shared: false }];
   }
