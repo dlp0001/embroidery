@@ -5,13 +5,23 @@
 // rewrite срабатывает раньше, чем серверная страница приложения, и
 // статика молча побеждает. Так случилось с /camp.
 const legacy = [
-  'embroidery', 'register', 'video', 'materials', 'materials2',
+  'embroidery',
   'portfolio', 'israeli-hints', 'studio', 'shop',
   'agreement', 'privacy-ru', 'consent-data', 'consent-marketing',
   'terms', 'refunds', 'privacy',
-  // Черновик лендинга видеокурса — Варе на вычитку. В день запуска он
-  // становится embroidery.html, а этот адрес отсюда уходит.
-  'embroidery-new',
+];
+
+// Адреса первого потока. Записи и список материалов теперь живут в курсе
+// за личной ссылкой, а старые ссылки разосланы в письмах и чатах — пусть
+// ведут туда же. Без доступа /learn сам покажет форму «прислать ссылку».
+const moved = [
+  { source: '/video', destination: '/learn/embroidery' },
+  { source: '/materials', destination: '/learn/embroidery/materials' },
+  { source: '/materials2', destination: '/learn/embroidery/materials' },
+  // Старая форма записи на поток в Zoom.
+  { source: '/register', destination: '/embroidery#register' },
+  // Черновик, по которому Варя вычитывала лендинг.
+  { source: '/embroidery-new', destination: '/embroidery' },
 ];
 
 const nextConfig = {
@@ -32,6 +42,7 @@ const nextConfig = {
         destination: '/embroidery?success=true',
         permanent: false,
       },
+      ...moved.map((m) => ({ ...m, permanent: false })),
     ];
   },
 };
