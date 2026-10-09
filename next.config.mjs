@@ -9,6 +9,9 @@ const legacy = [
   'portfolio', 'israeli-hints', 'studio',
   'agreement', 'privacy-ru', 'consent-data', 'consent-marketing',
   'terms', 'refunds', 'privacy',
+  // Черновик лендинга видеокурса — Варе на вычитку. В день запуска он
+  // становится embroidery.html, а этот адрес отсюда уходит.
+  'embroidery-new',
 ];
 
 const nextConfig = {
