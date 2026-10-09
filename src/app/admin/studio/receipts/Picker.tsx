@@ -4,15 +4,24 @@ import { useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { plural } from '@/lib/format';
 
+/**
+ * Строка списка — занятие, а не платёж. Так его и ищут глазами: «за
+ * какое занятие нет чека». Но квитанция выписывается на платёж целиком,
+ * поэтому у строк одного платежа общий `pay`: отметили одну — поднялись
+ * все, и в iCount уйдёт одна бумага.
+ */
 export type Row = {
-  id: string;
+  /** Платёж, на который выпишется квитанция. */
+  pay: string;
   who: string;
-  at: string;
-  what: string;
-  how: string;
+  /** «1 сентября · Отто» или «абонемент на 8 занятий». */
+  label: string;
   sum: string;
+  how: string;
   /** Про этот платёж говорили «чек не нужен». */
   declined: boolean;
+  /** В этом платеже не одно занятие: чек будет общий. */
+  shared: boolean;
 };
 
 /**
@@ -37,9 +46,9 @@ function Submit({ n }: { n: number }) {
 }
 
 /**
- * Выбор платежей, по которым надо выписать бумагу. Сгруппированы по
- * плательщику: квитанция выписывается на него, и смотреть на список
- * удобнее так же.
+ * Выбор занятий, по которым надо выписать бумагу. Сгруппированы по
+ * плательщику: квитанция выписывается на него, и смотреть список удобнее
+ * так же.
  *
  * По умолчанию не отмечено ничего. Это не осторожность ради осторожности:
  * квитанция уходит в бухгалтерию и отменяется только руками в iCount,
@@ -48,24 +57,26 @@ function Submit({ n }: { n: number }) {
 export default function Picker({ rows }: { rows: Row[] }) {
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
-  function toggle(id: string) {
+  function toggle(pay: string) {
     setPicked((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(pay)) next.delete(pay);
+      else next.add(pay);
       return next;
     });
   }
 
-  // Плательщик → его платежи: имя пишется один раз на всех.
+  // Плательщик → его занятия: имя пишется один раз на всех.
   const byWho = new Map<string, Row[]>();
   for (const r of rows) byWho.set(r.who, [...(byWho.get(r.who) ?? []), r]);
+
+  const lessons = rows.filter((r) => picked.has(r.pay)).length;
 
   return (
     <>
       <div className="row" style={{ marginBottom: 6 }}>
         <p className="hint" style={{ margin: 0 }}>
-          Отмечено {picked.size} из {rows.length}
+          Отмечено {lessons} из {rows.length}
         </p>
         {picked.size > 0 && (
           <button type="button" className="chip-money money"
@@ -75,28 +86,33 @@ export default function Picker({ rows }: { rows: Row[] }) {
         )}
       </div>
 
+      {/* Поля формы — по платежам, а не по строкам: две строки одного
+          платежа не должны просить две квитанции. */}
+      {[...picked].map((pay) => (
+        <input key={pay} type="hidden" name="pay" value={pay} />
+      ))}
+
       {[...byWho.entries()].map(([who, list]) => (
         <div key={who}>
           <div className="when visit-day">{who}</div>
-          {list.map((r) => {
-            const on = picked.has(r.id);
+          {list.map((r, i) => {
+            const on = picked.has(r.pay);
             return (
-              <button type="button" className="visit debt" key={r.id}
-                      onClick={() => toggle(r.id)} aria-pressed={on}
-                      aria-label={`${who}, ${r.sum} ${r.at}: ${
+              <button type="button" className="visit debt" key={`${r.pay}-${i}`}
+                      onClick={() => toggle(r.pay)} aria-pressed={on}
+                      aria-label={`${who}, ${r.label}, ${r.sum}: ${
                         on ? 'не выписывать' : 'выписать чек'}`}>
-                {on && <input type="hidden" name="pay" value={r.id} />}
                 <span className={on ? 'box box-sm box-on' : 'box box-sm'}>
                   {on && (
                     <svg viewBox="0 0 24 24"><path d="M4 12.5 L9.5 18 L20 6" /></svg>
                   )}
                 </span>
-                <span className="visit-who" style={{ opacity: on ? 1 : 0.55 }}>
-                  {r.at} · {r.what}
-                </span>
+                <span className="visit-who" style={{ opacity: on ? 1 : 0.55 }}>{r.label}</span>
                 <span className="visit-sum" style={{ opacity: on ? 1 : 0.55 }}>{r.sum}</span>
                 <span className="visit-how">
-                  {r.how}{r.declined ? ' · просили без чека' : ''}
+                  {r.how}
+                  {r.shared ? ' · общий чек' : ''}
+                  {r.declined ? ' · просили без чека' : ''}
                 </span>
               </button>
             );
@@ -117,8 +133,10 @@ export default function Picker({ rows }: { rows: Row[] }) {
       </div>
 
       <p className="hint" style={{ marginTop: 14 }}>
-        Квитанция уходит на почту плательщика и в бухгалтерию. Отменить её
-        можно только в iCount, и там это отдельная бумага — обратная.
+        Квитанция выписывается на платёж целиком: занятия, оплаченные
+        вместе, помечены «общий чек» и отмечаются разом. Бумага уходит на
+        почту плательщика и в бухгалтерию, а отменяется только в iCount —
+        и там это отдельная, обратная квитанция.
       </p>
     </>
   );

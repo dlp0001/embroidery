@@ -4,7 +4,7 @@ import { receiptTally, unbilledPayments, type Cell, type Unbilled } from '@/lib/
 import { isConfigured as receiptsConfigured } from '@/lib/icount';
 import { dayMonth, money, plural, todayISO, WAY, type PayMethod } from '@/lib/format';
 import { issueReceiptsAction } from '@/app/admin/receipt-actions';
-import Picker from './Picker';
+import Picker, { type Row as PickerRow } from './Picker';
 
 export const dynamic = 'force-dynamic';
 // Квитанции уходят в iCount по одной; страница ждёт ответа, чтобы сказать,
@@ -60,7 +60,7 @@ function how(p: Unbilled): string {
   return 'способ не записан';
 }
 
-/** За что платёж: занятия, абонемент, пакет смены или докупленные дни. */
+/** Платёж без занятий: абонемент, пакет смены или докупленные дни. */
 function what(p: Unbilled): string {
   if (p.extra_days > 0) {
     return `${p.group_title ? `${p.group_title}: ` : ''}докуплено ${p.extra_days} ${
@@ -71,11 +71,28 @@ function what(p: Unbilled): string {
       ? `${p.group_title}: пакет на ${p.lessons} ${plural(p.lessons, 'день', 'дня', 'дней')}`
       : `абонемент на ${p.lessons} ${plural(p.lessons, 'занятие', 'занятия', 'занятий')}`;
   }
-  if (p.items) return p.items;
   if (p.lessons > 0) {
     return `${p.lessons} ${plural(p.lessons, 'занятие', 'занятия', 'занятий')}`;
   }
   return 'оплата';
+}
+
+/**
+ * Строки списка: занятие на строку, как в «Оплатах». Платёж, за которым
+ * занятий нет — абонемент или докупленные дни, — остаётся одной строкой:
+ * дробить там нечего.
+ */
+function rowsOf(p: Unbilled): PickerRow[] {
+  const common = { pay: p.id, who: p.who, how: how(p), declined: p.declined };
+  if (p.items.length === 0) {
+    return [{ ...common, label: what(p), sum: money(p.amount, p.currency), shared: false }];
+  }
+  return p.items.map((i) => ({
+    ...common,
+    label: `${dayMonth(i.held_on)} · ${i.who}`,
+    sum: money(i.amount, p.currency),
+    shared: p.items.length > 1,
+  }));
 }
 
 /**
@@ -278,15 +295,7 @@ export default async function ReceiptsPage({
           <form action={issueReceiptsAction} style={{ marginTop: 18 }}>
             <input type="hidden" name="from" value={from} />
             <input type="hidden" name="to" value={to} />
-            <Picker rows={left.map((p) => ({
-              id: p.id,
-              who: p.who,
-              at: dayMonth(p.at.slice(0, 10)),
-              what: what(p),
-              how: how(p),
-              sum: money(p.amount, p.currency),
-              declined: p.declined,
-            }))} />
+            <Picker rows={left.flatMap(rowsOf)} />
           </form>
         )}
       </div>

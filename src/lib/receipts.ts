@@ -88,8 +88,8 @@ export type Unbilled = {
   /** Кому выписывать: плательщик, он же владелец начислений. */
   owner_id: string | null;
   who: string;
-  /** Что закрыто этим платежом: дни и имена, одной строкой. */
-  items: string | null;
+  /** Занятия, закрытые этим платежом: день, кто был, сколько стоило. */
+  items: { held_on: string; who: string; amount: string }[];
   lessons: number;
   group_title: string | null;
   extra_days: number;
@@ -119,10 +119,12 @@ export async function unbilledPayments(from: string, to: string): Promise<Unbill
               nullif((select count(*)::int from charges ch where ch.payment_id = p.id), 0),
               (select ps.lessons_total from passes ps where ps.payment_id = p.id),
               0) as lessons,
-            (select string_agg(x.line, ', ' order by x.held_on)
-               from (select distinct s.held_on,
-                            to_char(s.held_on, 'DD.MM') || ' '
-                              || coalesce(kid.name, ku.name, '?') as line
+            (select coalesce(json_agg(json_build_object(
+                      'held_on', x.held_on, 'who', x.who, 'amount', x.amount)
+                      order by x.held_on, x.who), '[]'::json)
+               from (select s.held_on::text as held_on,
+                            coalesce(kid.name, ku.name, '?') as who,
+                            ch.amount::text as amount
                        from charges ch
                        join studio_sessions s on s.id = ch.session_id
                        left join participants pt on pt.id = ch.participant_id
