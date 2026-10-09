@@ -2,6 +2,7 @@
 //
 //   npm run tg:teacher            сводка на сегодня прямо сейчас
 //   npm run tg:teacher -- next    напоминание про ближайшее занятие
+//   npm run tg:teacher -- money   деньги за месяц (по расписанию — утром в воскресенье)
 //   npm run tg:teacher -- day http://localhost:4321   на другом адресе
 //
 // Нужен CRON_FORCE_SECRET в .env.production.local и в Vercel. Это второй
@@ -16,7 +17,7 @@ if (!secret) {
 }
 
 const args = process.argv.slice(2);
-const force = args.find((a) => a === 'day' || a === 'next') ?? 'day';
+const force = args.find((a) => a === 'day' || a === 'next' || a === 'money') ?? 'day';
 const origin = args.find((a) => a.startsWith('http')) ?? 'https://www.re-create.art';
 
 const res = await fetch(`${origin}/api/cron/telegram-teacher?force=${force}`, {

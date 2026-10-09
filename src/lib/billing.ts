@@ -929,3 +929,29 @@ export async function paymentsTaken(limit = 150): Promise<TakenRow[]> {
     [limit],
   );
 }
+
+/**
+ * Сколько денег пришло за промежуток. Считается по дню платежа, а не по
+ * дню занятия: это касса, а не реализация. Подарки и проверочные платежи
+ * не в счёт — за ними денег нет.
+ */
+export async function takenBetween(
+  from: string, to: string,
+): Promise<{ sum: number; count: number; currency: string }> {
+  const row = await one<{ sum: string; count: number; currency: string | null }>(
+    `select coalesce(sum(p.amount), 0)::text as sum, count(*)::int as count,
+            min(p.currency) as currency
+       from payments p
+      where p.status = 'paid'
+        and p.provider <> 'gift'
+        and p.purpose is distinct from 'studio_test'
+        and p.created_at >= $1::date
+        and p.created_at < ($2::date + 1)`,
+    [from, to],
+  );
+  return {
+    sum: Number(row?.sum ?? 0),
+    count: row?.count ?? 0,
+    currency: row?.currency ?? 'ILS',
+  };
+}

@@ -2,8 +2,8 @@ import { one, query } from './db';
 import { tellCampChanges } from './notify';
 import { nowHM, todayISO } from './format';
 import {
-  claimSend, digestWatchers, isConfigured, recordSent, releaseSend, send, sentAgoMin,
-  teacherDayView, teacherSessionView, teacherToday, teachersInBot,
+  claimSend, digestWatchers, isConfigured, moneyMonthView, recordSent, releaseSend,
+  send, sentAgoMin, teacherDayView, teacherSessionView, teacherToday, teachersInBot,
 } from './telegram';
 
 /**
@@ -29,7 +29,16 @@ const AHEAD_TO = 30;
 /** Сводка ушла только что — напоминание по тому же занятию излишне. */
 const AFTER_DIGEST_QUIET = 90;
 
-export type Force = 'day' | 'next' | null;
+/**
+ * Деньги за месяц — воскресным утром. Раз в неделю и в один день: касса
+ * меняется медленно, а сводка, приходящая каждый день, к третьему дню
+ * перестаёт читаться. Окно до часу дня: тик бывает раз в четверть часа,
+ * а в воскресенье до студии ещё надо дойти.
+ */
+const MONEY_AT = '10:00';
+const MONEY_UNTIL = '13:00';
+
+export type Force = 'day' | 'next' | 'money' | null;
 
 export type DueResult = { at: string; tried: number; failed: number; sent: string[] };
 
@@ -48,8 +57,9 @@ export async function sendDue(force: Force): Promise<DueResult> {
   if (!isConfigured()) return { at, tried, failed, sent };
 
   const watchers = await digestWatchers();
+  const teachers = await teachersInBot();
 
-  for (const teacher of await teachersInBot()) {
+  for (const teacher of teachers) {
     const sessions = await teacherToday(teacher.id);
 
     // ── Сводка на день ──
@@ -121,6 +131,32 @@ export async function sendDue(force: Force): Promise<DueResult> {
       } else {
         failed++;
         if (force !== 'next') await releaseSend(campaign, teacher.chat_id);
+      }
+    }
+  }
+
+  // ── Деньги за месяц, воскресным утром ──
+  // Идёт и Варе, и тому, кто смотрит со стороны: цифры одни и те же, и
+  // обсуждать их проще, когда они пришли обоим в одно время.
+  const sunday = new Date(`${today}T00:00:00Z`).getUTCDay() === 0;
+  const moneyDue = force
+    ? force === 'money'
+    : sunday && now >= minutes(MONEY_AT) && now < minutes(MONEY_UNTIL);
+  if (moneyDue) {
+    const campaign = `money-week:${today}`;
+    const seen = new Set<string>();
+    for (const who of [...teachers, ...watchers]) {
+      if (seen.has(who.chat_id)) continue;
+      seen.add(who.chat_id);
+      if (force !== 'money' && !(await claimSend(campaign, who.chat_id))) continue;
+      const view = await moneyMonthView(who.name);
+      tried++;
+      if (await send(Number(who.chat_id), view.text)) {
+        await recordSent(campaign, who.chat_id, view.text);
+        sent.push(`деньги → ${who.name}`);
+      } else {
+        failed++;
+        if (force !== 'money') await releaseSend(campaign, who.chat_id);
       }
     }
   }

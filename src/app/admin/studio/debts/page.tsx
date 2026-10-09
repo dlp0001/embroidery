@@ -94,16 +94,7 @@ export default async function DebtsPage() {
     <>
       <div className="top">
         <div className="kicker">Re.Create.Art · Деньги</div>
-        <div className="row">
-          <h1 className="h1">Финансы</h1>
-          {admin && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Link className="btn-quiet" href="/admin/studio/camp">Лагерь</Link>
-              <Link className="btn-quiet" href="/admin/studio/stats">Статистика</Link>
-              <Link className="btn-quiet" href="/admin/studio/payments">Платежи</Link>
-            </div>
-          )}
-        </div>
+        <h1 className="h1">Финансы</h1>
         <p className="sub">Долги, абонементы и полученные деньги</p>
       </div>
 
@@ -114,6 +105,16 @@ export default async function DebtsPage() {
             плательщика: у детей нет родителя, и счёт выставить некому. В долги
             они не попадут, пока ребёнка не привяжут.{' '}
             <Link href="/admin/studio/people">Привязать в «Людях»</Link>.
+          </div>
+        )}
+
+        {/* Соседние денежные страницы: не в шапке, где они теснили
+            заголовок, а здесь — перед первой цифрой, которую читают. */}
+        {admin && (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+            <Link className="btn-quiet" href="/admin/studio/camp">Лагерь</Link>
+            <Link className="btn-quiet" href="/admin/studio/stats">Статистика</Link>
+            <Link className="btn-quiet" href="/admin/studio/payments">Платежи</Link>
           </div>
         )}
 

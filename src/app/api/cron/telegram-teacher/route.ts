@@ -31,7 +31,8 @@ export async function GET(req: Request): Promise<Response> {
     console.error('cron-teacher: force чужим ключом');
     return Response.json({ error: 'force требует своего ключа' }, { status: 403 });
   }
-  const force: Force = asked === 'day' || asked === 'next' ? asked : null;
+  const force: Force =
+    asked === 'day' || asked === 'next' || asked === 'money' ? asked : null;
 
   return Response.json({ force, ...(await sendDue(force)) });
 }

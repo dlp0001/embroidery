@@ -1,9 +1,11 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { takenBetween } from './billing';
 import { one, query, tx } from './db';
 import {
   dayMonth, eventClosed, hhmm, money, nowHM, plural, plusDays, todayISO,
   weekdayDayMonth,
 } from './format';
+import { periodStats } from './stats';
 import {
   debtors, eventSlotsForUser, markDeclined, passBalances, sessionIsPast, setBooking,
   slotsForUser, teacherSessions, unclosedBefore, unpaidCharges,
@@ -875,6 +877,47 @@ export async function teacherSessionView(
 }
 
 // ── Деньги ────────────────────────────────────────────────
+
+/**
+ * Деньги за месяц: сколько пришло и сколько студия за этот месяц
+ * отработала. Две цифры нарочно стоят рядом и нарочно не сходятся:
+ * касса — это когда заплатили, реализация — когда занятие прошло.
+ * Абонемент, купленный в сентябре, кормит октябрь, а октябрьский долг
+ * в кассу не попадёт вовсе, пока его не отдадут.
+ */
+export async function moneyMonthView(name: string | null): Promise<View> {
+  const today = todayISO();
+  const from = `${today.slice(0, 7)}-01`;
+  const [taken, done] = await Promise.all([
+    takenBetween(from, today),
+    periodStats(from, today),
+  ]);
+  const cur = done.currency;
+  const since = `с ${dayMonth(from)}`;
+
+  const lesson = done.done.single.sum + done.done.pass.sum;
+  const camp = done.done.event.sum + done.done.eventPass.sum;
+
+  const lines = [
+    greeting(firstName(name)),
+    '',
+    `Получено ${since}: ${money(Math.round(taken.sum), cur)}`,
+    `   ${taken.count}\u00a0${plural(taken.count, 'платёж', 'платежа', 'платежей')}`,
+    '',
+    `Реализация ${since}:`,
+    `   занятия — ${money(Math.round(lesson), cur)}`,
+  ];
+  // Лагерь показываем, только когда он был: строка «лагерь — 0» каждую
+  // неделю говорила бы лишь о том, что сейчас не лето.
+  if (camp > 0) lines.push(`   лагерь — ${money(Math.round(camp), cur)}`);
+  lines.push(
+    '',
+    'Реализация — то, что прошло: деньги за это могли прийти раньше'
+      + ' или ещё не прийти.',
+  );
+
+  return { text: lines.join('\n'), keyboard: [] };
+}
 
 /**
  * Свои долги и абонементы. Оплатить отсюда нельзя нарочно: выбрать, за
