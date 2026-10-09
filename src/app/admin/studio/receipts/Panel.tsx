@@ -135,7 +135,8 @@ export default function Panel({
             по требованию: подробности нужны реже, чем итог. */}
         <button type="button" className="fold" aria-expanded={open}
                 onClick={() => setOpen((v) => !v)}
-                style={{ alignItems: 'center', gap: 14, padding: '8px 0 10px' }}>
+                style={{ alignItems: 'center', gap: 14, flexWrap: 'wrap',
+                         padding: '8px 0 10px' }}>
           <span aria-hidden style={{ fontSize: 8, color: 'var(--warm-gray)' }}>
             {open ? '▼' : '▶'}
           </span>
@@ -149,6 +150,16 @@ export default function Panel({
               {money(left, currency)}
             </span>
           </span>
+          {/* Чем станет «выписано», если нажать кнопку. Появляется только
+              когда есть что считать: пустой столбец про будущее — шум. */}
+          {chosen > 0 && (
+            <span style={PAIR}>
+              <span style={TAG}>Будет выписано</span>
+              <span style={{ ...NUM, color: 'var(--ok)' }}>
+                {money(billed + chosen, currency)}
+              </span>
+            </span>
+          )}
         </button>
 
         <div style={{ display: open ? undefined : 'none', paddingBottom: 12 }}>{children}</div>
