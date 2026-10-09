@@ -238,8 +238,8 @@
       </a>
       <div class="hero-price-block">
         <div class="price-main">
-          <span class="lang-en">₪240 / $80</span>
-          <span class="lang-ru">₪240 / $80 / 6 800 ₽</span>
+          <span class="lang-en">₪180 / $60</span>
+          <span class="lang-ru">₪180 / $60 / 5 000 ₽</span>
         </div>
       </div>
     </div>
@@ -494,7 +494,7 @@
               <label class="payment-label" for="pay-ru">
                 <span class="payment-flag">🇷🇺</span>
                 <span class="payment-name">Россия</span>
-                <span class="payment-sub">6 800 ₽</span>
+                <span class="payment-sub">5 000 ₽</span>
               </label>
             </div>
             <div class="payment-option">
@@ -502,7 +502,7 @@
               <label class="payment-label" for="pay-ils">
                 <span class="payment-flag">🇮🇱</span>
                 <span class="payment-name">ישראל</span>
-                <span class="payment-sub">₪240</span>
+                <span class="payment-sub">₪180</span>
               </label>
             </div>
             <div class="payment-option">
@@ -510,7 +510,7 @@
               <label class="payment-label" for="pay-int">
                 <span class="payment-flag">🌍</span>
                 <span class="payment-name">Other</span>
-                <span class="payment-sub">$80</span>
+                <span class="payment-sub">$60</span>
               </label>
             </div>
           </div>
@@ -519,7 +519,7 @@
           </p>
         </div>
         <div class="payment-info" id="info-ru" style="display:none;">
-          <p><strong>Оплата для России:</strong> после отправки заявки вы будете автоматически переадресованы на страницу оплаты <strong>ЮKassa</strong> — карты РФ, СБП, ЮMoney.<br>Стоимость: <strong>6 800 ₽</strong></p>
+          <p><strong>Оплата для России:</strong> после отправки заявки вы будете автоматически переадресованы на страницу оплаты <strong>ЮKassa</strong> — карты РФ, СБП, ЮMoney.<br>Стоимость: <strong>5 000 ₽</strong></p>
           <div style="margin-top:16px; display:flex; flex-direction:column; gap:10px;">
             <label style="display:flex; align-items:flex-start; gap:10px; cursor:pointer; font-size:13px; color:var(--warm-gray); line-height:1.5;">
               <input type="checkbox" id="consent-data" style="margin-top:2px; accent-color:var(--rose); flex-shrink:0;">
@@ -532,12 +532,12 @@
           </div>
         </div>
         <div class="payment-info active" id="info-ils">
-          <p><strong>תשלום בשקלים:</strong> לאחר שליחת הבקשה, תועברו לעמוד תשלום מאובטח.<br>מחיר: <strong>₪240</strong></p>
+          <p><strong>תשלום בשקלים:</strong> לאחר שליחת הבקשה, תועברו לעמוד תשלום מאובטח.<br>מחיר: <strong>₪180</strong></p>
         </div>
         <div class="payment-info" id="info-int">
-          <p><strong>International payment:</strong> after submitting, you'll be redirected to a secure payment page.<br>Price: <strong>$80 USD</strong></p>
+          <p><strong>International payment:</strong> after submitting, you'll be redirected to a secure payment page.<br>Price: <strong>$60 USD</strong></p>
         </div>
-        <button class="btn-submit" id="submitBtn" onclick="handleSubmit()">לתשלום · ₪240</button>
+        <button class="btn-submit" id="submitBtn" onclick="handleSubmit()">לתשלום · ₪180</button>
       </div>
     </div>
   </div>
@@ -577,7 +577,7 @@ function switchLang(lang) {
       document.getElementById('info-ru').style.display = '';
       document.getElementById('info-ru').classList.add('active');
       document.getElementById('info-ils').classList.remove('active');
-      document.getElementById('submitBtn').textContent = 'Перейти к оплате · 6 800 ₽';
+      document.getElementById('submitBtn').textContent = 'Перейти к оплате · 5 000 ₽';
       document.getElementById('show-ru-link').style.display = 'none';
       // Auto-switch to Russian
       switchLang('ru');
@@ -593,7 +593,7 @@ function showRussia() {
   document.getElementById('info-ru').style.display = '';
   document.getElementById('info-ru').classList.add('active');
   document.getElementById('info-ils').classList.remove('active');
-  document.getElementById('submitBtn').textContent = 'Перейти к оплате · 6 800 ₽';
+  document.getElementById('submitBtn').textContent = 'Перейти к оплате · 5 000 ₽';
   document.getElementById('show-ru-link').style.display = 'none';
   switchLang('ru');
 }
@@ -605,7 +605,7 @@ document.querySelectorAll('input[name="payment"]').forEach(radio => {
     document.getElementById('info-ru')?.classList.toggle('active', val === 'ru');
     document.getElementById('info-ils').classList.toggle('active', val === 'ils');
     document.getElementById('info-int').classList.toggle('active', val === 'international');
-    const labels = { ru: 'Перейти к оплате · 6 800 ₽', ils: 'לתשלום · ₪240', international: 'Proceed to payment · $80 USD' };
+    const labels = { ru: 'Перейти к оплате · 5 000 ₽', ils: 'לתשלום · ₪180', international: 'Proceed to payment · $60 USD' };
     document.getElementById('submitBtn').textContent = labels[val];
   });
 });
@@ -637,7 +637,7 @@ async function handleSubmit() {
     if (!consentData || !consentMarketing) {
       showToast('Пожалуйста, отметьте оба согласия для продолжения');
       btn.disabled = false;
-      btn.textContent = 'Перейти к оплате · 6 800 ₽';
+      btn.textContent = 'Перейти к оплате · 5 000 ₽';
       return;
     }
   }
@@ -660,7 +660,7 @@ async function handleSubmit() {
     if (!data.url) {
       showToast(data.error || (lang === 'ru' ? 'Ошибка отправки. Попробуйте ещё раз.' : 'Something went wrong. Please try again.'));
       btn.disabled = false;
-      const labels = { ru: 'Перейти к оплате · 6 800 ₽', ils: 'לתשלום · ₪240', international: 'Proceed to payment · $80 USD' };
+      const labels = { ru: 'Перейти к оплате · 5 000 ₽', ils: 'לתשלום · ₪180', international: 'Proceed to payment · $60 USD' };
       btn.textContent = labels[payMethod];
       return;
     }
@@ -669,7 +669,7 @@ async function handleSubmit() {
     console.error(err);
     showToast(lang === 'ru' ? 'Ошибка отправки. Попробуйте ещё раз.' : 'Something went wrong. Please try again.');
     btn.disabled = false;
-    const labels = { ru: 'Перейти к оплате · 6 800 ₽', ils: 'לתשלום · ₪240', international: 'Proceed to payment · $80 USD' };
+    const labels = { ru: 'Перейти к оплате · 5 000 ₽', ils: 'לתשלום · ₪180', international: 'Proceed to payment · $60 USD' };
     btn.textContent = labels[payMethod];
   }
 }

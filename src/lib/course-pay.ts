@@ -41,9 +41,9 @@ type Offer = {
 
 const OFFERS: Record<string, Offer> = {
   embroidery: {
-    ils: 240,
-    usd: 80,
-    rub: 6800,
+    ils: 180,
+    usd: 60,
+    rub: 5000,
     polarProduct: '95f44221-6627-4bc5-969d-0bea77c4783b',
     item: 'Видеокурс по вышивке «Как вышить в современном мире», доступ на 6 месяцев',
     receipt: 'Видеокурс по вышивке, доступ на 6 месяцев | קורס רקמה מוקלט, גישה ל-6 חודשים',
