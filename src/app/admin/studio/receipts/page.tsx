@@ -4,7 +4,7 @@ import { receiptTally, unbilledPayments, type Cell, type Unbilled } from '@/lib/
 import { isConfigured as receiptsConfigured } from '@/lib/icount';
 import { dayMonth, money, plural, todayISO, WAY, type PayMethod } from '@/lib/format';
 import { issueReceiptsAction } from '@/app/admin/receipt-actions';
-import Picker, { type Row as PickerRow } from './Picker';
+import Panel, { type Row as PickerRow } from './Panel';
 
 export const dynamic = 'force-dynamic';
 // Квитанции уходят в iCount по одной; страница ждёт ответа, чтобы сказать,
@@ -85,12 +85,12 @@ function what(p: Unbilled): string {
 function rowsOf(p: Unbilled): PickerRow[] {
   const common = { pay: p.id, who: p.who, how: how(p), declined: p.declined };
   if (p.items.length === 0) {
-    return [{ ...common, label: what(p), sum: money(p.amount, p.currency), shared: false }];
+    return [{ ...common, label: what(p), amount: Number(p.amount), shared: false }];
   }
   return p.items.map((i) => ({
     ...common,
     label: `${dayMonth(i.held_on)} · ${i.who}`,
-    sum: money(i.amount, p.currency),
+    amount: Number(i.amount),
     shared: p.items.length > 1,
   }));
 }
@@ -187,66 +187,73 @@ export default async function ReceiptsPage({
           })}
         </div>
 
-        <form className="card" style={{ display: 'flex', gap: 12, flexWrap: 'wrap',
-                                        alignItems: 'flex-end', marginBottom: 18 }}>
-          <div className="field" style={{ marginBottom: 0, flex: '1 1 140px' }}>
-            <label htmlFor="from">С какого дня</label>
-            <input id="from" name="from" type="date" defaultValue={from} />
-          </div>
-          <div className="field" style={{ marginBottom: 0, flex: '1 1 140px' }}>
-            <label htmlFor="to">По какой</label>
-            <input id="to" name="to" type="date" defaultValue={to} />
-          </div>
-          <button className="btn-quiet" type="submit">Показать</button>
-        </form>
+        {/* Что вышло с прошлого нажатия. iCount отвечает по одной
+            квитанции, и половина могла пройти, а половина нет. */}
+        {(done > 0 || failed > 0) && (
+          <p className={failed > 0 ? 'note' : 'hint'} style={{ marginTop: 0, marginBottom: 12 }}>
+            {done > 0 && `Выписано ${done}\u00a0${plural(done, 'чек', 'чека', 'чеков')}.`}
+            {failed > 0 && ` Не вышло: ${failed}. iCount отказал — можно нажать ещё раз,`
+              + ' причина в журнале сервера.'}
+          </p>
+        )}
 
-        <div style={{ overflowX: 'auto' }}>
-          <table className="rep">
-            <thead>
-              <tr>
-                <th>Как оплачено</th>
-                <th>Выписан</th>
-                <th>Не выписан</th>
-                <th>Итого</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.kind}>
-                  <td>{r.label}</td>
-                  <td><Money c={r.billed} /></td>
-                  <td>
-                    {r.left.count === 0
-                      ? <span className="dim">—</span>
-                      : <span className="due">{money(r.left.sum, currency)}</span>}
-                    {r.left.count > 0 && (
-                      <div className="hint rep-cnt">
-                        {r.left.count}&nbsp;{plural(r.left.count, 'платёж', 'платежа', 'платежей')}
-                      </div>
-                    )}
-                  </td>
-                  <td>
-                    {r.billed.count + r.left.count === 0
-                      ? <span className="dim">—</span>
-                      : money(r.billed.sum + r.left.sum, currency)}
-                  </td>
+        <Panel
+          from={from}
+          to={to}
+          billed={sum(billed)}
+          left={sum(missing)}
+          currency={currency}
+          rows={issuing ? left.flatMap(rowsOf) : undefined}
+          action={issuing ? issueReceiptsAction : undefined}
+        >
+          <div style={{ overflowX: 'auto' }}>
+            <table className="rep">
+              <thead>
+                <tr>
+                  <th>Как оплачено</th>
+                  <th>Выписан</th>
+                  <th>Не выписан</th>
+                  <th>Итого</th>
                 </tr>
-              ))}
-              <tr className="total">
-                <td>Итого</td>
-                <td>{money(sum(billed), currency)}</td>
-                <td>{money(sum(missing), currency)}</td>
-                <td>{money(sum(billed) + sum(missing), currency)}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.kind}>
+                    <td>{r.label}</td>
+                    <td><Money c={r.billed} /></td>
+                    <td>
+                      {r.left.count === 0
+                        ? <span className="dim">—</span>
+                        : <span className="due">{money(r.left.sum, currency)}</span>}
+                      {r.left.count > 0 && (
+                        <div className="hint rep-cnt">
+                          {r.left.count}&nbsp;{plural(r.left.count, 'платёж', 'платежа', 'платежей')}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {r.billed.count + r.left.count === 0
+                        ? <span className="dim">—</span>
+                        : money(r.billed.sum + r.left.sum, currency)}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="total">
+                  <td>Итого</td>
+                  <td>{money(sum(billed), currency)}</td>
+                  <td>{money(sum(missing), currency)}</td>
+                  <td>{money(sum(billed) + sum(missing), currency)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <p className="hint" style={{ marginTop: 16 }}>
-          По карте квитанция выписывается сама, сразу после оплаты. По
-          деньгам, принятым студией, — только если о ней попросили: в
-          журнале, в «Оплатах» или отсюда.
-        </p>
+          <p className="hint" style={{ marginTop: 12 }}>
+            По карте квитанция выписывается сама, сразу после оплаты. По
+            деньгам, принятым студией, — только если о ней попросили: в
+            журнале, в «Оплатах» или отсюда.
+          </p>
+        </Panel>
 
         {!icount && (
           <p className="note" style={{ marginTop: 16 }}>
@@ -281,23 +288,6 @@ export default async function ReceiptsPage({
           </p>
         )}
 
-        {/* Что вышло с прошлого нажатия. iCount отвечает по одной
-            квитанции, и половина могла пройти, а половина нет. */}
-        {(done > 0 || failed > 0) && (
-          <p className={failed > 0 ? 'note' : 'hint'} style={{ marginTop: 16 }}>
-            {done > 0 && `Выписано ${done}\u00a0${plural(done, 'чек', 'чека', 'чеков')}.`}
-            {failed > 0 && ` Не вышло: ${failed}. iCount отказал — можно нажать ещё раз,`
-              + ' причина в журнале сервера.'}
-          </p>
-        )}
-
-        {issuing && (
-          <form action={issueReceiptsAction} style={{ marginTop: 18 }}>
-            <input type="hidden" name="from" value={from} />
-            <input type="hidden" name="to" value={to} />
-            <Picker rows={left.flatMap(rowsOf)} />
-          </form>
-        )}
       </div>
     </>
   );
