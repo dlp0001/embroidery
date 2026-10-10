@@ -20,6 +20,8 @@ export type Buyer = {
   provider: string | null;
   amount: string | null;
   currency: string | null;
+  /** Когда платили: у первого потока — дата из таблицы. */
+  paid_on: string | null;
   receipt_url: string | null;
   receipt_error: string | null;
   /** id оплаты у PayPlus — чтобы добить квитанцию. */
@@ -36,7 +38,8 @@ export async function buyers(slug: string): Promise<Buyer[]> {
             (select count(*)::int from course_devices d
               where d.access_id = a.id and d.revoked_at is null) as devices,
             a.link_sent_at::date::text as link_sent,
-            o.provider, o.amount::text, o.currency, o.receipt_url, o.receipt_error,
+            o.provider, o.amount::text, o.currency, o.created_at::date::text as paid_on,
+            o.receipt_url, o.receipt_error,
             case when o.provider = 'payplus' then o.provider_id end as payplus_id
        from course_access a
        join courses c on c.id = a.course_id

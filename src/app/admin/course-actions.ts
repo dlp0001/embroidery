@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { grantAccess, sendLink } from '@/lib/course';
 import { issueCourseReceipt } from '@/lib/course-pay';
 import { payplusCard, resetDevices, restore, revoke } from '@/lib/course-admin';
-import { legacyBuyers } from '@/lib/course-legacy';
+import { backfillLegacyOrders, legacyBuyers, recordLegacyOrder } from '@/lib/course-legacy';
 import { currentUser, isAdmin, isSuperadmin } from '@/lib/session';
 
 const PAGE = '/admin/courses';
@@ -80,6 +80,7 @@ export async function importLegacyAction(): Promise<void> {
   const failed: string[] = [];
   for (const b of batch) {
     const grant = await grantAccess({ slug: 'embroidery', email: b.email, name: b.name, source: 'legacy' });
+    await recordLegacyOrder(grant.accessId, b);
     if (!(await sendLink(grant.accessId, 'moved'))) failed.push(b.email);
     // Resend принимает не больше двух писем в секунду.
     await new Promise((r) => setTimeout(r, 600));
@@ -92,6 +93,15 @@ export async function importLegacyAction(): Promise<void> {
       ? { error: `Доступ открыт ${batch.length}, письма не ушли: ${failed.join(', ')}. Им — «Прислать ссылку». Осталось ${left}.` }
       : { note: `Доступ открыт и письма ушли: ${batch.length}. Осталось ${left}.` }),
   });
+}
+
+/** Суммы из таблицы тем, кого перенесли раньше, чем это научились делать. */
+export async function backfillLegacyAction(): Promise<void> {
+  const user = await currentUser();
+  if (!user || !isSuperadmin(user)) redirect(PAGE);
+  const done = await backfillLegacyOrders('embroidery');
+  revalidatePath(PAGE);
+  back({ note: `Суммы из таблицы подтянуты: ${done}` });
 }
 
 export async function retryReceiptAction(form: FormData): Promise<void> {

@@ -2,11 +2,11 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { currentUser, isAdmin, isSuperadmin } from '@/lib/session';
 import { abandoned, buyers, type Buyer } from '@/lib/course-admin';
-import { legacyBuyers, type LegacySheet } from '@/lib/course-legacy';
+import { legacyBuyers, legacyWithoutOrder, type LegacySheet } from '@/lib/course-legacy';
 import { MAX_DEVICES } from '@/lib/course-limits';
 import { money, shortDate } from '@/lib/format';
 import {
-  grantCourseAction, importLegacyAction, resendLinkAction, resetDevicesAction, restoreAction, revokeAction,
+  backfillLegacyAction, grantCourseAction, importLegacyAction, resendLinkAction, resetDevicesAction, restoreAction, revokeAction,
   retryReceiptAction,
 } from '@/app/admin/course-actions';
 
@@ -24,7 +24,24 @@ const PROVIDER: Record<string, string> = {
   payplus: 'PayPlus',
   polar: 'Polar',
   yookassa: 'ЮKassa',
+  paddle: 'Paddle',
+  lemonsqueezy: 'Lemon Squeezy',
+  sheet: 'по таблице',
 };
+
+/** «Первый поток · Polar · 240 ₪ · оплата 02.06.26» или «PayPlus · 180 ₪ · с 10.10.26». */
+function paidLine(b: Buyer): string {
+  const parts: string[] = [];
+  if (b.source === 'legacy') parts.push('Первый поток');
+  if (b.provider) {
+    parts.push(PROVIDER[b.provider] ?? b.provider);
+    if (b.amount) parts.push(money(b.amount, b.currency ?? 'ILS'));
+  } else if (b.source !== 'legacy') {
+    parts.push(SOURCE[b.source]);
+  }
+  parts.push(b.source === 'legacy' && b.paid_on ? `оплата ${shortDate(b.paid_on)}` : `с ${shortDate(b.since)}`);
+  return parts.join(' · ');
+}
 
 /**
  * Покупатели видеокурса. Студия здесь ни при чём: это отдельные люди,
@@ -40,7 +57,9 @@ export default async function CoursesPage({
   const { note, error, legacy } = await searchParams;
   const boss = isSuperadmin(user);
 
-  const [list, lost] = await Promise.all([buyers('embroidery'), abandoned('embroidery')]);
+  const [list, lost, noSum] = await Promise.all([
+    buyers('embroidery'), abandoned('embroidery'), boss ? legacyWithoutOrder('embroidery') : 0,
+  ]);
 
   // Таблицу читаем только по просьбе: это поход в Google на каждый заход.
   let sheet: LegacySheet | null = null;
@@ -96,9 +115,18 @@ export default async function CoursesPage({
             <div className="what" style={{ marginBottom: 6 }}>Первый поток из таблицы</div>
             <p className="hint" style={{ marginBottom: 14 }}>
               Оплатившие из Google Sheets получают доступ на 6 месяцев и письмо «записи переехали»
-              со ссылкой. У кого доступ уже есть, того не трогаем. Делать в день, когда закрывается
-              /video.
+              со ссылкой. У кого доступ уже есть, того не трогаем, так что нажимать можно снова, если
+              в таблице появятся новые оплатившие.
             </p>
+            {noSum > 0 && (
+              <form action={backfillLegacyAction} style={{ marginBottom: 12 }}>
+                <p className="hint" style={{ marginBottom: 10 }}>
+                  У {noSum} перенесённых в карточке нет суммы оплаты: их переносили до того,
+                  как суммы научились сохранять.
+                </p>
+                <button className="btn-quiet" type="submit">Подтянуть суммы из таблицы</button>
+              </form>
+            )}
             {!legacy ? (
               <Link className="btn-quiet" href="/admin/courses?legacy=1">Проверить таблицу</Link>
             ) : sheetError ? (
@@ -138,12 +166,7 @@ export default async function CoursesPage({
               <div style={{ minWidth: 0 }}>
                 <div className="what" style={{ fontSize: 19, overflowWrap: 'anywhere' }}>{b.name || b.email}</div>
                 {b.name && <div className="sub" style={{ overflowWrap: 'anywhere' }}>{b.email}</div>}
-                <div className="money">
-                  {b.provider
-                    ? `${PROVIDER[b.provider] ?? b.provider} · ${b.amount ? money(b.amount, b.currency ?? 'ILS') : ''}`
-                    : SOURCE[b.source]}
-                  {' · '}с {shortDate(b.since)}
-                </div>
+                <div className="money">{paidLine(b)}</div>
                 <div className="money">
                   Устройств {b.devices} из {MAX_DEVICES}
                   {b.link_sent ? ` · ссылка ${shortDate(b.link_sent)}` : ''}
