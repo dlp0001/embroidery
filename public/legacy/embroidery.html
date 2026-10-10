@@ -65,6 +65,13 @@
   .nav-right { display: flex; align-items: center; gap: 16px; }
   .nav-cta { font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; padding: 9px 28px; background: var(--rose); color: #fff; text-decoration: none; transition: background 0.2s; }
   .nav-cta:hover { background: var(--rose-dark); }
+  /* Вход для тех, кто курс уже купил: ссылку из письма теряют, а сюда
+     приходят по старой памяти. /learn сам предложит прислать ссылку. */
+  .nav-link { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--rose); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 6px; text-decoration-color: var(--rose-light); white-space: nowrap; transition: color 0.2s, text-decoration-color 0.2s; }
+  .nav-link:hover { color: var(--rose-dark); text-decoration-color: var(--rose-dark); }
+  .hero-owned { margin-top: 28px; font-size: 13px; color: var(--warm-gray); }
+  .hero-owned a { color: var(--rose); text-decoration: none; border-bottom: 1px solid var(--rose-light); padding-bottom: 2px; transition: color 0.2s, border-color 0.2s; }
+  .hero-owned a:hover { color: var(--rose-dark); border-color: var(--rose-dark); }
 
   /* HERO */
   .hero { display: grid; grid-template-columns: 1fr 1fr; min-height: 600px; margin-top: 72px; }
@@ -171,6 +178,11 @@
     .nav-logo { font-size: 15px; }
     .lang-switch { margin-left: 8px; }
     .lang-btn { padding: 3px 7px; font-size: 9px; }
+    /* Три вещи справа не помещаются рядом с полным логотипом: имя уходит,
+       как на главной, — оно крупно встречает на первом экране. */
+    .nav-logo span { display: none; }
+    .nav-right { gap: 10px; }
+    .nav-link { font-size: 9px; letter-spacing: 0.1em; text-underline-offset: 4px; }
     .nav-cta {
       padding: 0 16px; font-size: 9px; letter-spacing: 0.15em;
       display: inline-flex; align-items: center; min-height: 32px;
@@ -197,13 +209,17 @@
 <!-- NAV -->
 <nav>
   <div class="nav-left">
-    <a href="/" style="text-decoration:none;"><div class="nav-logo">Re.Create.Art · <span>Варя Перлина</span></div></a>
+    <a href="/" style="text-decoration:none;"><div class="nav-logo">Re.Create.Art<span> · Варя Перлина</span></div></a>
     <div class="lang-switch">
       <button class="lang-btn active" onclick="switchLang('en')" id="btn-en">EN</button>
       <button class="lang-btn" onclick="switchLang('ru')" id="btn-ru">RU</button>
     </div>
   </div>
   <div class="nav-right">
+    <a href="/learn/embroidery" class="nav-link">
+      <span class="lang-en">My lessons</span>
+      <span class="lang-ru">Мои уроки</span>
+    </a>
     <a href="#register" class="nav-cta">
       <span class="lang-en">Buy</span>
       <span class="lang-ru">Купить</span>
@@ -242,6 +258,10 @@
         </div>
       </div>
     </div>
+    <p class="hero-owned fade-up">
+      <span class="lang-en">Already bought the course? <a href="/learn/embroidery">Open your lessons →</a></span>
+      <span class="lang-ru">Уже купили курс? <a href="/learn/embroidery">Открыть уроки →</a></span>
+    </p>
   </div>
   <div class="hero-right">
     <img src="photo2.jpg" alt="Embroidery in a hoop — by Varya Perlin">
