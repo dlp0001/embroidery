@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { courseBySlug, deviceAccess, lessonsWithPlayers, longDate } from '@/lib/course';
+import { courseAccess, courseBySlug, lessonsWithPlayers, longDate } from '@/lib/course';
 import Shell from '../Shell';
 import RequestLinkForm from '../RequestLinkForm';
 
@@ -13,15 +13,16 @@ export const metadata: Metadata = {
 
 /**
  * Курс. Уроки и подписанные ссылки на видео отдаются только браузеру,
- * который открыл курс по личной ссылке из письма. Остальным — форма, куда
- * ввести почту покупателя.
+ * который открыл курс по личной ссылке из письма, или родителю студии,
+ * вошедшему в кабинет с той же почтой. Остальным — форма, куда ввести
+ * почту покупателя.
  */
 export default async function CoursePage({ params }: { params: Promise<{ course: string }> }) {
   const { course: slug } = await params;
   const course = await courseBySlug(slug);
   if (!course) notFound();
 
-  const access = await deviceAccess(course);
+  const access = await courseAccess(course);
 
   if (!access) {
     return (
@@ -38,6 +39,13 @@ export default async function CoursePage({ params }: { params: Promise<{ course:
               покупали, — пришлём свежую ссылку.
             </p>
             <RequestLinkForm course={course.slug} />
+            {/* Ссылки на вход здесь нарочно нет: вход создаёт кабинет студии,
+                а покупателю курса он не нужен. Родители студии и так знают,
+                где их кабинет. */}
+            <p className="gate-note">
+              Ходите в студию? Войдите в кабинет студии с той же почтой, с которой покупали
+              курс, — он откроется сам, без ссылки.
+            </p>
             <p className="gate-note">
               Ещё не купили? <a href="/embroidery">Всё о курсе</a>
             </p>

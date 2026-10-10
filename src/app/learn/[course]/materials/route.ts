@@ -1,4 +1,4 @@
-import { courseBySlug, deviceAccess } from '@/lib/course';
+import { courseAccess, courseBySlug } from '@/lib/course';
 import { EMBROIDERY_MATERIALS } from '@/server/course/embroidery-materials';
 
 export const runtime = 'nodejs';
@@ -15,7 +15,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ course: 
   const course = page ? await courseBySlug(slug) : null;
   if (!course) return new Response('Not found', { status: 404 });
 
-  const access = await deviceAccess(course);
+  const access = await courseAccess(course);
   if (!access || access.expired) {
     return Response.redirect(new URL(`/learn/${slug}`, req.url), 303);
   }

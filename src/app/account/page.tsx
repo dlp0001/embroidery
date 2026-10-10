@@ -4,6 +4,7 @@ import ContactCard from '@/components/ContactCard';
 import EventSignup from '@/components/EventSignup';
 import OnlyMine from '@/components/OnlyMine';
 import SlotList from '@/components/SlotList';
+import { cabinetCourses, longDate } from '@/lib/course';
 import { requireParent } from '@/lib/session';
 import {
   PASS_WARN_DAYS, eventSlotsForUser, passBalances, slotsForUser, unpaidCharges,
@@ -23,12 +24,13 @@ export default async function WeekPage({
   // вчетверо больше, чем у одной семьи, и среди чужих теряются свои.
   const showAll = (await searchParams).all === '1';
   const today = todayISO();
-  const [passes, unpaid, slots, events, chat] = await Promise.all([
+  const [passes, unpaid, slots, events, chat, courses] = await Promise.all([
     passBalances(user.id),
     unpaidCharges(user.id),
     slotsForUser(user.id, today, plusDays(today, 7)),
     eventSlotsForUser(user.id),
     chatOfUser(user.id),
+    cabinetCourses(user.email),
   ]);
 
   // Пакет лагеря лежит рядом с обычным абонементом: показываем оба.
@@ -180,6 +182,23 @@ export default async function WeekPage({
             в другие дни — снимите отметку, чтобы увидеть.
           </p>
         )}
+
+        {/* Видеокурс, купленный на ту же почту. Курс живёт отдельно от
+            студии, это единственное место, где они встречаются: отсюда
+            курс открывается без ссылки из письма. */}
+        {courses.map((c) => (
+          <div className="card" key={c.slug} style={{ marginTop: 20, ...(c.expired ? { opacity: 0.65 } : {}) }}>
+            <div className="row">
+              <div>
+                <div className="what">{c.title}</div>
+                <div className="sub">
+                  Видеокурс · {c.expired ? `доступ закончился ${longDate(c.until)}` : `доступ до ${longDate(c.until)}`}
+                </div>
+              </div>
+              {!c.expired && <a className="btn" href={`/learn/${c.slug}`}>Открыть</a>}
+            </div>
+          </div>
+        ))}
 
         {/* Внизу «Недели»: сюда доходят, когда что-то понадобилось, а
             куда писать — до сих пор в кабинете не было сказано нигде. */}

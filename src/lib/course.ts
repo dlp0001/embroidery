@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { MAX_DEVICES } from './course-limits';
 import { one, query, tx } from './db';
 import { dayMonth } from './format';
+import { realUser } from './session';
 import { siteOrigin } from './site';
 
 /**
@@ -13,6 +14,10 @@ import { siteOrigin } from './site';
  * Студия этих таблиц не читает и не пишет, курс не трогает студийные.
  * Так покупатель курса не всплывает ни в «Людях», ни в журнале, ни в
  * рассылках, а родитель студии, купивший курс, остаётся обычным родителем.
+ *
+ * Мостик в одну сторону: курс верит входу в кабинет студии, если почта
+ * та же, что при покупке (см. courseAccess). Студия про курс знает одно —
+ * карточку в кабинете (cabinetCourses), и только читает.
  */
 
 const BUNNY_LIBRARY = '675652';
@@ -110,6 +115,8 @@ export type Access = {
   /** Последний день доступа, YYYY-MM-DD по времени студии. */
   until: string;
   expired: boolean;
+  /** Как пустили: по ссылке из письма или через вход в кабинет студии. */
+  via: 'link' | 'cabinet';
 };
 
 /**
@@ -136,7 +143,48 @@ export async function deviceAccess(course: Course): Promise<Access | null> {
   if (row.stale) {
     await query('update course_devices set last_seen = now() where id = $1', [row.device_id]);
   }
-  return { id: row.id, email: row.email, name: row.name, until: row.until, expired: row.expired };
+  return { id: row.id, email: row.email, name: row.name, until: row.until, expired: row.expired, via: 'link' };
+}
+
+/**
+ * Доступ через кабинет студии: вошедший тем же адресом, с которого покупал.
+ * Устройство не заводим и в лимит не считаем: в кабинет входят кодом с этой
+ * почты, такой вход не перешлёшь. Берём настоящего вошедшего — когда
+ * суперадмин смотрит чужой кабинет, курс за другого не открывается.
+ */
+async function cabinetAccess(course: Course): Promise<Access | null> {
+  const user = await realUser();
+  if (!user) return null;
+  const row = await one<{ id: string; email: string; name: string | null; until: string; expired: boolean }>(
+    `select id, email, name, expires_at::date::text as until, expires_at <= now() as expired
+       from course_access
+      where course_id = $1 and email = $2 and revoked_at is null`,
+    [course.id, user.email],
+  );
+  return row ? { ...row, via: 'cabinet' } : null;
+}
+
+/**
+ * Пускать ли в курс: по ссылке из письма, а если её в этом браузере нет
+ * или срок по ней вышел — через кабинет студии.
+ */
+export async function courseAccess(course: Course): Promise<Access | null> {
+  const byLink = await deviceAccess(course);
+  if (byLink && !byLink.expired) return byLink;
+  return (await cabinetAccess(course)) ?? byLink;
+}
+
+export type CabinetCourse = { slug: string; title: string; until: string; expired: boolean };
+
+/** Курсы, купленные на почту из кабинета: для карточки на главной кабинета. */
+export async function cabinetCourses(email: string): Promise<CabinetCourse[]> {
+  return query<CabinetCourse>(
+    `select c.slug, c.title, a.expires_at::date::text as until, a.expires_at <= now() as expired
+       from course_access a join courses c on c.id = a.course_id
+      where a.email = $1 and a.revoked_at is null and c.status = 'published'
+      order by a.expires_at desc`,
+    [email],
+  );
 }
 
 // ── Ссылка из письма ──────────────────────────────────────
