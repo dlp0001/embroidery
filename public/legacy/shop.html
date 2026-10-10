@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Магазин · Re.Create.Art</title>
-<meta name="description" content="Магазин Вари Перлиной: онлайн-курсы, которые можно купить и пройти дома.">
+<meta name="description" content="Магазин Вари Перлиной: онлайн-курсы в записи и вещи с ручной вышивкой.">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
 <link rel="shortcut icon" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -116,8 +116,7 @@
   /* ── Магазин ── */
   .shop-head { margin-top: 72px; }
   .shop-intro { font-size: 15px; color: var(--warm-gray); max-width: 560px; line-height: 1.9; margin: -32px 0 56px; }
-  /* Товар пока один, поэтому карточка широкая: фото слева, всё о товаре
-     справа. Когда товаров станет больше, сетка сама перейдёт в колонки. */
+  /* Карточка товара широкая: фото слева, всё о товаре справа. */
   .shop-grid { display: grid; grid-template-columns: 1fr; gap: 56px; }
   .product { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; color: inherit; text-decoration: none; }
   .product-media { overflow: hidden; aspect-ratio: 4/3; background: var(--linen); }
@@ -130,12 +129,19 @@
   .product-btn { align-self: flex-start; display: inline-block; padding: 16px 40px; background: var(--charcoal); color: #fff; font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; transition: background 0.3s; }
   a.product:hover .product-btn { background: var(--rose); }
   .product-info { display: flex; flex-direction: column; }
+  /* Вещь с рилзом: видео вертикальное, поэтому колонка под него уже, иначе
+     карточка вытягивается на два экрана. Грузится видео только по нажатию. */
+  .product-reel { grid-template-columns: minmax(0, 360px) 1fr; }
+  .product-reel .product-media { aspect-ratio: 9/16; background: #000; }
+  .product-media video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .product-sold { font-family: 'Jost', sans-serif; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm-gray); background: var(--linen); padding: 5px 14px; margin-left: 12px; vertical-align: middle; }
 
   @media (max-width: 900px) {
     .shop-head { margin-top: 56px; }
     .shop-intro { margin: -32px 0 40px; }
     .product { grid-template-columns: 1fr; gap: 24px; }
     .product-btn { align-self: stretch; text-align: center; }
+    .product-reel .product-media { max-width: 360px; width: 100%; }
   }
 </style>
 </head>
@@ -149,12 +155,12 @@
   </div>
 </nav>
 
-<!-- Товар пока один. Цены здесь же, что на лендинге курса и в
-     src/lib/course-pay.ts: меняются все три места вместе. -->
+<!-- Цена курса здесь же, что на лендинге курса и в src/lib/course-pay.ts:
+     меняются все три места вместе. -->
 <section class="section shop-head">
   <div class="section-label">Магазин</div>
-  <h1 class="section-title">То, что можно купить<br>и пройти дома</h1>
-  <p class="shop-intro">Курсы Вари в записи: смотрите в своём темпе, а ссылка на курс приходит на почту сразу после оплаты.</p>
+  <h1 class="section-title">Курсы в записи<br>и вещи ручной работы</h1>
+  <p class="shop-intro">Курсы смотрите в своём темпе — ссылка приходит на почту сразу после оплаты. Вещи Варя расшивает вручную.</p>
 
   <div class="shop-grid">
     <a href="/embroidery" class="product">
@@ -172,6 +178,21 @@
         <span class="product-btn">Подробнее и купить</span>
       </div>
     </a>
+
+    <!-- Продана: кнопки нет, а рилз остаётся — показать, какие вещи бывают. -->
+    <div class="product product-reel">
+      <div class="product-media">
+        <video src="/media/shirt-reel.mp4" poster="/media/shirt-poster.jpg"
+               controls playsinline preload="none"
+               aria-label="Рилз про жёлтую рубашку с вышивкой"></video>
+      </div>
+      <div class="product-info">
+        <div class="dir-label">Одежда · Ручная вышивка</div>
+        <div class="dir-title">Жёлтая рубашка с вышивкой</div>
+        <p class="dir-desc">Рубашка, расшитая вручную рисунками: на воротнике «Hello!» и «Bye!», на кармане кот, на груди свинка, цветы и двое человечков с сердцем, на рукавах морковка, тюльпан и домик, на спине надпись и птица-ладошка.</p>
+        <div class="product-price">₪700<span class="product-sold">Продана</span></div>
+      </div>
+    </div>
   </div>
 </section>
 
