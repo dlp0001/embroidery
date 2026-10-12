@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { canTeach, currentUser } from '@/lib/session';
 import NotConfigured from '@/components/NotConfigured';
+import { formStamp } from '@/lib/form-guard';
 import LoginForm from './LoginForm';
 
 export default async function LoginPage() {
@@ -14,7 +15,7 @@ export default async function LoginPage() {
         <h1 className="h1">Вход</h1>
       </div>
       <div className="body">
-        <LoginForm />
+        <LoginForm stamp={formStamp()} />
       </div>
     </main>
   );

@@ -5,6 +5,12 @@ import { createSession } from './session';
 const CODE_TTL_MIN = 10;
 const MAX_ATTEMPTS = 5;
 const MAX_CODES_PER_15MIN = 3;
+/**
+ * Коды на адреса, которых у нас нет, — за час на всех. Так приходят новые
+ * родители, но их единицы в день; больше — это бот, который подставляет
+ * чужие адреса. Заведённых людей предел не касается: войти они смогут.
+ */
+const MAX_NEW_PER_HOUR = 10;
 
 function hashCode(email: string, code: string): string {
   const pepper = process.env.SESSION_SECRET ?? '';
@@ -32,6 +38,19 @@ export async function requestCode(rawEmail: string): Promise<RequestCodeResult> 
   }
   if (Number(recent?.n ?? 0) >= MAX_CODES_PER_15MIN) {
     return { ok: false, error: 'Слишком много запросов. Попробуйте через несколько минут.' };
+  }
+
+  const known = await one('select 1 from users where email = $1', [email]);
+  if (!known) {
+    const fresh = await one<{ n: number }>(
+      `select count(*)::int as n from login_codes l
+        where l.created_at > now() - interval '1 hour'
+          and not exists (select 1 from users u where u.email = l.email)`,
+    );
+    if ((fresh?.n ?? 0) >= MAX_NEW_PER_HOUR) {
+      console.warn('login: предел новых адресов за час, письмо не отправлено', email);
+      return { ok: false, error: 'Сейчас слишком много новых входов. Попробуйте через час или напишите на info@re-create.art.' };
+    }
   }
 
   const code = String(randomInt(0, 1_000_000)).padStart(6, '0');

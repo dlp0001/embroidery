@@ -3,14 +3,24 @@
 import { useActionState } from 'react';
 import { sendCodeAction, verifyCodeAction, type LoginState } from './actions';
 
+// Имена полей те же, что в lib/form-guard: этот файл уходит в браузер,
+// поэтому сам модуль защиты сюда не импортируем.
+const TRAP_FIELD = 'website';
+const STAMP_FIELD = 'stamp';
+
 const initial: LoginState = { step: 'email', email: '' };
 
-export default function LoginForm() {
+export default function LoginForm({ stamp }: { stamp: string }) {
   const [emailState, sendCode, sendingCode] = useActionState(sendCodeAction, initial);
 
   if (emailState.step === 'email') {
     return (
       <form action={sendCode}>
+        <input type="hidden" name={STAMP_FIELD} value={stamp} />
+        {/* Ловушка для ботов: человек это поле не видит и не заполнит. */}
+        <div aria-hidden="true" style={{ position: 'absolute', left: '-10000px', width: 1, height: 1, overflow: 'hidden' }}>
+          <label>Сайт<input name={TRAP_FIELD} type="text" tabIndex={-1} autoComplete="off" defaultValue="" /></label>
+        </div>
         <div className="field">
           <label htmlFor="email">Почта</label>
           <input id="email" name="email" type="email" inputMode="email" autoComplete="email"
