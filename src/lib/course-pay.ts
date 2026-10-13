@@ -226,6 +226,12 @@ export type Paid = {
   /** Что пришло на самом деле. null — касса не сказала, не сверяем. */
   amount: number | null;
   currency: string | null;
+  /**
+   * false — сумму записать, но с начатой оплатой не сверять. Так у Polar:
+   * он может взять оплату в валюте покупателя и со скидкой по промокоду,
+   * и тогда 0 ₪ против 60 $ из формы — не подлог, а честная оплата.
+   */
+  checkAmount?: boolean;
   raw?: unknown;
 };
 
@@ -244,7 +250,8 @@ export async function fulfil(p: Paid): Promise<{ ok: boolean; accessId?: string;
     console.error(`course ${p.provider}: оплата ${checkout.id} начата в ${checkout.provider}`);
     return { ok: false };
   }
-  if (checkout && p.amount !== null && Math.abs(p.amount - Number(checkout.amount)) > 0.01) {
+  if (checkout && p.checkAmount !== false && p.amount !== null
+      && Math.abs(p.amount - Number(checkout.amount)) > 0.01) {
     console.error(`course ${p.provider}: сумма разошлась`, p.amount, checkout.amount);
     return { ok: false };
   }

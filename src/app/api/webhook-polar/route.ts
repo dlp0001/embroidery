@@ -12,6 +12,8 @@ type PolarOrder = {
   paid?: boolean;
   currency?: string;
   total_amount?: number;
+  /** После скидки и без налога, в центах: то, что студия выручила. */
+  net_amount?: number;
   metadata?: Record<string, unknown>;
   product_id?: string;
   product?: { id?: string };
@@ -53,10 +55,13 @@ export async function POST(req: Request) {
       slug: course.slug,
       email: order.customer?.email ?? order.customer_email,
       name: order.customer?.name ?? null,
-      // Сумму не сверяем: к цене товара Polar может добавить налог страны
-      // покупателя. Сверяем товар — это сделал polarCourse.
-      amount: null,
+      // Записываем, сколько выручили на самом деле: после скидки, без
+      // налога, в валюте, которую Polar выбрал покупателю. Иначе покупка по
+      // промокоду на 100% легла бы в продажи по цене из формы. С начатой
+      // оплатой не сверяем — сверяем товар, это сделал polarCourse.
+      amount: typeof order.net_amount === 'number' ? order.net_amount / 100 : null,
       currency: order.currency?.toUpperCase() ?? null,
+      checkAmount: false,
       raw: order,
     });
     return Response.json({ received: true });

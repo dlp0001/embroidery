@@ -2,8 +2,9 @@
 // настоящей покупки. Сайт поднять конфигурацией site-polar-test: у неё
 // секрет local-test-secret.
 //
-//   node scripts/polar-webhook-test.mjs <checkout-id|-> <email> [--bad-signature] [--order=<id>]
+//   node scripts/polar-webhook-test.mjs <checkout-id|-> <email> [--bad-signature] [--order=<id>] [--net=<центы>]
 //
+// --net=<центы> — сколько Polar выручил после скидки (0 — промокод на 100%).
 // --order — тот же id заказа ещё раз: так проверяется, что повторный
 // вебхук не продлевает доступ и не шлёт второе письмо.
 //
@@ -15,6 +16,7 @@ import { createHmac, randomUUID } from 'node:crypto';
 const [checkout, email = 'polar-test@example.com'] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 const bad = process.argv.includes('--bad-signature');
 const orderId = process.argv.find((a) => a.startsWith('--order='))?.slice(8) ?? `test-${randomUUID()}`;
+const net = process.argv.find((a) => a.startsWith('--net='))?.slice(6);
 const secret = 'local-test-secret';
 const url = 'http://localhost:4321/api/webhook-polar';
 
@@ -26,6 +28,7 @@ const body = JSON.stringify({
     paid: true,
     currency: 'usd',
     total_amount: 8000,
+    ...(net !== undefined ? { net_amount: Number(net) } : {}),
     metadata: { course: 'embroidery', ...(checkout && checkout !== '-' ? { checkout } : {}) },
     customer: { email, name: 'Тест Polar' },
   },
