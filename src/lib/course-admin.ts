@@ -82,6 +82,63 @@ export async function abandoned(slug: string): Promise<Abandoned[]> {
   );
 }
 
+export type Sales = {
+  /** Сколько раз курс купили: одна оплата — одна покупка. */
+  count: number;
+  /** Сколько денег, по каждой валюте отдельно. */
+  sums: { currency: string; sum: number }[];
+};
+
+/**
+ * Продажи курса: сколько купили и на сколько. Суммы разложены по валютам
+ * и нарочно не складываются в одну: PayPlus берёт шекели, Polar — что
+ * выбрал покупатель, ЮKassa — рубли, а курса пересчёта у студии нет и
+ * выдумывать его для сводки нельзя.
+ *
+ * Считаем только оплаты через кассы сайта. Первый поток (курс в зуме,
+ * перенесённый из гугл-таблицы) лежит здесь же, но курс эти люди не
+ * покупали — им открыли доступ, и в продажи видеокурса они не идут.
+ *
+ * from — день, с которого считать (включительно); null — за всё время.
+ */
+export async function sales(slug: string, from: string | null): Promise<Sales> {
+  const rows = await query<{ currency: string | null; n: number; sum: string }>(
+    // У Polar в course_orders.amount лежит цена формы, а не то, что
+    // человек заплатил: вебхук суммы не сверяет, и промокод в ней не
+    // виден. Настоящая оплата — net_amount в его ответе, в копейках.
+    `with paid as (
+       select o.currency,
+              case when o.provider = 'polar' and (o.raw ->> 'net_amount') is not null
+                     then (o.raw ->> 'net_amount')::numeric / 100
+                   else o.amount end as amount
+         from course_orders o
+         join course_access a on a.id = o.access_id
+         join courses c on c.id = a.course_id
+        where c.slug = $1
+          and ($2::date is null or o.created_at >= $2::date)
+          -- Перенос первого потока: id вида sheet:почта.
+          and o.provider_id not like 'sheet:%'
+     )
+     select currency, count(*)::int as n, coalesce(sum(amount), 0)::text as sum
+       from paid
+      -- Доступ по промокоду в ноль — не продажа: денег нет, и в выручке
+      -- такой строке делать нечего.
+      where amount > 0
+      group by currency
+      -- Шекель первым: это валюта студии. Остальные по алфавиту, а не по
+      -- величине суммы — рубли иначе встают вперёд просто потому, что их
+      -- в числе больше.
+      order by (currency <> 'ILS'), currency`,
+    [slug, from],
+  );
+  return {
+    count: rows.reduce((n, r) => n + r.n, 0),
+    sums: rows
+      .filter((r) => r.currency)
+      .map((r) => ({ currency: r.currency as string, sum: Number(r.sum) })),
+  };
+}
+
 export async function resetDevices(accessId: string): Promise<void> {
   await query(
     'update course_devices set revoked_at = now() where access_id = $1 and revoked_at is null',

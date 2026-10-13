@@ -1,5 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { takenBetween } from './billing';
+import { sales as courseSales, type Sales } from './course-admin';
 import { one, query, tx } from './db';
 import {
   dayMonth, eventClosed, hhmm, money, nowHM, plural, plusDays, todayISO,
@@ -878,6 +879,17 @@ export async function teacherSessionView(
 
 // ── Деньги ────────────────────────────────────────────────
 
+/** Курс у студии пока один; продажи считаем по нему. */
+const COURSE_SLUG = 'embroidery';
+
+/** «2 покупки, 240 ₪ · 60 USD» — или «покупок нет». */
+function salesLine(s: Sales): string {
+  if (!s.count) return 'покупок нет';
+  const sums = s.sums.map((x) => money(x.sum, x.currency)).join(' · ');
+  const bought = `${s.count} ${plural(s.count, 'покупка', 'покупки', 'покупок')}`;
+  return sums ? `${bought}, ${sums}` : bought;
+}
+
 /**
  * Деньги за месяц: сколько пришло и сколько студия за этот месяц
  * отработала. Две цифры нарочно стоят рядом и нарочно не сходятся:
@@ -888,9 +900,11 @@ export async function teacherSessionView(
 export async function moneyMonthView(name: string | null): Promise<View> {
   const today = todayISO();
   const from = `${today.slice(0, 7)}-01`;
-  const [taken, done] = await Promise.all([
+  const [taken, done, courseMonth, courseAll] = await Promise.all([
     takenBetween(from, today),
     periodStats(from, today),
+    courseSales(COURSE_SLUG, from),
+    courseSales(COURSE_SLUG, null),
   ]);
   const cur = done.currency;
   const since = `с ${dayMonth(from)}`;
@@ -914,7 +928,18 @@ export async function moneyMonthView(name: string | null): Promise<View> {
     '',
     'Реализация — то, что прошло: деньги за это могли прийти раньше'
       + ' или ещё не прийти.',
+    '',
+    // Курс идёт отдельной строкой нарочно: его деньги лежат в своих
+    // таблицах и в «Получено» выше не входят — там только касса студии.
+    'Курс по вышивке:',
+    `   ${since} — ${salesLine(courseMonth)}`,
   );
+  // «Всего» показываем, только когда до этого месяца что-то продавалось:
+  // иначе это та же строка второй раз. Месяц — часть всего времени, так
+  // что равное число покупок значит равные суммы.
+  if (courseAll.count !== courseMonth.count) {
+    lines.push(`   всего — ${salesLine(courseAll)}`);
+  }
 
   return { text: lines.join('\n'), keyboard: [] };
 }
