@@ -9,8 +9,8 @@ import {
 } from '@/lib/format';
 import Link from 'next/link';
 import { extendPassAction } from '@/app/admin/schedule-actions';
+import Fold from '@/components/Fold';
 import Section from '@/components/Section';
-import ExtendFold from './ExtendFold';
 
 export const dynamic = 'force-dynamic';
 
@@ -201,9 +201,9 @@ export default async function DebtsPage({
               </div>
 
               {admin && canExtend(p) && (
-                <ExtendFold>
+                <Fold label="Продлить">
                   <ExtendForm pass={p} currency={currency} receipts={receipts} />
-                </ExtendFold>
+                </Fold>
               )}
             </div>
           ))}
@@ -224,9 +224,9 @@ export default async function DebtsPage({
                   <Receipt url={p.receipt_url} />
                 </div>
                 {admin && canExtend(p) && (
-                  <ExtendFold>
+                  <Fold label="Продлить">
                     <ExtendForm pass={p} currency={currency} receipts={receipts} />
-                  </ExtendFold>
+                  </Fold>
                 )}
               </div>
             ))}

@@ -6,6 +6,7 @@ import {
 } from '@/lib/studio';
 import { hhmm, todayISO, weekdayDayMonth } from '@/lib/format';
 import BookChild from '@/components/BookChild';
+import Fold from '@/components/Fold';
 import BookedList from '@/components/BookedList';
 import DroppedList from '@/components/DroppedList';
 import SessionTime from '@/components/SessionTime';
@@ -243,10 +244,12 @@ export default async function AdminCalendarPage({
         ))}
 
         {admin && (
-          /* Блок разовый и редкий: занимать им пол-экрана незачем. Поэтому
-             список и кнопка стоят в одну строку, а не широкой колонкой. */
-          <div className="card" style={{ borderStyle: 'dashed', marginTop: 16 }}>
-            <div className="lbl" style={{ margin: '0 0 10px' }}>Добавить занятие</div>
+          /* Разовое занятие заводят раз в сезон, и до нажатия блок —
+             ссылка: место на этой странице нужно расписанию, а не форме,
+             которую открывают в десятый вторник. */
+          <div style={{ marginTop: 6 }}>
+          <Fold label="Добавить занятие">
+          <div className="card" style={{ borderStyle: 'dashed', marginTop: 10 }}>
             <form action={addSessionAction}
                   style={{ display: 'flex', gap: 12, alignItems: 'center',
                            justifyContent: 'space-between', flexWrap: 'wrap' }}>
@@ -266,6 +269,8 @@ export default async function AdminCalendarPage({
             <p className="hint" style={{ marginTop: 12 }}>
               Разовое занятие вне обычного расписания группы. Время берётся у группы.
             </p>
+          </div>
+          </Fold>
           </div>
         )}
       </div>
