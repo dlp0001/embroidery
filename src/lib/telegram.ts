@@ -1140,7 +1140,7 @@ export function passOutView(
 ): { text: string } {
   return {
     text: [
-      `В абонементе кончились занятия: все ${t.lessons_total} отмечены.`,
+      `В абонементе закончились занятия: все ${t.lessons_total} отмечены.`,
       '',
       `Следующее занятие посчитается по базовой цене, ${money(price.amount, price.currency)}.`,
       '',
@@ -1153,8 +1153,8 @@ export function passOutView(
 export function passEndsView(t: PassEnds, today: string, origin: string): { text: string } {
   const days = daysUntil(t.valid_to, today);
   const when = days === 0
-    ? 'срок кончается сегодня'
-    : `срок кончается через ${days} ${plural(days, 'день', 'дня', 'дней')}, ${
+    ? 'срок заканчивается сегодня'
+    : `срок заканчивается через ${days} ${plural(days, 'день', 'дня', 'дней')}, ${
         dayMonth(t.valid_to)}`;
   return {
     text: [
@@ -1177,7 +1177,7 @@ export function packOutView(t: PackOut, origin: string): { text: string } {
     : `${dayMonth(t.days[0])} — ${dayMonth(t.days[n - 1])}`;
   return {
     text: [
-      `В пакете «${t.title}» кончились дни: все ${t.lessons_total} отмечены.`,
+      `В пакете «${t.title}» закончились дни: все ${t.lessons_total} отмечены.`,
       '',
       `Впереди ещё ${n} ${plural(n, 'день', 'дня', 'дней')}: ${when}.`
         + ` День можно докупить за ${money(t.price, 'ILS')} — это дешевле,`
