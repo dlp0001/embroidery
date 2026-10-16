@@ -2,8 +2,9 @@ import { one, query } from './db';
 import { tellCampChanges } from './notify';
 import { nowHM, todayISO } from './format';
 import {
-  claimSend, digestWatchers, isConfigured, moneyMonthView, recordSent, releaseSend,
-  send, sentAgoMin, teacherDayView, teacherSessionView, teacherToday, teachersInBot,
+  askAgainTargets, askView, claimSend, digestWatchers, isConfigured, moneyMonthView,
+  recordSent, releaseSend, send, sentAgoMin, teacherDayView, teacherSessionView,
+  teacherToday, teachersInBot,
 } from './telegram';
 
 /**
@@ -38,7 +39,15 @@ const AFTER_DIGEST_QUIET = 90;
 const MONEY_AT = '10:00';
 const MONEY_UNTIL = '13:00';
 
-export type Force = 'day' | 'next' | 'money' | null;
+/**
+ * Утреннее напоминание родителям, которые на сегодня не отметились.
+ * Вечерний вопрос приходит в семь, когда день уже кончился; к утру про
+ * него забывают, а Варе к обеду надо знать, на скольких готовить.
+ */
+const ASK_AM_AT = '09:40';
+const ASK_AM_UNTIL = '12:00';
+
+export type Force = 'day' | 'next' | 'money' | 'ask' | null;
 
 export type DueResult = { at: string; tried: number; failed: number; sent: string[] };
 
@@ -138,6 +147,28 @@ export async function sendDue(force: Force): Promise<DueResult> {
   // ── Деньги за месяц, воскресным утром ──
   // Идёт и Варе, и тому, кто смотрит со стороны: цифры одни и те же, и
   // обсуждать их проще, когда они пришли обоим в одно время.
+  // ── Утром: кто сегодня так и не отметился ──
+  const askDue = force
+    ? force === 'ask'
+    : now >= minutes(ASK_AM_AT) && now < minutes(ASK_AM_UNTIL);
+  if (askDue) {
+    for (const t of await askAgainTargets()) {
+      const campaign = `ask-am:${t.session_id}`;
+      if (force !== 'ask' && !(await claimSend(campaign, t.chat_id))) continue;
+      const view = await askView(t.user_id, t.session_id);
+      // Занятие отменили, пока мы собирались, — спрашивать не о чем.
+      if (!view) continue;
+      tried++;
+      if (await send(Number(t.chat_id), view.text, view.keyboard, view.html)) {
+        await recordSent(campaign, t.chat_id, view.text);
+        sent.push(`напоминание → ${t.chat_id}`);
+      } else {
+        failed++;
+        if (force !== 'ask') await releaseSend(campaign, t.chat_id);
+      }
+    }
+  }
+
   const sunday = new Date(`${today}T00:00:00Z`).getUTCDay() === 0;
   const moneyDue = force
     ? force === 'money'

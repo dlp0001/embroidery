@@ -32,7 +32,8 @@ export async function GET(req: Request): Promise<Response> {
     return Response.json({ error: 'force требует своего ключа' }, { status: 403 });
   }
   const force: Force =
-    asked === 'day' || asked === 'next' || asked === 'money' ? asked : null;
+    asked === 'day' || asked === 'next' || asked === 'money' || asked === 'ask'
+      ? asked : null;
 
   return Response.json({ force, ...(await sendDue(force)) });
 }

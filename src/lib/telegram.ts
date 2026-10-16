@@ -1234,6 +1234,48 @@ export async function askTargets(): Promise<AskTarget[]> {
 }
 
 /**
+ * Кого спросить ещё раз утром: занятие сегодня, человек не записан и
+ * вечером не отказался. Вечерний вопрос приходит в семь, когда день
+ * кончился и отвечать некогда; к утру про него забывают.
+ *
+ * Отказавшихся не трогаем: они ответили, и второй вопрос читался бы
+ * как «мы тебе не поверили». Занятие, до которого меньше часа, тоже
+ * пропускаем — собраться уже не успеть.
+ */
+export async function askAgainTargets(): Promise<AskTarget[]> {
+  return query<AskTarget>(
+    `select distinct u.tg_chat_id::text as chat_id, u.id as user_id, s.id as session_id
+       from studio_sessions s
+       join studio_groups g on g.id = s.group_id and g.active and g.kind = 'lesson'
+       join participants p
+         on (g.audience = 'adults' and p.user_id is not null)
+         or (g.audience = 'kids' and p.child_id is not null)
+       left join children ch on ch.id = p.child_id
+       left join users pu on pu.id = p.user_id
+       join users u
+         on (p.user_id is not null and u.id = p.user_id)
+         or (p.child_id is not null
+             and exists (select 1 from guardians gg
+                          where gg.child_id = p.child_id and gg.user_id = u.id))
+      where s.held_on = current_date
+        and s.status <> 'cancelled'
+        and ch.archived_at is null
+        and (p.user_id is null or pu.attends)
+        and u.tg_chat_id is not null
+        and (s.held_on + g.starts_at) > now() + interval '1 hour'
+        /* Ни записи, ни отказа: человек промолчал. */
+        and not exists (select 1 from bookings b
+                         where b.session_id = s.id and b.participant_id = p.id)
+        and (exists (select 1 from attendance a
+                       join studio_sessions s2 on s2.id = a.session_id
+                      where a.participant_id = p.id and a.status = 'present'
+                        and s2.group_id = g.id and s2.held_on > current_date - 14)
+          or exists (select 1 from preferred_days pd
+                      where pd.participant_id = p.id and pd.weekday = g.weekday))`,
+  );
+}
+
+/**
  * Сам вопрос: одно занятие, семья под ним, по две кнопки на каждого.
  * Коротко — в отличие от недели, это сообщение приходит само и вечером,
  * и простыня на семь дней тут не к месту.
@@ -1260,8 +1302,10 @@ export async function askView(userId: string, sessionId: string): Promise<View |
 
   const head = rows[0];
   const free = head.capacity === null ? null : Math.max(head.capacity - head.taken, 0);
+  // Утреннее напоминание шлёт этот же вид, а «завтра» в день занятия —
+  // прямая ложь. Слово берём из даты, а не из того, кто нас позвал.
   const lines = [
-    'Кто придёт завтра?',
+    head.held_on === todayISO() ? 'Кто придёт сегодня?' : 'Кто придёт завтра?',
     `${weekdayDayMonth(head.held_on)} · ${hhmm(head.starts_at)}`
       + (free === null ? '' : ` · ${free === 0 ? 'мест нет' : `свободно ${free} из ${head.capacity}`}`),
     '',
