@@ -1065,8 +1065,6 @@ export type PassOut = {
   pass_id: string;
   /** Сколько занятий было в абонементе: все они уже отмечены. */
   lessons_total: number;
-  /** Докуда абонемент действовал бы, будь в нём занятия. */
-  valid_to: string | null;
 };
 
 /**
@@ -1084,8 +1082,7 @@ export type PassOut = {
  */
 export async function passOutTargets(): Promise<PassOut[]> {
   return query<PassOut>(
-    `select u.tg_chat_id::text as chat_id, p.id as pass_id,
-            p.lessons_total, p.valid_to::text as valid_to
+    `select u.tg_chat_id::text as chat_id, p.id as pass_id, p.lessons_total
        from passes p
        join users u on u.id = p.owner_id
       where p.group_id is null
@@ -1141,16 +1138,15 @@ export async function passEndsTargets(): Promise<PassEnds[]> {
 export function passOutView(
   t: PassOut, price: { amount: number; currency: string }, origin: string,
 ): { text: string } {
-  const lines = [
-    `В абонементе кончились занятия: все ${t.lessons_total} отмечены.`,
-    '',
-  ];
-  lines.push(t.valid_to
-    ? `Срок у него ещё идёт, до ${dayMonth(t.valid_to)}, но ходить по нему больше нечем:`
-      + ` следующее занятие посчитается отдельно, за ${money(price.amount, price.currency)}.`
-    : `Следующее занятие посчитается отдельно, за ${money(price.amount, price.currency)}.`);
-  lines.push('', `Новый абонемент: ${origin}/account/pay`);
-  return { text: lines.join('\n') };
+  return {
+    text: [
+      `В абонементе кончились занятия: все ${t.lessons_total} отмечены.`,
+      '',
+      `Следующее занятие посчитается по базовой цене, ${money(price.amount, price.currency)}.`,
+      '',
+      `Новый абонемент: ${origin}/account/pay`,
+    ].join('\n'),
+  };
 }
 
 /** Письмо про сгорающий срок. */
