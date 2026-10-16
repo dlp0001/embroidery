@@ -83,7 +83,12 @@ function ExtendForm(
   );
 }
 
-export default async function DebtsPage() {
+export default async function DebtsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ added?: string; paper?: string; covered?: string }>;
+}) {
+  const { added, paper, covered } = await searchParams;
   const user = await requireTeacher();
   const admin = isAdmin(user);
   const [rows, passes, price] = await Promise.all([
@@ -113,6 +118,23 @@ export default async function DebtsPage() {
       </div>
 
       <div className="body">
+        {/* После «Продлить» карточка пакета меняется на одну цифру, и
+            непонятно, случилось ли что-нибудь. Рассказываем словами. */}
+        {added && (
+          <div className="note" style={{ marginBottom: 16 }}>
+            Докуплено: {added}.
+            {Number(covered ?? 0) > 0 && (
+              <> Закрыто дней смены: {covered}.</>
+            )}
+            {paper === 'ok' && ' Чек выписан и ушёл на почту.'}
+            {paper === 'fail' && (
+              <> Чек не вышел: iCount отказал. Его можно выписать на{' '}
+                <Link href="/admin/studio/receipts">«Чеках»</Link>.</>
+            )}
+            {paper === 'no' && ' Чек не просили.'}
+          </div>
+        )}
+
         {unbilled > 0 && (
           <div className="note" style={{ marginBottom: 18 }}>
             {unbilled}&nbsp;{plural(unbilled, 'занятие', 'занятия', 'занятий')} без

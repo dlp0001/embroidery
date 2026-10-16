@@ -232,6 +232,22 @@ function howPaid(form: FormData): PayMethod | 'unpaid' {
   return way;
 }
 
+/**
+ * Выписывает чек и говорит, что из этого вышло. Отказ iCount внутри
+ * проглочен нарочно — деньги важнее бумажки, — поэтому спрашиваем сам
+ * платёж: бумагу ждёт родитель, стоящий у стола.
+ */
+async function billed(paymentId: string | null | undefined): Promise<'no' | 'ok' | 'fail'> {
+  if (!paymentId) return 'no';
+  await issueReceipt(paymentId);
+  const got = await one<{ ok: boolean }>(
+    `select (invoice_url is not null or raw ? 'receipt') as ok
+       from payments where id = $1`,
+    [paymentId],
+  );
+  return got?.ok ? 'ok' : 'fail';
+}
+
 export async function issuePassAction(form: FormData): Promise<void> {
   const user = await requireAdmin();
   // Форма присылает один ключ вида «id группы:дней»: так пакет лагеря
@@ -262,16 +278,7 @@ export async function issuePassAction(form: FormData): Promise<void> {
   // Чек выписываем сразу: Варя просит его, когда родитель стоит рядом.
   // И тут же смотрим, вышел ли он: отказ iCount внутри проглочен, а
   // сказать про него надо — бумагу ждёт родитель, стоящий у стола.
-  let paper: 'no' | 'ok' | 'fail' = 'no';
-  if (receipt && sold.paymentId) {
-    await issueReceipt(sold.paymentId);
-    const got = await one<{ ok: boolean }>(
-      `select (invoice_url is not null or raw ? 'receipt') as ok
-         from payments where id = $1`,
-      [sold.paymentId],
-    );
-    paper = got?.ok ? 'ok' : 'fail';
-  }
+  const paper = await billed(receipt ? sold.paymentId : null);
 
   revalidatePath('/admin/studio/debts');
   revalidatePath('/admin/studio');
@@ -315,11 +322,22 @@ export async function extendPassAction(form: FormData): Promise<void> {
   );
   if (!done.ok) throw new Error(done.reason ?? 'NOT_EXTENDED');
   // Чек выписываем сразу: Варя просит его, когда родитель стоит рядом.
-  if (receipt && done.paymentId) await issueReceipt(done.paymentId);
+  const paper = await billed(receipt ? done.paymentId : null);
+
   revalidatePath('/admin/studio/debts');
   revalidatePath('/admin/studio/ledger');
   revalidatePath('/account');
   revalidatePath('/account/pay');
+
+  // Как и после продажи: без этого рассказа непонятно, случилось ли
+  // что-нибудь вообще — карточка пакета меняется на одну цифру.
+  const told = new URLSearchParams({
+    added: `${offer.title}: +${days} ${plural(days, 'день', 'дня', 'дней')} · ${
+      paid === 'unpaid' ? 'пока не оплачено' : money(offer.price * days, 'ILS')}`,
+    paper,
+  });
+  if (done.covered) told.set('covered', String(done.covered));
+  redirect(`/admin/studio/debts?${told}`);
 }
 
 const HOW = ['cash', 'transfer', 'bit', 'paybox'] as const;

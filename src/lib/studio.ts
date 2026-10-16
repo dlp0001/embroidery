@@ -1991,7 +1991,11 @@ export async function extendPass(
     receipt: boolean;
   },
   byUser: string | null,
-): Promise<{ ok: boolean; reason?: string; total?: number; paymentId?: string }> {
+): Promise<{
+  ok: boolean; reason?: string; total?: number; paymentId?: string;
+  /** Сколько неоплаченных дней смены закрылось этими деньгами. */
+  covered?: number;
+}> {
   if (!Number.isInteger(input.days) || input.days < 1 || input.days > 30) {
     return { ok: false, reason: 'Странное число дней.' };
   }
@@ -2057,7 +2061,7 @@ export async function extendPass(
       details: { days: input.days, price: input.price, paid: input.paid, covered },
     });
 
-    return { ok: true, total, paymentId: paymentId ?? undefined };
+    return { ok: true, total, covered, paymentId: paymentId ?? undefined };
   });
 }
 
