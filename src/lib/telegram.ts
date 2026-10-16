@@ -3,13 +3,13 @@ import { takenBetween } from './billing';
 import { sales as courseSales, type Sales } from './course-admin';
 import { one, query, tx } from './db';
 import {
-  dayMonth, eventClosed, hhmm, money, nowHM, plural, plusDays, todayISO,
+  dayMonth, daysUntil, eventClosed, hhmm, money, nowHM, plural, plusDays, todayISO,
   weekdayDayMonth,
 } from './format';
 import { periodStats } from './stats';
 import {
-  debtors, eventSlotsForUser, markDeclined, passBalances, sessionIsPast, setBooking,
-  slotsForUser, teacherSessions, unclosedBefore, unpaidCharges,
+  PASS_WARN_DAYS, debtors, eventSlotsForUser, markDeclined, passBalances, sessionIsPast,
+  setBooking, slotsForUser, teacherSessions, unclosedBefore, unpaidCharges,
   type GroupKind, type SlotRow,
 } from './studio';
 
@@ -1058,6 +1058,119 @@ export async function packOutTargets(): Promise<PackOut[]> {
                      where s.group_id = g.id and s.status <> 'cancelled'
                        and s.held_on > current_date)`,
   );
+}
+
+export type PassOut = {
+  chat_id: string;
+  pass_id: string;
+  /** Сколько занятий было в абонементе: все они уже отмечены. */
+  lessons_total: number;
+  /** Докуда абонемент действовал бы, будь в нём занятия. */
+  valid_to: string | null;
+};
+
+/**
+ * У кого абонемент истрачен весь, а срок ещё идёт. Дальше ребёнок ходит
+ * за поштучную цену, и семья узнаёт об этом из долга в «Оплате» — через
+ * неделю, а то и позже.
+ *
+ * Абонемент тут обычный, не пакет смены: про смену говорит packOut, и
+ * условия у них разные настолько, что общий запрос вышел бы хитрее
+ * двух простых.
+ *
+ * Тому, у кого рядом лежит другой действующий абонемент, не пишем:
+ * истратить старый и жить вторым — обычное дело, и «абонемент кончился»
+ * в такой день читается как ошибка.
+ */
+export async function passOutTargets(): Promise<PassOut[]> {
+  return query<PassOut>(
+    `select u.tg_chat_id::text as chat_id, p.id as pass_id,
+            p.lessons_total, p.valid_to::text as valid_to
+       from passes p
+       join users u on u.id = p.owner_id
+      where p.group_id is null
+        and u.tg_chat_id is not null
+        and (p.valid_to is null or p.valid_to >= current_date)
+        /* Истрачен весь. */
+        and p.lessons_total <= (select count(*) from charges ch where ch.pass_id = p.id)
+        /* И заменить его нечем. */
+        and not exists (
+          select 1 from passes q
+           where q.owner_id = p.owner_id and q.group_id is null and q.id <> p.id
+             and (q.valid_to is null or q.valid_to >= current_date)
+             and q.lessons_total > (select count(*) from charges ch where ch.pass_id = q.id))`,
+  );
+}
+
+export type PassEnds = {
+  chat_id: string;
+  pass_id: string;
+  /** Сколько занятий сгорит вместе со сроком. */
+  left: number;
+  valid_to: string;
+};
+
+/**
+ * У кого срок абонемента на исходе, а занятия в нём остались. Кабинет
+ * про это говорит за неделю, но в кабинет заходят раз в месяц, и
+ * сгоревшие занятия родитель обнаруживает задним числом.
+ *
+ * Срок считаем по дням, а не по часам: абонемент кончается днём, а не
+ * минутой, и «осталось 0 дней» значит «сегодня последний».
+ */
+export async function passEndsTargets(): Promise<PassEnds[]> {
+  return query<PassEnds>(
+    `select u.tg_chat_id::text as chat_id, p.id as pass_id,
+            p.valid_to::text as valid_to,
+            (p.lessons_total
+              - (select count(*) from charges ch where ch.pass_id = p.id))::int as left
+       from passes p
+       join users u on u.id = p.owner_id
+      where p.group_id is null
+        and u.tg_chat_id is not null
+        and p.valid_to is not null
+        and p.valid_to >= current_date
+        and p.valid_to <= current_date + $1::int
+        /* Есть чему сгорать. */
+        and p.lessons_total > (select count(*) from charges ch where ch.pass_id = p.id)`,
+    [PASS_WARN_DAYS],
+  );
+}
+
+/** Письмо про кончившийся абонемент. */
+export function passOutView(
+  t: PassOut, price: { amount: number; currency: string }, origin: string,
+): { text: string } {
+  const lines = [
+    `В абонементе кончились занятия: все ${t.lessons_total} отмечены.`,
+    '',
+  ];
+  lines.push(t.valid_to
+    ? `Срок у него ещё идёт, до ${dayMonth(t.valid_to)}, но ходить по нему больше нечем:`
+      + ` следующее занятие посчитается отдельно, за ${money(price.amount, price.currency)}.`
+    : `Следующее занятие посчитается отдельно, за ${money(price.amount, price.currency)}.`);
+  lines.push('', `Новый абонемент: ${origin}/account/pay`);
+  return { text: lines.join('\n') };
+}
+
+/** Письмо про сгорающий срок. */
+export function passEndsView(t: PassEnds, today: string, origin: string): { text: string } {
+  const days = daysUntil(t.valid_to, today);
+  const when = days === 0
+    ? 'срок кончается сегодня'
+    : `срок кончается через ${days} ${plural(days, 'день', 'дня', 'дней')}, ${
+        dayMonth(t.valid_to)}`;
+  return {
+    text: [
+      `В абонементе осталось ${t.left} ${
+        plural(t.left, 'занятие', 'занятия', 'занятий')}, а ${when}.`,
+      '',
+      'Неиспользованные занятия сгорают. Записаться на ближайшие дни можно'
+        + ' здесь, командой /week.',
+      '',
+      `Абонемент: ${origin}/account/pay`,
+    ].join('\n'),
+  };
 }
 
 /** Письмо про кончившийся пакет. Дни перечисляем: их два-три, не список. */

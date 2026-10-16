@@ -1,8 +1,11 @@
 import { cronRights, describeAuth } from '@/lib/cron-auth';
 import {
   askTargets, askView, claimSend, isConfigured, packOutTargets, packOutView,
+  passEndsTargets, passEndsView, passOutTargets, passOutView,
   recordSent, releaseSend, send,
 } from '@/lib/telegram';
+import { lessonPrice } from '@/lib/studio';
+import { todayISO } from '@/lib/format';
 import { siteOrigin } from '@/lib/site';
 
 export const runtime = 'nodejs';
@@ -80,7 +83,48 @@ export async function GET(req: Request): Promise<Response> {
     await pause();
   }
 
+  // Абонементы — тем же заходом. Два разных повода: занятия кончились
+  // раньше срока и срок кончается раньше занятий. Оба раза человек
+  // теряет деньги молча, и оба раза об этом некому сказать.
+  const today = todayISO();
+  let passes = 0;
+  const price = await lessonPrice();
+  for (const t of await passOutTargets()) {
+    // Ключ с размером абонемента: купили новый на столько же занятий и
+    // снова истратили — скажем ещё раз, а про тот же дважды не скажем.
+    const campaign = `pass-out:${t.pass_id}:${t.lessons_total}`;
+    if (!(await claimSend(campaign, t.chat_id))) continue;
+
+    const view = passOutView(t, price, origin);
+    if (await send(Number(t.chat_id), view.text)) {
+      await recordSent(campaign, t.chat_id, view.text);
+      passes++;
+    } else {
+      await releaseSend(campaign, t.chat_id);
+    }
+    await pause();
+  }
+
+  let ending = 0;
+  for (const t of await passEndsTargets()) {
+    // Дата в ключе: срок продлили — предупредим про новый.
+    const campaign = `pass-ends:${t.pass_id}:${t.valid_to}`;
+    if (!(await claimSend(campaign, t.chat_id))) continue;
+
+    const view = passEndsView(t, today, origin);
+    if (await send(Number(t.chat_id), view.text)) {
+      await recordSent(campaign, t.chat_id, view.text);
+      ending++;
+    } else {
+      await releaseSend(campaign, t.chat_id);
+    }
+    await pause();
+  }
+
   console.log(`cron: вопросов ${targets.length}, отправлено ${sent}, пропущено ${skipped},`
-    + ` не ушло ${failed}, про кончившиеся пакеты ${packs}`);
-  return Response.json({ targets: targets.length, sent, skipped, failed, packs });
+    + ` не ушло ${failed}, про кончившиеся пакеты ${packs},`
+    + ` про кончившиеся абонементы ${passes}, про сгорающий срок ${ending}`);
+  return Response.json({
+    targets: targets.length, sent, skipped, failed, packs, passes, ending,
+  });
 }
