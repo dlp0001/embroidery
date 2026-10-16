@@ -112,9 +112,17 @@ if (only) {
   params.push(campaign);
   where.push(`not exists (select 1 from mail_log m
                            where m.campaign = $${params.length} and m.email = u.email)`);
-  // Родители — те, у кого есть неархивный ребёнок. С --all письмо уходит
-  // каждому, у кого в базе есть почта: и взрослым ученикам тоже.
-  if (!everyone) {
+  // Письмо может само сказать, кому оно: 'no-bot' — тем, у кого телеграм
+  // не подключён, и неважно, свой ребёнок у них или они ходят сами.
+  // Остальным такое письмо не о чем: бот у них уже есть.
+  if (letter.audience === 'no-bot') {
+    where.push('u.tg_chat_id is null');
+    where.push(`(u.attends
+                 or exists (select 1 from guardians g join children ch on ch.id = g.child_id
+                             where g.user_id = u.id and ch.archived_at is null))`);
+  } else if (!everyone) {
+    // Родители — те, у кого есть неархивный ребёнок. С --all письмо уходит
+    // каждому, у кого в базе есть почта: и взрослым ученикам тоже.
     where.push(`exists (select 1 from guardians g join children ch on ch.id = g.child_id
                          where g.user_id = u.id and ch.archived_at is null)`);
   }
