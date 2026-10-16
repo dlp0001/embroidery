@@ -1,8 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { after } from 'next/server';
 import { confirmCash, declineCash, issueReceipt } from '@/lib/billing';
+import { one } from '@/lib/db';
+import { money, plural } from '@/lib/format';
 import { hhmm, WAYS, type PayMethod } from '@/lib/format';
 import { cashConfirmed, cashDeclined, sessionChanged } from '@/lib/notify';
 import type { SaveResult } from '@/components/AutoSave';
@@ -257,11 +260,41 @@ export async function issuePassAction(form: FormData): Promise<void> {
     user.id,
   );
   // Чек выписываем сразу: Варя просит его, когда родитель стоит рядом.
-  if (receipt && sold.paymentId) await issueReceipt(sold.paymentId);
+  // И тут же смотрим, вышел ли он: отказ iCount внутри проглочен, а
+  // сказать про него надо — бумагу ждёт родитель, стоящий у стола.
+  let paper: 'no' | 'ok' | 'fail' = 'no';
+  if (receipt && sold.paymentId) {
+    await issueReceipt(sold.paymentId);
+    const got = await one<{ ok: boolean }>(
+      `select (invoice_url is not null or raw ? 'receipt') as ok
+         from payments where id = $1`,
+      [sold.paymentId],
+    );
+    paper = got?.ok ? 'ok' : 'fail';
+  }
+
   revalidatePath('/admin/studio/debts');
   revalidatePath('/admin/studio');
   revalidatePath('/account');
   revalidatePath('/account/pay');
+
+  // После продажи страница выглядит ровно как до неё, и непонятно,
+  // случилось ли что-нибудь. Возвращаемся с рассказом.
+  const who = await one<{ name: string | null; email: string }>(
+    'select name, email from users where id = $1', [String(form.get('ownerId'))],
+  );
+  const what = offer.groupTitle
+    ? `${offer.groupTitle}: пакет на ${offer.lessons} ${
+        plural(offer.lessons, 'день', 'дня', 'дней')}`
+    : `абонемент на ${offer.lessons} ${
+        plural(offer.lessons, 'занятие', 'занятия', 'занятий')}`;
+  const sum = paid === 'unpaid' ? 'пока не оплачен' : money(offer.price, 'ILS');
+  const told = new URLSearchParams({
+    sold: `${what} · ${who?.name ?? who?.email ?? 'семья'} · ${sum}`,
+    paper,
+  });
+  if (sold.covered > 0) told.set('covered', String(sold.covered));
+  redirect(`/admin/studio/pay?${told}`);
 }
 
 /** Докупить дни в пакет смены за наличные или перевод. Цену берём у смены. */

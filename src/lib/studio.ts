@@ -2073,6 +2073,8 @@ export type PassRow = {
   kind: GroupKind;
   /** Чем именно заплатили: наличные, перевод, биток, пейбокс. */
   paid_how: string | null;
+  /** Квитанция, если её выписали: ссылку отдаёт iCount. */
+  receipt_url: string | null;
   /** Цена докупаемого дня, если этот пакет можно нарастить. */
   extra_price: number | null;
   /** Сколько дней ещё можно докупить: дальше конца смены смысла нет. */
@@ -2095,7 +2097,9 @@ export async function allActivePasses(): Promise<PassRow[]> {
             ${PACK_ROOM} as max_days,
             (select pay.provider from payments pay where pay.id = p.payment_id) as paid,
             (select pay.raw ->> 'pay_method' from payments pay
-              where pay.id = p.payment_id) as paid_how
+              where pay.id = p.payment_id) as paid_how,
+            (select pay.invoice_url from payments pay
+              where pay.id = p.payment_id) as receipt_url
        from passes p
        join users u on u.id = p.owner_id
       where (p.valid_to is null or p.valid_to >= current_date)
@@ -2133,6 +2137,8 @@ export async function spentPasses(days = 30): Promise<SpentPass[]> {
             (select pay.provider from payments pay where pay.id = p.payment_id) as paid,
             (select pay.raw ->> 'pay_method' from payments pay
               where pay.id = p.payment_id) as paid_how,
+            (select pay.invoice_url from payments pay
+              where pay.id = p.payment_id) as receipt_url,
             (select max(s.held_on)::text from charges c
                join studio_sessions s on s.id = c.session_id
               where c.pass_id = p.id) as last_used

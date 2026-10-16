@@ -30,7 +30,9 @@ const label: React.CSSProperties = {
 export default async function PayPage({
   searchParams,
 }: {
-  searchParams: Promise<{ who?: string }>;
+  searchParams: Promise<{
+    who?: string; sold?: string; paper?: string; covered?: string;
+  }>;
 }) {
   const user = await requireTeacher();
   if (!isAdmin(user)) {
@@ -47,7 +49,7 @@ export default async function PayPage({
     );
   }
 
-  const { who } = await searchParams;
+  const { who, sold, paper, covered } = await searchParams;
   const [rows, claims, owners, packs, price] = await Promise.all([
     debtors(), pendingCash(), passOwners(), saleOffers(), lessonPrice(),
   ]);
@@ -91,6 +93,25 @@ export default async function PayPage({
       </div>
 
       <div className="body">
+        {/* После продажи страница выглядит ровно как до неё: абонемент
+            уехал на «Финансы», а здесь менялась разве что подпись в
+            списке. Поэтому рассказываем словами, что именно вышло. */}
+        {sold && (
+          <div className="note" style={{ marginBottom: 16 }}>
+            Продано: {sold}.
+            {Number(covered ?? 0) > 0 && (
+              <> Закрыто из долга: {covered}&nbsp;
+                {plural(Number(covered), 'занятие', 'занятия', 'занятий')}.</>
+            )}
+            {paper === 'ok' && ' Чек выписан и ушёл на почту.'}
+            {paper === 'fail' && (
+              <> Чек не вышел: iCount отказал. Его можно выписать на{' '}
+                <Link href="/admin/studio/receipts">«Чеках»</Link>.</>
+            )}
+            {paper === 'no' && ' Чек не просили.'}
+          </div>
+        )}
+
         {claims.length > 0 && (
           <>
             <div className="lbl" style={{ marginTop: 0 }}>Ждут подтверждения</div>

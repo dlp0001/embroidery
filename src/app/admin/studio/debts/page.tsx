@@ -24,6 +24,20 @@ function paidWith(p: PassRow): string {
   return `оплачен ${p.paid === 'cash' ? 'наличными' : p.paid === 'transfer' ? 'переводом' : 'картой'}`;
 }
 /**
+ * Ссылка на выписанную квитанцию. Её нет у тех, кому чек не просили, и
+ * у старых платежей, по которым iCount отдал только номер документа.
+ */
+function Receipt({ url }: { url: string | null }) {
+  if (!url) return null;
+  return (
+    <>
+      {' · '}
+      <a href={url} target="_blank" rel="noreferrer">чек</a>
+    </>
+  );
+}
+
+/**
  * Докупить дни в пакет смены. Стоит и у действующего пакета, и у
  * кончившегося: дни в смене ещё идут, а платить за них как за разовые
  * дороже, чем добрать в пакет.
@@ -159,6 +173,7 @@ export default async function DebtsPage() {
                     осталось {p.left} из {p.lessons_total}
                     {p.valid_to ? ` · до ${dayMonth(p.valid_to)}` : ''}
                     {` · ${paidWith(p)}`}
+                    <Receipt url={p.receipt_url} />
                   </div>
                 </div>
               </div>
@@ -184,6 +199,7 @@ export default async function DebtsPage() {
                   все {p.lessons_total} использованы
                   {p.last_used ? ` · последнее ${dayMonth(p.last_used)}` : ''}
                   {` · ${paidWith(p)}`}
+                  <Receipt url={p.receipt_url} />
                 </div>
                 {admin && canExtend(p) && (
                   <ExtendFold>
