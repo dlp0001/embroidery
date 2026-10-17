@@ -199,12 +199,12 @@ export async function setSessionTimeAction(form: FormData): Promise<void> {
  * Отвечает результатом, а не переходом: «мест нет» надо сказать прямо
  * в том месте, где выбирали ребёнка.
  */
-export async function bookChildAction(form: FormData): Promise<SaveResult> {
+export async function bookPersonAction(form: FormData): Promise<SaveResult> {
   if (await onlyLooking()) return { ok: false, error: 'Только смотрите: менять нельзя.' };
   const admin = await requireAdmin();
   const sessionId = String(form.get('sessionId') ?? '');
   const participantId = String(form.get('participantId') ?? '');
-  if (!sessionId || !participantId) return { ok: false, error: 'Выберите ребёнка.' };
+  if (!sessionId || !participantId) return { ok: false, error: 'Выберите, кого записать.' };
   const res = await setBooking(sessionId, participantId, true, { userId: admin.id, via: 'journal' });
   if (!res.ok) return { ok: false, error: res.reason ?? 'Записать не вышло.' };
   refresh();
@@ -212,7 +212,7 @@ export async function bookChildAction(form: FormData): Promise<SaveResult> {
 }
 
 /** Снять запись с занятия. Спрашивает подтверждение на экране, не здесь. */
-export async function unbookChildAction(form: FormData): Promise<SaveResult> {
+export async function unbookPersonAction(form: FormData): Promise<SaveResult> {
   if (await onlyLooking()) return { ok: false, error: 'Только смотрите: менять нельзя.' };
   const admin = await requireAdmin();
   const sessionId = String(form.get('sessionId') ?? '');

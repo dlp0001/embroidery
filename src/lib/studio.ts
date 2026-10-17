@@ -2265,6 +2265,31 @@ export async function bookableChildren(): Promise<BookableChild[]> {
   );
 }
 
+export type BookableAdult = {
+  participant_id: string;
+  name: string;
+  /**
+   * Ходит на занятия. У того, кто не ходит, запись на обычное взрослое
+   * занятие бессмысленна: журнал его всё равно не покажет — туда он
+   * пускает только отмеченных этим флагом. А на мастер-класс пускает по
+   * самой записи, и там записывать можно кого угодно.
+   */
+  attends: boolean;
+};
+
+/**
+ * Взрослые, которых можно записать на занятие. Нужны Варе там же, где и
+ * дети: человек договорился голосом, а в кабинет не зашёл.
+ */
+export async function bookableAdults(): Promise<BookableAdult[]> {
+  return query<BookableAdult>(
+    `select p.id as participant_id, coalesce(u.name, u.email) as name, u.attends
+       from participants p
+       join users u on u.id = p.user_id
+      order by u.attends desc, coalesce(u.name, u.email)`,
+  );
+}
+
 /** Все взрослые с детьми и составом групп. */
 export async function families(): Promise<Family[]> {
   const rows = await query<Family>(

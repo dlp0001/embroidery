@@ -1,18 +1,18 @@
 import Link from 'next/link';
 import { isAdmin, requireTeacher } from '@/lib/session';
 import {
-  allGroups, bookableChildren, bookedInSessions, ensureSessions, sessionsInRange,
+  allGroups, bookableAdults, bookableChildren, bookedInSessions, ensureSessions, sessionsInRange,
   type CalendarSession,
 } from '@/lib/studio';
 import { hhmm, todayISO, weekdayDayMonth } from '@/lib/format';
-import BookChild from '@/components/BookChild';
+import BookPerson from '@/components/BookPerson';
 import Fold from '@/components/Fold';
 import BookedList from '@/components/BookedList';
 import DroppedList from '@/components/DroppedList';
 import SessionTime from '@/components/SessionTime';
 import {
-  addSessionAction, bookChildAction, setSessionStatusAction, setSessionTimeAction,
-  unbookChildAction,
+  addSessionAction, bookPersonAction, setSessionStatusAction, setSessionTimeAction,
+  unbookPersonAction,
 } from '@/app/admin/schedule-actions';
 
 export const dynamic = 'force-dynamic';
@@ -103,8 +103,10 @@ export default async function AdminCalendarPage({
   const month = /^\d{4}-\d{2}$/.test(params.m ?? '') ? params.m! : today.slice(0, 7);
   const { days, first, last } = grid(month);
 
-  const [sessions, groups, kids] = await Promise.all([
-    sessionsInRange(first, last), allGroups(), admin ? bookableChildren() : Promise.resolve([]),
+  const [sessions, groups, kids, adults] = await Promise.all([
+    sessionsInRange(first, last), allGroups(),
+    admin ? bookableChildren() : Promise.resolve([]),
+    admin ? bookableAdults() : Promise.resolve([]),
   ]);
   const selected = /^\d{4}-\d{2}-\d{2}$/.test(params.d ?? '') ? params.d! : today;
   const daySessions = sessions.filter((s) => s.held_on === selected);
@@ -194,7 +196,7 @@ export default async function AdminCalendarPage({
                       sessionId={s.session_id}
                       booked={booked.filter(
                         (b) => b.session_id === s.session_id && b.status === 'booked')}
-                      action={unbookChildAction}
+                      action={unbookPersonAction}
                     />
                     {/* Кто записывался и снялся: на вопрос «кто отменил»
                         должен отвечать экран, а не память. */}
@@ -233,10 +235,37 @@ export default async function AdminCalendarPage({
                   </form>
                 )}
 
-                {/* Записывают руками, когда родитель договорился голосом.
-                    На отменённое и на взрослое занятие ребёнка не пишем. */}
+                {/* Записывают руками, когда человек договорился голосом.
+                    На отменённое занятие не пишем никого. */}
                 {s.status !== 'cancelled' && s.audience === 'kids' && (
-                  <BookChild sessionId={s.session_id} children={kids} action={bookChildAction} />
+                  <BookPerson
+                    label="Записать ребёнка"
+                    sessionId={s.session_id}
+                    people={kids.map((c) => ({
+                      participant_id: c.participant_id, name: c.name, note: c.parent,
+                    }))}
+                    action={bookPersonAction}
+                  />
+                )}
+
+                {/* На обычное взрослое занятие предлагаем только тех, кто
+                    ходит: журнал там и показывает только их, и запись
+                    остальных осталась бы обещанием без последствий. На
+                    мастер-класс берут кого угодно — туда пускает сама
+                    запись. */}
+                {s.status !== 'cancelled' && s.audience === 'adults' && (
+                  <BookPerson
+                    label="Записать взрослого"
+                    sessionId={s.session_id}
+                    people={adults
+                      .filter((a) => a.attends || s.kind !== 'lesson')
+                      .map((a) => ({
+                        participant_id: a.participant_id,
+                        name: a.name,
+                        note: a.attends ? null : 'обычно не ходит',
+                      }))}
+                    action={bookPersonAction}
+                  />
                 )}
               </div>
             )}

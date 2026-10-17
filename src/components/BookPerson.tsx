@@ -2,22 +2,34 @@
 
 import { useState, useTransition } from 'react';
 import type { SaveResult } from '@/components/AutoSave';
-import type { BookableChild } from '@/lib/studio';
+
+/** Кого предлагаем записать: ребёнка с родителем или взрослого. */
+export type Bookable = {
+  participant_id: string;
+  name: string;
+  /** Чем различать тёзок: чей ребёнок, ходит ли взрослый обычно. */
+  note?: string | null;
+};
 
 /**
- * Запись ребёнка на занятие руками, из расписания.
+ * Запись на занятие руками, из расписания. Одна и та же форма для детей
+ * и для взрослых: разница только в слове на ссылке и в том, кого дают
+ * выбрать, а запись устроена одинаково — она на участника.
  *
- * Список детей прячется до нажатия: записывают так изредка, а список
- * длинный, и висеть под каждым занятием ему незачем.
+ * Список прячется до нажатия: записывают так изредка, а список длинный,
+ * и висеть под каждым занятием ему незачем.
  */
-export default function BookChild({
+export default function BookPerson({
   sessionId,
-  children,
+  people,
   action,
+  label,
 }: {
   sessionId: string;
-  children: BookableChild[];
+  people: Bookable[];
   action: (form: FormData) => Promise<SaveResult>;
+  /** «Записать ребёнка» или «Записать взрослого». */
+  label: string;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,12 +47,12 @@ export default function BookChild({
     });
   }
 
-  if (children.length === 0) return null;
+  if (people.length === 0) return null;
 
   if (!open) {
     return (
       <button type="button" className="linky" onClick={() => setOpen(true)}>
-        Записать ребёнка
+        {label}
       </button>
     );
   }
@@ -61,9 +73,9 @@ export default function BookChild({
                    maxWidth: 260 }}
         >
           <option value="" disabled>Кого записать</option>
-          {children.map((c) => (
-            <option key={c.participant_id} value={c.participant_id}>
-              {c.parent ? `${c.name} · ${c.parent}` : c.name}
+          {people.map((p) => (
+            <option key={p.participant_id} value={p.participant_id}>
+              {p.note ? `${p.name} · ${p.note}` : p.name}
             </option>
           ))}
         </select>
