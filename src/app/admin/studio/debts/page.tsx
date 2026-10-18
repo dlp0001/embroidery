@@ -145,13 +145,16 @@ export default async function DebtsPage({
         )}
 
         {/* Соседние денежные страницы: не в шапке, где они теснили
-            заголовок, а здесь — перед первой цифрой, которую читают. */}
+            заголовок, а здесь — перед первой цифрой, которую читают.
+            Кнопками — то, куда ходят каждую неделю; ссылками — то, за чем
+            заглядывают изредка: платежи подряд и отчёт по смене. */}
         {admin && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-            <Link className="btn-quiet" href="/admin/studio/camp">Лагерь</Link>
+          <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap',
+                        alignItems: 'center', marginBottom: 14 }}>
             <Link className="btn-quiet" href="/admin/studio/stats">Статистика</Link>
-            <Link className="btn-quiet" href="/admin/studio/payments">Платежи</Link>
             <Link className="btn-quiet" href="/admin/studio/receipts">Чеки</Link>
+            <Link className="linky" href="/admin/studio/payments">Платежи</Link>
+            <Link className="linky" href="/admin/studio/camp">Лагерь</Link>
           </div>
         )}
 
