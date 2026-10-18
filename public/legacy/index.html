@@ -44,12 +44,10 @@
   .nav-link:hover { color: var(--rose-dark); text-decoration-color: var(--rose-dark); }
   /* Кнопка в шапке — такая же, как на других страницах: ею зовут
      в кабинет, а студия рядом остаётся ссылкой. */
-  .nav-cta {
-    font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase;
-    padding: 9px 24px; background: var(--rose); color: #fff;
-    text-decoration: none; transition: background 0.2s;
-  }
-  .nav-cta:hover { background: var(--rose-dark); }
+  /* Вход в кабинет — значком: слово «Кабинет» в шапке спорило с
+     «Студией» рядом, а розовая заливка перетягивала весь первый экран. */
+  .nav-icon { display: inline-flex; align-items: center; color: var(--rose); transition: color 0.2s; }
+  .nav-icon:hover { color: var(--rose-dark); }
 
   .hero { display: grid; grid-template-columns: 1fr 1fr; min-height: 560px; margin-top: 72px; }
   .hero-left { padding: 100px 64px; display: flex; flex-direction: column; justify-content: center; }
@@ -99,7 +97,6 @@
     nav { padding: 12px 16px; min-height: 56px; }
     .nav-logo { font-size: 15px; }
     .nav-right { gap: 10px; }
-    .nav-cta { padding: 9px 14px; font-size: 9px; letter-spacing: 0.1em; }
     .nav-link { font-size: 10px; letter-spacing: 0.1em; text-underline-offset: 4px; }
     /* На телефоне имя из логотипа уходит: шапке важнее кнопка, а имя
        встречает ниже, крупно, на первом же экране. */
@@ -120,13 +117,21 @@
 <nav>
   <a href="/" class="nav-logo">Re.Create.Art<span> · Варя Перлина</span></a>
   <div class="nav-right">
+    <a href="/embroidery" class="nav-link">Курс</a>
     <a href="/shop" class="nav-link">Магазин</a>
     <a href="/studio" class="nav-link">Студия</a>
-  <!-- Кнопка ведёт в журнал, а не в кабинет родителя: решает роль, а не
-       ссылка. Преподаватель и админ попадают в журнал, родителя оттуда
-       сразу уводит в его кабинет, незалогиненного — на вход, и после
-       входа он окажется там же, где оказался бы сразу. -->
-    <a href="/admin/studio" class="nav-cta">Кабинет</a>
+  <!-- Значок вместо кнопки: шапке хватает одного розового пятна, а им
+       остаётся логотип. Куда вести, решает роль, а не ссылка —
+       преподавателя и админа журнал пускает, родителя сразу уводит в его
+       кабинет, незалогиненного — на вход. Подпись нужна читалке: без неё
+       ссылка со значком для неё пустая. -->
+    <a href="/admin/studio" class="nav-icon" aria-label="Кабинет" title="Кабинет">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+         stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/>
+      <path d="M6.2 18.4a6.6 6.6 0 0 1 11.6 0"/>
+    </svg>
+    </a>
   </div>
 </nav>
 
@@ -178,7 +183,10 @@
     </a>
 
     <div class="dir-card">
+      <!-- Картинка спрятана до самого курса: снимок есть, а курса ещё
+           нет, и фотография обещает больше, чем «Скоро».
       <div class="dir-media"><img src="knitting.jpg" alt="Вязаное полотно со словом CREATE, спицы и клубки на столе"></div>
+      -->
       <div class="dir-label">Онлайн-курс · Взрослым</div>
       <div class="dir-title">Курс вязания</div>
       <p class="dir-desc">Второй курс в той же логике, что и вышивка: спокойный темп, записи уроков и понятный список материалов.</p>

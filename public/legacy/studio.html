@@ -23,8 +23,10 @@
   .nav-back { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm-gray); text-decoration: none; white-space: nowrap; transition: color 0.2s; }
   .nav-back:hover { color: var(--rose); }
   .nav-side { display: flex; align-items: center; gap: 20px; }
-  .nav-cta { font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; padding: 9px 24px; background: var(--rose); color: #fff; text-decoration: none; transition: background 0.2s; }
-  .nav-cta:hover { background: var(--rose-dark); }
+  /* Вход в кабинет — значком: слово «Кабинет» в шапке спорило с
+     «Студией» рядом, а розовая заливка перетягивала весь первый экран. */
+  .nav-icon { display: inline-flex; align-items: center; color: var(--rose); transition: color 0.2s; }
+  .nav-icon:hover { color: var(--rose-dark); }
 
   .hero { display: grid; grid-template-columns: 1fr 1fr; min-height: 520px; }
   .hero-left { padding: 90px 64px; display: flex; flex-direction: column; justify-content: center; }
@@ -95,7 +97,6 @@
   /* Совсем узкие экраны: логотип не уменьшаем, ужимаем всё вокруг него. */
   @media (max-width: 360px) {
     nav { padding: 12px 12px; }
-    .nav-cta { padding: 9px 12px; font-size: 9px; letter-spacing: 0.1em; }
     .nav-side { gap: 6px; }
   }
   @media (max-width: 900px) {
@@ -111,10 +112,6 @@
     }
     .nav-word { display: none; }
     .hero-pretitle { letter-spacing: 0.2em; }
-    .nav-cta {
-      padding: 0 16px; letter-spacing: 0.15em;
-      display: inline-flex; align-items: center; min-height: 32px;
-    }
     .hero { grid-template-columns: 1fr; }
     .hero-left { padding: 56px 28px; }
     .hero-cta { align-self: stretch; text-align: center; padding: 16px 24px; }
@@ -136,7 +133,16 @@
   <a href="/" class="nav-logo">Re.Create.Art · <span>Варя Перлина</span></a>
   <div class="nav-side">
     <a href="/" class="nav-back" aria-label="На главную">←<span class="nav-word"> На главную</span></a>
-    <a href="/login" class="nav-cta">Кабинет</a>
+  <!-- Значок вместо кнопки, как на главной. Ведёт в журнал, а не на
+       вход: роль разберётся сама — преподавателя журнал пустит, родителя
+       уведёт в кабинет, а гостя на /login, куда эта ссылка и вела. -->
+    <a href="/admin/studio" class="nav-icon" aria-label="Кабинет" title="Кабинет">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+         stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/>
+      <path d="M6.2 18.4a6.6 6.6 0 0 1 11.6 0"/>
+    </svg>
+    </a>
   </div>
 </nav>
 
