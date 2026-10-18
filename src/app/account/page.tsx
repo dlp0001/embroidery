@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import BookingHint from '@/components/BookingHint';
-import BotNudge from '@/components/BotNudge';
 import ContactCard from '@/components/ContactCard';
 import EventSignup from '@/components/EventSignup';
 import OnlyMine from '@/components/OnlyMine';
@@ -146,10 +145,6 @@ export default async function WeekPage({
             </div>
           </div>
         )}
-
-        {/* Приглашение в бота — выше занятий, но ниже долга и абонемента:
-            деньги и сгорающий пакет важнее. */}
-        {!chat && <BotNudge />}
 
         <EventSignup rows={events} />
 
