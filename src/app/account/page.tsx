@@ -34,11 +34,14 @@ export default async function WeekPage({
     cabinetCourses(user.email),
   ]);
 
-  // Пакет лагеря лежит рядом с обычным абонементом: показываем оба.
-  const mine = passes.filter((p) => p.left > 0 && !p.ended);
+  // Неделя — про обычные занятия, поэтому пакеты смены сюда не берём:
+  // дни лагеря идут своим блоком ниже, а пакет к ним виден на «Оплате»,
+  // там же, где его продлевают.
+  const studio = passes.filter((p) => p.kind === 'lesson');
+  const mine = studio.filter((p) => p.left > 0 && !p.ended);
   // Кончившийся абонемент с экрана не убираем: «куда он делся» — вопрос
   // неприятнее, чем строчка «закончился». Держим его, пока свежий.
-  const over = passes.filter((p) => p.ended || p.left === 0);
+  const over = studio.filter((p) => p.ended || p.left === 0);
   const debt = unpaid.reduce((sum, c) => sum + Number(c.amount), 0);
 
   // Дни лагеря показываем отдельно и целиком, а из недели убираем:
