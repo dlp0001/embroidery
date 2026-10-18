@@ -63,6 +63,12 @@
   .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 17px; color: var(--charcoal); letter-spacing: 0.06em; }
   .nav-logo span { color: var(--rose); }
   .nav-right { display: flex; align-items: center; gap: 16px; }
+  /* Та же стрелка «назад», что на «Студии»: с внутренней страницы
+     возвращаются чаще, чем уходят дальше, а логотип как ссылка на
+     главную угадывается не всеми. На узком экране от неё остаётся одна
+     стрелка — место нужно логотипу. */
+  .nav-back { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm-gray); text-decoration: none; white-space: nowrap; transition: color 0.2s; }
+  .nav-back:hover { color: var(--rose); }
   .nav-cta { font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; padding: 9px 28px; background: var(--rose); color: #fff; text-decoration: none; transition: background 0.2s; }
   .nav-cta:hover { background: var(--rose-dark); }
   /* Вход для тех, кто курс уже купил: ссылку из письма теряют, а сюда
@@ -183,6 +189,11 @@
     .nav-logo span { display: none; }
     .nav-right { gap: 10px; }
     .nav-link { font-size: 9px; letter-spacing: 0.1em; text-underline-offset: 4px; }
+    .nav-back {
+      letter-spacing: 0; font-size: 17px; line-height: 1; padding: 0 6px;
+      display: flex; align-items: center; min-height: 32px;
+    }
+    .nav-word { display: none; }
     .nav-cta {
       padding: 0 16px; font-size: 9px; letter-spacing: 0.15em;
       display: inline-flex; align-items: center; min-height: 32px;
@@ -216,6 +227,9 @@
     </div>
   </div>
   <div class="nav-right">
+    <a href="/" class="nav-back" aria-label="На главную">←<span class="nav-word">
+      <span class="lang-en"> Home</span><span class="lang-ru"> На главную</span>
+    </span></a>
     <a href="/learn/embroidery" class="nav-link">
       <span class="lang-en">My lessons</span>
       <span class="lang-ru">Мои уроки</span>
