@@ -17,16 +17,22 @@ const API = 'https://api.anthropic.com/v1/messages';
  */
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-5-5';
 
-/** Ответ ждём недолго: человек стоит с телефоном над чеком. */
-const TIMEOUT_MS = 30_000;
+/**
+ * Сколько ждём. Чек на три десятка строк модель разбирает полминуты и
+ * дольше, а весь вызов у нас живёт минуту — поэтому ждём сорок пять
+ * секунд и оставляем пятнадцать на запись и ответ в телеграм.
+ */
+const TIMEOUT_MS = 45_000;
 
 export function isConfigured(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
 }
 
 export type Scanned = {
-  /** Название лавки так, как оно написано на чеке. */
+  /** Юридическое лицо: оно идёт в бухгалтерию. */
   supplier: string | null;
+  /** Вывеска магазина. Человек помнит её, а фирму — никогда. */
+  trade_name: string | null;
   /** ח.פ или ע.מ — номер в израильском реестре, если он напечатан. */
   supplier_vat: string | null;
   /** Тип документа глазами iCount: invoice, invrec, receipt, other. */
@@ -72,7 +78,8 @@ const PROMPT = `Ты разбираешь фотографию израильс�
 
 Верни ТОЛЬКО JSON без пояснений и без markdown, с полями:
 {
-  "supplier": "название лавки как на чеке",
+  "supplier": "юридическое лицо с ח.פ",
+  "trade_name": "вывеска магазина, если она отдельной строкой",
   "supplier_vat": "ח.פ / ע.מ, только цифры",
   "doc_type": "invoice | invrec | receipt | other",
   "doc_number": "номер документа",
@@ -95,8 +102,8 @@ const PROMPT = `Ты разбираешь фотографию израильс�
 }
 
 Правила:
-- supplier — юридическое лицо, рядом с которым стоит ח.פ или ע.מ. На чеке
-  часто две шапки: вывеска магазина и фирма. Бери фирму.
+- На чеке часто две шапки: вывеска магазина и фирма с ח.פ. В supplier
+  пиши фирму, в trade_name — вывеску. Одна шапка — trade_name оставь null.
 - חשבונית מס = invoice, חשבונית מס קבלה = invrec, קבלה = receipt.
 - Дату бери из чека, а не сегодняшнюю. Израильский формат ДД/ММ/ГГГГ.
 - amount — строка לתשלום или סה"כ, то есть итог с НДС.
@@ -170,7 +177,8 @@ export async function readReceipt(
     return {
       ok: true,
       data: {
-        supplier: str(got.supplier),
+        supplier: firm(str(got.supplier)),
+        trade_name: str(got.trade_name),
         supplier_vat: str(got.supplier_vat)?.replace(/\D/g, '') || null,
         doc_type: str(got.doc_type),
         doc_number: str(got.doc_number),
@@ -207,6 +215,19 @@ function items(v: unknown): Item[] {
     });
   }
   return out;
+}
+
+/**
+ * Имя фирмы без номера в реестре. Модель иногда приклеивает «ח.פ
+ * 515148286» к названию — на чеке они стоят рядом, — а в справочник
+ * поставщиков такое имя попасть не должно: номер у него своё поле.
+ */
+function firm(name: string | null): string | null {
+  if (!name) return null;
+  const clean = name
+    .replace(/[,\s]*(?:ח\.?\s?פ|ע\.?\s?מ|ח\.?\s?צ)\.?\s*[:]?\s*\d[\d-]{6,}\s*$/u, '')
+    .trim();
+  return clean || name;
 }
 
 function str(v: unknown): string | null {

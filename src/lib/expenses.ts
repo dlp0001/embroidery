@@ -28,6 +28,7 @@ export async function kinds(): Promise<Kind[]> {
 export type Expense = {
   id: string;
   supplier: string | null;
+  trade_name: string | null;
   supplier_vat: string | null;
   doc_type: string | null;
   doc_number: string | null;
@@ -45,7 +46,7 @@ export type Expense = {
   what: string | null;
 };
 
-const FIELDS = `e.id, e.supplier, e.supplier_vat, e.doc_type, e.doc_number,
+const FIELDS = `e.id, e.supplier, e.trade_name, e.supplier_vat, e.doc_type, e.doc_number,
                 e.spent_on::text, e.amount::text, e.vat::text, e.currency,
                 e.kind_id, k.title as kind_title, k.icount_type,
                 e.status, e.icount_id, e.chat_id::text, e.message_id::text,
@@ -85,13 +86,14 @@ export async function applyScan(
   await query(
     `update expenses set supplier = $2, supplier_vat = $3, doc_type = $4,
             doc_number = $5, spent_on = $6::date, amount = $7, vat = $8,
-            currency = coalesce($9, currency), raw = $10::jsonb
+            currency = coalesce($9, currency), raw = $10::jsonb, trade_name = $11
       where id = $1`,
     [
       id, scan?.supplier ?? null, scan?.supplier_vat ?? null, scan?.doc_type ?? null,
       scan?.doc_number ?? null, scan?.spent_on ?? null, scan?.amount ?? null,
       scan?.vat ?? null, scan?.currency ?? null,
       JSON.stringify({ ...(scan ?? {}), ...(error ? { error } : {}) }),
+      scan?.trade_name ?? null,
     ],
   );
   if (!scan?.items?.length) return;
@@ -294,4 +296,37 @@ export async function splitsFor(ids: string[]): Promise<Map<string, Split[]>> {
     ]);
   }
   return out;
+}
+
+/** Строки чека вместе с их номером: для правки нужен адрес каждой. */
+export type LineRow = {
+  id: string;
+  line_no: number;
+  sku: string | null;
+  name: string;
+  qty: string | null;
+  price: string | null;
+  sum: string | null;
+  kind_guess: string | null;
+};
+
+export async function linesOf(ids: string[]): Promise<Map<string, LineRow[]>> {
+  if (ids.length === 0) return new Map();
+  const rows = await query<LineRow & { expense_id: string }>(
+    `select id, expense_id, line_no, sku, name, qty::text, price::text, sum::text, kind_guess
+       from expense_items where expense_id = any($1::uuid[]) order by expense_id, line_no`,
+    [ids],
+  );
+  const out = new Map<string, LineRow[]>();
+  for (const r of rows) out.set(r.expense_id, [...(out.get(r.expense_id) ?? []), r]);
+  return out;
+}
+
+/**
+ * Меняет группу у одной строки. Человек всегда прав: модель догадывалась,
+ * а он смотрит на чек. Общая сумма расхода от этого не меняется — она
+ * уже проведена и в бухгалтерии, здесь только наша разбивка.
+ */
+export async function setLineKind(lineId: string, guess: string): Promise<void> {
+  await query('update expense_items set kind_guess = $2 where id = $1', [lineId, guess]);
 }

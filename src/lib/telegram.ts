@@ -1424,6 +1424,8 @@ export function readExpenseTap(data: string): ExpenseTap | null {
 
 export type ReceiptCard = {
   supplier: string | null;
+  /** Вывеска магазина: её человек узнаёт, фирму — нет. */
+  trade_name?: string | null;
   /** Числом из модели или строкой из базы: деньги печатаются одинаково. */
   amount: string | number | null;
   vat: string | number | null;
@@ -1464,7 +1466,8 @@ export function receiptCard(
     ? `${cents(e.amount, e.currency)}${e.vat ? `, НДС ${cents(e.vat, e.currency)}` : ''}`
     : 'сумма не разобрана';
   const lines = [
-    `<b>${esc(e.supplier ?? 'поставщик не разобран')}</b>`,
+    `<b>${esc(e.trade_name ?? e.supplier ?? 'поставщик не разобран')}</b>`,
+    ...(e.trade_name && e.supplier ? [esc(e.supplier)] : []),
     sum,
     [
       e.spent_on ? dayMonth(e.spent_on) : 'дата не разобрана',

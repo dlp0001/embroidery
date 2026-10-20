@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { isAdmin, requireTeacher } from '@/lib/session';
-import { expensesIn, spentByKind, splitsFor, type ListRow } from '@/lib/expenses';
+import { expensesIn, linesOf, spentByKind, splitsFor, type ListRow } from '@/lib/expenses';
+import { setLineKindAction } from '@/app/admin/cost-actions';
+import Lines from './Lines';
 import { cents, dayMonth, plural, todayISO } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
@@ -75,7 +77,8 @@ export default async function CostsPage({
   const [byKind, rows] = await Promise.all([spentByKind(from, to), expensesIn(from, to)]);
   // Разбор по строкам: показания модели, а не решение человека. Поэтому
   // стоит мелко, под суммой, и ни во что не суммируется.
-  const splits = await splitsFor(rows.map((r) => r.id));
+  const ids = rows.map((r) => r.id);
+  const [splits, lines] = await Promise.all([splitsFor(ids), linesOf(ids)]);
   const total = byKind.reduce((s, r) => s + Number(r.sum), 0);
   const waiting = rows.filter((r) => r.status === 'new');
 
@@ -152,7 +155,12 @@ export default async function CostsPage({
             <div className="card" key={e.id}>
               <div className="row" style={{ alignItems: 'flex-start' }}>
                 <div>
-                  <div className="what">{e.supplier ?? 'поставщик не разобран'}</div>
+                  <div className="what">
+                    {e.trade_name ?? e.supplier ?? 'поставщик не разобран'}
+                  </div>
+                  {e.trade_name && e.supplier && (
+                    <div className="sub">{e.supplier}</div>
+                  )}
                   <div className="sub">
                     {[
                       e.spent_on ? dayMonth(e.spent_on) : 'дата не разобрана',
@@ -184,6 +192,14 @@ export default async function CostsPage({
                   )}
                 </div>
               </div>
+
+              {/* Строки под чеком: раскрываются нажатием, группу у любой
+                  можно поменять руками. */}
+              <Lines
+                lines={lines.get(e.id) ?? []}
+                action={setLineKindAction}
+                total={e.amount === null ? null : Number(e.amount)}
+              />
             </div>
           );
         })}
