@@ -195,3 +195,78 @@ export async function createReceipt(input: ReceiptInput): Promise<Receipt> {
     url: typeof data.doc_url === 'string' ? data.doc_url : null,
   };
 }
+
+// ── Расходы ───────────────────────────────────────────────
+
+export type Supplier = {
+  supplier_id: string;
+  supplier_name: string;
+  /** ח.פ: по нему узнаём лавку вернее, чем по написанию названия. */
+  vat_id: string;
+};
+
+/** Поставщики, заведённые в бухгалтерии. Их немного, берём списком целиком. */
+export async function suppliers(): Promise<Supplier[]> {
+  const data = await call<{ suppliers?: Record<string, Supplier> }>('supplier/get_list', {});
+  return Object.values(data.suppliers ?? {});
+}
+
+/**
+ * Заводит поставщика. Зовём, только когда в списке его не нашлось: лавок
+ * у студии немного, и список сам сойдётся за пару месяцев.
+ */
+export async function addSupplier(name: string, vatId?: string | null): Promise<string | null> {
+  const data = await call<{ supplier_id?: number | string }>('supplier/add', {
+    supplier_name: name,
+    ...(vatId ? { vat_id: vatId } : {}),
+  });
+  const id = data.supplier_id;
+  return id === undefined || id === null ? null : String(id);
+}
+
+export type ExpenseInput = {
+  supplierId: string;
+  /** Вид расхода из справочника iCount: наша группа переводится в него. */
+  typeId: number;
+  /** invoice, invrec, receipt, other — как на бумаге. */
+  docType: string;
+  docNumber: string;
+  /** Итого с НДС. */
+  sum: number;
+  /** Сам НДС, если он выделен. */
+  vat?: number | null;
+  /** Дата документа, она же дата расхода: ГГГГ-ММ-ДД. */
+  date: string;
+  /** Деньги уже отданы: по чеку из магазина это всегда так. */
+  paid?: boolean;
+};
+
+/**
+ * Заводит расход. Возвращает его номер в iCount — по нему расход потом
+ * находится и, если что, удаляется.
+ *
+ * Дат у расхода три, и все три мы ставим в день покупки: чек из магазина
+ * оплачен на месте, и разводить документ, расход и оплату по разным дням
+ * значило бы выдумывать то, чего на бумаге нет.
+ */
+export async function createExpense(input: ExpenseInput): Promise<string | null> {
+  const data = await call<{ expense_id?: number | string }>('expense/create', {
+    supplier_id: input.supplierId,
+    expense_type_id: input.typeId,
+    expense_doctype: input.docType,
+    expense_docnum: input.docNumber,
+    expense_sum: input.sum,
+    ...(input.vat ? { expense_vat: input.vat } : {}),
+    invoice_date: input.date,
+    expense_date: input.date,
+    expense_paid_date: input.date,
+    expense_paid: input.paid === false ? 0 : 1,
+  });
+  const id = data.expense_id;
+  return id === undefined || id === null ? null : String(id);
+}
+
+/** Убирает расход. Нужен, когда провели не то: правим не руками в кабинете. */
+export async function dropExpense(id: string): Promise<void> {
+  await call('expense/delete', { expense_id: id });
+}

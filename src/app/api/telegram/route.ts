@@ -1,9 +1,14 @@
 import { confirmCash, declineCash } from '@/lib/billing';
+import {
+  dropExpenseRow, kinds, pushExpense, rememberCard, saveReceipt, setKind, expenseById,
+} from '@/lib/expenses';
+import { isConfigured as visionReady, readReceipt } from '@/lib/vision';
 import { cashConfirmed, cashDeclined, claimCard, claimOf } from '@/lib/notify';
 import {
-  answerCallback, applyTap, bindChat, chatUser, editMessage, eventViews, isStudioAdmin,
-  debtorsView, isTeacher, payView, readMoneyTap, readTap, relayAnswer, relayFromParent,
-  secretOk, send, teacherDayView, viewAfterTap, weekView, PAY_LETTER,
+  answerCallback, applyTap, bindChat, chatUser, editMessage, eventViews, fileBytes,
+  isStudioAdmin, debtorsView, isTeacher, payView, readExpenseTap, readMoneyTap, readTap,
+  receiptCard, relayAnswer, relayFromParent, secretOk, send, sendAndGetId, teacherDayView,
+  viewAfterTap, weekView, PAY_LETTER,
 } from '@/lib/telegram';
 
 export const runtime = 'nodejs';
@@ -22,6 +27,8 @@ type Update = {
   message?: {
     chat?: { id?: number };
     text?: string;
+    /** Снимок чека. Телеграм присылает его в нескольких размерах. */
+    photo?: { file_id?: string; file_size?: number; width?: number }[];
     /** Ответ на сообщение: так студия отвечает родителю. */
     reply_to_message?: { message_id?: number };
   };
@@ -133,6 +140,74 @@ async function onMessage(
   for (const view of await eventViews(user.id, origin)) {
     await send(chatId, view.text, view.keyboard, view.html);
   }
+}
+
+/**
+ * Снимок чека. Берём средний размер: телеграм отдаёт несколько, и самый
+ * большой — это мегабайты, которые модель читает не лучше, а дольше.
+ */
+function pickPhoto(sizes: { file_id?: string; file_size?: number }[]): string | null {
+  const fit = sizes.filter((p) => p.file_id && (p.file_size ?? 0) <= 1_200_000);
+  const best = (fit.length ? fit : sizes).at(-1);
+  return best?.file_id ?? null;
+}
+
+/**
+ * Чек от Вари: сохраняем снимок, читаем поля и спрашиваем статью затрат.
+ *
+ * Фотографии принимаем только у тех, кто ведёт деньги студии. Родителю
+ * бот картинки не обещал, и молча заводить расход от чужого снимка —
+ * последнее, чего хочется в бухгалтерии.
+ */
+async function onPhoto(
+  chatId: number, sizes: { file_id?: string; file_size?: number }[], origin: string,
+): Promise<void> {
+  const user = await chatUser(chatId);
+  if (!user) {
+    await send(chatId, stranger(origin));
+    return;
+  }
+  if (!(await isStudioAdmin(user.id))) {
+    await send(chatId, 'Картинки я пока не понимаю. Напишите словами — передам в студию.');
+    return;
+  }
+
+  const fileId = pickPhoto(sizes);
+  const photo = fileId ? await fileBytes(fileId) : null;
+  if (!photo) {
+    await send(chatId, 'Не получилось забрать снимок у телеграма. Пришлите ещё раз.');
+    return;
+  }
+
+  if (!visionReady()) {
+    await send(chatId, 'Распознавание не подключено: нет ключа к модели.');
+    return;
+  }
+
+  const read = await readReceipt(photo);
+  const id = await saveReceipt({
+    photo,
+    photoType: 'image/jpeg',
+    userId: user.id,
+    chatId,
+    scan: read.ok ? read.data : null,
+    error: read.ok ? null : read.error,
+  });
+
+  if (!read.ok) {
+    await send(chatId, [
+      'Снимок сохранил, но прочитать не смог.',
+      '',
+      read.error,
+      '',
+      `Поля можно заполнить руками: ${origin}/admin/studio/costs`,
+    ].join('\n'));
+    return;
+  }
+
+  const card = receiptCard(id, { ...read.data, doc_type: read.data.doc_type }, await kinds());
+  const messageId = await sendAndGetId(chatId, card.text, card.keyboard, card.html);
+  if (messageId) await rememberCard(id, messageId);
 }
 
 /** Что бот умеет. Разное у родителя и у преподавателя. */
@@ -255,6 +330,57 @@ async function onTap(
   await editMessage(chatId, messageId, view.text, view.keyboard, view.html);
 }
 
+/**
+ * Нажатие на карточке чека: выбрана статья затрат или «не проводить».
+ * Возвращает true, если кнопка была наша.
+ */
+async function onExpense(
+  id: string, chatId: number, messageId: number, data: string,
+): Promise<boolean> {
+  const tap = readExpenseTap(data);
+  if (!tap) return false;
+
+  const user = await chatUser(chatId);
+  if (!user || !(await isStudioAdmin(user.id))) {
+    await answerCallback(id, 'Расходы проводит админ.');
+    return true;
+  }
+
+  const before = await expenseById(tap.expenseId);
+  if (!before) {
+    await answerCallback(id, 'Этого чека больше нет.');
+    return true;
+  }
+  if (before.status !== 'new') {
+    await answerCallback(id, before.status === 'done' ? 'Уже проведён.' : 'Уже отклонён.');
+    return true;
+  }
+
+  if (!tap.kindId) {
+    await dropExpenseRow(tap.expenseId);
+    await answerCallback(id, 'Не проводим.');
+    await editMessage(chatId, messageId,
+      `${before.supplier ?? 'Чек'}: не проводим. Снимок остался в «Расходах».`);
+    return true;
+  }
+
+  await setKind(tap.expenseId, tap.kindId);
+  const done = await pushExpense(tap.expenseId);
+  const now = await expenseById(tap.expenseId);
+  const what = `${now?.supplier ?? 'Чек'} · ${now?.amount ?? '?'} ${now?.currency ?? ''}`;
+
+  if (done.ok) {
+    await answerCallback(id, 'Провёл.');
+    await editMessage(chatId, messageId,
+      `${what}\n${now?.kind_title ?? ''} · проведено в iCount${
+        done.icountId ? ` № ${done.icountId}` : ''}`);
+  } else {
+    await answerCallback(id, 'iCount отказал.');
+    await editMessage(chatId, messageId, `${what}\nНе провёл: ${done.error}`);
+  }
+  return true;
+}
+
 export async function POST(req: Request): Promise<Response> {
   if (!secretOk(req.headers.get('x-telegram-bot-api-secret-token'))) {
     console.error('telegram: вызов с чужим секретом');
@@ -275,14 +401,19 @@ export async function POST(req: Request): Promise<Response> {
   try {
     if (tap?.id && chatId && tap.message?.message_id) {
       // Деньги идут своим путём: у них другие права и другая карточка.
-      const money = await onMoney(tap.id, chatId, tap.message.message_id, tap.data ?? '');
-      if (!money) await onTap(tap.id, chatId, tap.message.message_id, tap.data ?? '', origin);
+      const data = tap.data ?? '';
+      // Деньги идут своим путём: у них другие права и другая карточка.
+      const money = await onMoney(tap.id, chatId, tap.message.message_id, data);
+      const spent = money || await onExpense(tap.id, chatId, tap.message.message_id, data);
+      if (!spent) await onTap(tap.id, chatId, tap.message.message_id, data, origin);
     } else if (chatId) {
       const text = (update.message?.text ?? '').trim();
+      const photo = update.message?.photo ?? [];
       // Апдейты бывают всякие: вступление в чат, правка сообщения, стикер.
-      // Всё, что не текст в личке, нас пока не касается.
+      // Нас касаются текст и снимок чека.
       const replyTo = update.message?.reply_to_message?.message_id ?? null;
-      if (text) await onMessage(chatId, text, origin, replyTo);
+      if (photo.length > 0) await onPhoto(chatId, photo, origin);
+      else if (text) await onMessage(chatId, text, origin, replyTo);
     }
   } catch (err) {
     console.error('telegram: апдейт не обработан', err);

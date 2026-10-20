@@ -153,6 +153,7 @@ export default async function DebtsPage({
                         alignItems: 'center', marginBottom: 14 }}>
             <Link className="btn-quiet" href="/admin/studio/stats">Статистика</Link>
             <Link className="btn-quiet" href="/admin/studio/receipts">Чеки</Link>
+            <Link className="linky" href="/admin/studio/costs">Расходы</Link>
             <Link className="linky" href="/admin/studio/payments">Платежи</Link>
             <Link className="linky" href="/admin/studio/camp">Лагерь</Link>
           </div>

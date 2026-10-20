@@ -1382,3 +1382,98 @@ export async function applyTap(userId: string, tap: Tap): Promise<string> {
   if (!tap.book && tap.from === 'ask') await markDeclined(tap.sessionId, tap.participantId);
   return tap.book ? 'Записали' : 'Отменили';
 }
+
+// ── Чеки: снимок от Вари превращается в расход ────────────
+
+/**
+ * Забирает файл из телеграма. Два шага: сперва спрашиваем путь, потом
+ * качаем. Второй запрос идёт не на обычный адрес API, а на файловый.
+ */
+export async function fileBytes(fileId: string): Promise<Buffer | null> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return null;
+  const res = await call<{ file_path?: string }>('getFile', { file_id: fileId });
+  const path = res.ok ? res.result?.file_path : null;
+  if (!path) return null;
+  try {
+    const file = await fetch(`${API}/file/bot${token}/${path}`, {
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!file.ok) return null;
+    return Buffer.from(await file.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+/** Нажатие на карточке чека: выбор группы или отказ. */
+export type ExpenseTap = { expenseId: string; kindId: string | null };
+
+export function readExpenseTap(data: string): ExpenseTap | null {
+  const drop = /^ed([A-Za-z0-9_-]{22})$/.exec(data);
+  if (drop) {
+    const expenseId = unpackId(drop[1]);
+    return expenseId ? { expenseId, kindId: null } : null;
+  }
+  const pick = /^e([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{22})$/.exec(data);
+  if (!pick) return null;
+  const expenseId = unpackId(pick[1]);
+  const kindId = unpackId(pick[2]);
+  return expenseId && kindId ? { expenseId, kindId } : null;
+}
+
+export type ReceiptCard = {
+  supplier: string | null;
+  /** Числом из модели или строкой из базы: деньги печатаются одинаково. */
+  amount: string | number | null;
+  vat: string | number | null;
+  currency: string;
+  spent_on: string | null;
+  doc_number: string | null;
+  what: string | null;
+};
+
+const DOC_WORD: Record<string, string> = {
+  invoice: 'счёт-фактура',
+  invrec: 'счёт-квитанция',
+  receipt: 'квитанция',
+  other: 'документ',
+};
+
+/**
+ * Карточка разобранного чека. Показываем ровно то, что уйдёт в
+ * бухгалтерию, и спрашиваем единственное, чего модель знать не может, —
+ * к какой статье затрат это отнести.
+ */
+export function receiptCard(
+  id: string,
+  e: ReceiptCard & { doc_type?: string | null },
+  groups: { id: string; title: string }[],
+): View {
+  const sum = e.amount
+    ? `${money(e.amount, e.currency)}${e.vat ? `, НДС ${money(e.vat, e.currency)}` : ''}`
+    : 'сумма не разобрана';
+  const lines = [
+    `<b>${esc(e.supplier ?? 'поставщик не разобран')}</b>`,
+    sum,
+    [
+      e.spent_on ? dayMonth(e.spent_on) : 'дата не разобрана',
+      e.doc_type ? DOC_WORD[e.doc_type] ?? e.doc_type : null,
+      e.doc_number ? `№ ${esc(e.doc_number)}` : null,
+    ].filter(Boolean).join(' · '),
+  ];
+  if (e.what) lines.push('', esc(e.what));
+  lines.push('', 'К какой статье отнести?');
+
+  // По две в ряд: названия длинные, в три кнопки строка не влезает.
+  const keyboard: Keyboard = [];
+  for (let i = 0; i < groups.length; i += 2) {
+    keyboard.push(groups.slice(i, i + 2).map((g) => ({
+      text: g.title,
+      callback_data: `e${packId(id)}.${packId(g.id)}`,
+    })));
+  }
+  keyboard.push([{ text: 'Не проводить', callback_data: `ed${packId(id)}` }]);
+
+  return { text: lines.join('\n'), keyboard, html: true };
+}
