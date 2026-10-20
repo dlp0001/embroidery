@@ -4,6 +4,7 @@ import ContactCard from '@/components/ContactCard';
 import EventSignup from '@/components/EventSignup';
 import OnlyMine from '@/components/OnlyMine';
 import SlotList from '@/components/SlotList';
+import { familyOwners } from '@/lib/family';
 import { cabinetCourses, longDate } from '@/lib/course';
 import { requireParent } from '@/lib/session';
 import {
@@ -24,9 +25,12 @@ export default async function WeekPage({
   // вчетверо больше, чем у одной семьи, и среди чужих теряются свои.
   const showAll = (await searchParams).all === '1';
   const today = todayISO();
+  // Долги и абонементы — семейные: платит один родитель, а начисление
+  // журнал мог записать на другого.
+  const family = await familyOwners(user.id);
   const [passes, unpaid, slots, events, chat, courses] = await Promise.all([
-    passBalances(user.id),
-    unpaidCharges(user.id),
+    passBalances(family),
+    unpaidCharges(family),
     slotsForUser(user.id, today, plusDays(today, 7)),
     eventSlotsForUser(user.id),
     chatOfUser(user.id),

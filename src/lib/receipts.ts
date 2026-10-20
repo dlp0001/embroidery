@@ -85,9 +85,16 @@ export type Unbilled = {
   provider: string;
   pay_method: string | null;
   purpose: string | null;
-  /** Кому выписывать: плательщик, он же владелец начислений. */
+  /** Кто отдал деньги. */
   owner_id: string | null;
   who: string;
+  /**
+   * На кого выписывается бумага: в семье метку «чеки» держит один
+   * родитель, а платить может любой. Совпадает с плательщиком, пока
+   * второго родителя нет.
+   */
+  bill_to: string | null;
+  bill_name: string | null;
   /** Занятия, закрытые этим платежом: день, кто был, сколько стоило. */
   items: { held_on: string; who: string; amount: string }[];
   lessons: number;
@@ -108,6 +115,7 @@ export async function unbilledPayments(from: string, to: string): Promise<Unbill
     `select p.id, p.created_at::text as at, p.amount::text, p.currency, p.provider,
             p.raw ->> 'pay_method' as pay_method, p.purpose, p.user_id as owner_id,
             coalesce(u.name, u.email, 'без плательщика') as who,
+            b.id as bill_to, coalesce(b.name, b.email) as bill_name,
             coalesce(p.raw ->> 'receipt_wanted' = 'no', false) as declined,
             case when p.raw ? 'extends_pass'
                  then coalesce((p.raw ->> 'days')::int, 0) else 0 end as extra_days,
@@ -133,6 +141,13 @@ export async function unbilledPayments(from: string, to: string): Promise<Unbill
                       where ch.payment_id = p.id) x) as items
        from payments p
        left join users u on u.id = p.user_id
+       /* Тот же отбор, по которому бумагу выписывает lib/billing. */
+       left join users b on b.id = coalesce((
+             select h.id from guardians mine
+               join guardians theirs on theirs.child_id = mine.child_id
+               join users h on h.id = theirs.user_id
+              where mine.user_id = p.user_id and h.receipts
+              order by h.created_at, h.id limit 1), p.user_id)
       where ${MONEY} and not ${BILLED}
         and p.created_at >= $1::date and p.created_at < ($2::date + 1)
       order by u.name nulls last, p.created_at`,

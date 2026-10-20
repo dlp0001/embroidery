@@ -608,7 +608,11 @@ export type PassBalance = {
   ended: boolean;
 };
 
-export async function passBalances(ownerId: string): Promise<PassBalance[]> {
+/**
+ * Абонементы владельца. Список — это семья: абонемент покупает один
+ * родитель, а тратится он на общих детей, и видеть его вправе оба.
+ */
+export async function passBalances(owner: string | string[]): Promise<PassBalance[]> {
   return query<PassBalance>(
     `select p.id, p.lessons_total, p.valid_to::text, p.group_id,
             (select g.title from studio_groups g where g.id = p.group_id) as group_title,
@@ -626,13 +630,13 @@ export async function passBalances(ownerId: string): Promise<PassBalance[]> {
             ${PACK_ROOM} as max_days,
             coalesce(p.valid_to < current_date, false) as ended
        from passes p
-      where p.owner_id = $1
+      where p.owner_id = any($1::uuid[])
         /* Недавно кончившиеся отдаём тоже: родителю надо видеть, что
            абонемент истёк, а не гадать, почему он пропал с экрана.
            Кому нужны только живые, тот отбирает по ended и left. */
         and (p.valid_to is null or p.valid_to >= current_date - 30)
       order by p.valid_to nulls last, p.created_at`,
-    [ownerId],
+    [[owner].flat()],
   );
 }
 
@@ -651,7 +655,12 @@ export type UnpaidCharge = {
   declared: boolean;
 };
 
-export async function unpaidCharges(ownerId: string): Promise<UnpaidCharge[]> {
+/**
+ * Неоплаченные занятия. Список владельцев — это семья: долг у неё
+ * общий, и закрыть его вправе любой из родителей, на кого бы журнал ни
+ * записал само начисление.
+ */
+export async function unpaidCharges(owner: string | string[]): Promise<UnpaidCharge[]> {
   return query<UnpaidCharge>(
     `select ch.id, s.held_on::text, g.id as group_id, g.title as group_title, g.kind,
             ch.amount::text, ch.currency,
@@ -659,7 +668,7 @@ export async function unpaidCharges(ownerId: string): Promise<UnpaidCharge[]> {
             exists (
               select 1 from payments pay
                where pay.provider = 'cash' and pay.status = 'pending'
-                 and pay.purpose = 'studio_debt' and pay.user_id = ch.owner_id
+                 and pay.purpose = 'studio_debt'
                  and pay.raw -> 'charge_ids' ? ch.id::text
             ) as declared
        from charges ch
@@ -668,9 +677,9 @@ export async function unpaidCharges(ownerId: string): Promise<UnpaidCharge[]> {
        join participants p on p.id = ch.participant_id
        left join children c on c.id = p.child_id
        left join users u on u.id = p.user_id
-      where ch.owner_id = $1 and ch.pass_id is null and ch.payment_id is null
+      where ch.owner_id = any($1::uuid[]) and ch.pass_id is null and ch.payment_id is null
       order by s.held_on`,
-    [ownerId],
+    [[owner].flat()],
   );
 }
 
@@ -1904,7 +1913,9 @@ export type ExtendOffer = {
  * у которых задана цена докупаемого дня и нет пакета побольше: пока он
  * есть, дешевле купить его.
  */
-export async function extendOffer(passId: string, ownerId?: string): Promise<ExtendOffer | null> {
+export async function extendOffer(
+  passId: string, owner?: string | string[],
+): Promise<ExtendOffer | null> {
   const row = await one<{
     owner_id: string; title: string; price: string; max_days: number;
   }>(
@@ -1913,13 +1924,13 @@ export async function extendOffer(passId: string, ownerId?: string): Promise<Ext
        from passes p
        join studio_groups g on g.id = p.group_id
       where p.id = $1
-        and ($2::uuid is null or p.owner_id = $2::uuid)
+        and ($2::uuid[] is null or p.owner_id = any($2::uuid[]))
         and g.kind <> 'lesson' and g.active and g.extra_price is not null
         and ${PACK_OPEN}
         and (p.valid_to is null or p.valid_to >= current_date - 30)
         and p.lessons_total >= coalesce((
               select max((o->>'lessons')::int) from jsonb_array_elements(g.pass_offers) o), 0)`,
-    [passId, ownerId ?? null],
+    [passId, owner === undefined ? null : [owner].flat()],
   );
   if (!row || row.max_days < 1) return null;
   return {
@@ -2174,6 +2185,8 @@ export type Family = {
   participant_id: string | null;
   name: string | null;
   billing_name: string | null;
+  /** Квитанции семьи выписываются на него. В семье это кто-то один. */
+  receipts: boolean;
   telegram: string | null;
   phone: string | null;
   email: string;
@@ -2293,7 +2306,8 @@ export async function bookableAdults(): Promise<BookableAdult[]> {
 /** Все взрослые с детьми и составом групп. */
 export async function families(): Promise<Family[]> {
   const rows = await query<Family>(
-    `select u.id as user_id, u.name, u.billing_name, u.telegram, u.phone, u.email, u.attends,
+    `select u.id as user_id, u.name, u.billing_name, u.receipts,
+            u.telegram, u.phone, u.email, u.attends,
             (select p.id from participants p where p.user_id = u.id) as participant_id,
             coalesce((select array_agg(r.role order by r.role) from user_roles r
                        where r.user_id = u.id), '{}') as roles,

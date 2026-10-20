@@ -84,13 +84,18 @@ function what(p: Unbilled): string {
  */
 function rowsOf(p: Unbilled): PickerRow[] {
   // Та же подпись, по которой платежи складываются в одну бумагу на
-  // сервере: плательщик, валюта и способ, каким iCount знает оплату.
+  // сервере: получатель бумаги, валюта и способ, каким iCount знает
+  // оплату. Получатель, а не плательщик: в семье платить могут оба, а
+  // квитанция у них одна.
   const way = p.pay_method
     ?? (p.provider === 'transfer' ? 'transfer' : p.provider === 'cash' ? 'cash' : 'cc');
   const common = {
     pay: p.id,
-    group: `${p.owner_id}|${p.currency}|${way}`,
-    who: p.who,
+    group: `${p.bill_to ?? p.owner_id}|${p.currency}|${way}`,
+    // Платил один родитель, бумага уходит другому — это надо видеть.
+    who: p.bill_name && p.bill_to !== p.owner_id
+      ? `${p.who} · чек на ${p.bill_name}`
+      : p.who,
     how: how(p),
     declined: p.declined,
   };

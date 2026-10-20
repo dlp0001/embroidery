@@ -7,6 +7,7 @@ import {
 } from './icount';
 import { logMoneyIn } from './ledger';
 import { createPaymentLink, fetchTransaction, isConfigured } from './payplus';
+import { familyOwners } from './family';
 import { coverCampDays, extendOffer, lessonPrice, saleOffers } from './studio';
 
 export type Intent =
@@ -58,15 +59,15 @@ export async function startPayment(
     const picked = intent.chargeIds?.length ? intent.chargeIds : null;
     const debts = await query<{ id: string; amount: string }>(
       `select ch.id, ch.amount::text from charges ch
-        where ch.owner_id = $1 and ch.pass_id is null and ch.payment_id is null
+        where ch.owner_id = any($1::uuid[]) and ch.pass_id is null and ch.payment_id is null
           and ($2::uuid[] is null or ch.id = any($2::uuid[]))
           and not exists (
             select 1 from payments pay
              where pay.provider = 'cash' and pay.status = 'pending'
-               and pay.purpose = 'studio_debt' and pay.user_id = ch.owner_id
+               and pay.purpose = 'studio_debt'
                and pay.raw -> 'charge_ids' ? ch.id::text)
         order by ch.created_at`,
-      [user.id, picked],
+      [await familyOwners(user.id), picked],
     );
     if (debts.length === 0) return { error: 'Нечего оплачивать.' };
     amount = debts.reduce((s, c) => s + Number(c.amount), 0);
@@ -75,7 +76,7 @@ export async function startPayment(
   } else if (intent.kind === 'extend') {
     // Цену берём у смены, а не с экрана: на экране её мог поправить кто
     // угодно, а платить человек должен ровно столько, сколько стоит день.
-    const offer = await extendOffer(intent.passId, user.id);
+    const offer = await extendOffer(intent.passId, await familyOwners(user.id));
     if (!offer) return { error: 'Этот пакет продлить нельзя.' };
     if (intent.days < 1 || intent.days > offer.maxDays) {
       return { error: 'Столько дней в смене уже не осталось.' };
@@ -321,6 +322,8 @@ type ToBill = {
   id: string; provider: string; amount: string; currency: string; purpose: string | null;
   raw: Record<string, unknown> | null; user_id: string; email: string;
   name: string | null; billing_name: string | null;
+  /** На кого выписывать: держатель метки в семье, иначе сам плательщик. */
+  bill_to: string;
 };
 
 /** Чем закрыт платёж с точки зрения квитанции. */
@@ -423,8 +426,18 @@ async function receiptItems(p: ToBill): Promise<ReceiptItem[]> {
 }
 
 const UNBILLED = `select p.id, p.provider, p.amount::text, p.currency, p.purpose, p.raw,
-            u.id as user_id, u.name, u.billing_name, u.email
-       from payments p join users u on u.id = p.user_id
+            p.user_id, b.id as bill_to, b.name, b.billing_name, b.email
+       from payments p
+       /* Квитанцию выписываем не на плательщика, а на того, у кого в
+          семье метка «чеки»: платить вправе оба родителя, а в
+          отчётности семья должна быть одним человеком. Метки нет ни у
+          кого — бумага идёт плательщику, как было до второго родителя. */
+       join users b on b.id = coalesce((
+             select h.id from guardians mine
+               join guardians theirs on theirs.child_id = mine.child_id
+               join users h on h.id = theirs.user_id
+              where mine.user_id = p.user_id and h.receipts
+              order by h.created_at, h.id limit 1), p.user_id)
       where p.status = 'paid' and p.invoice_url is null and p.raw -> 'receipt' is null
         /* Подарок закрыт нулевым платежом: чек на ноль не выписывают. */
         and p.provider <> 'gift'
@@ -494,7 +507,7 @@ async function issueOne(group: ToBill[], card?: Card | null): Promise<boolean> {
   try {
     const doc = await createReceipt({
       paymentId: head.id,
-      userId: head.user_id,
+      userId: head.bill_to,
       // В квитанции человек назван так, как его завёл админ: имена в
       // отчётности должны сходиться между собой, а не с кабинетом.
       customerName: head.billing_name ?? head.name ?? head.email,
@@ -558,7 +571,7 @@ export async function issueReceiptFor(ids: string[], limit = 10): Promise<Issued
 
   const groups = new Map<string, ToBill[]>();
   for (const p of rows) {
-    const key = `${p.user_id}|${p.currency}|${methodKey(p)}`;
+    const key = `${p.bill_to}|${p.currency}|${methodKey(p)}`;
     groups.set(key, [...(groups.get(key) ?? []), p]);
   }
 
@@ -666,15 +679,15 @@ export async function declareCash(
   const picked = chargeIds.length ? chargeIds : null;
   const debts = await query<{ id: string; amount: string; currency: string }>(
     `select ch.id, ch.amount::text, ch.currency from charges ch
-      where ch.owner_id = $1 and ch.pass_id is null and ch.payment_id is null
+      where ch.owner_id = any($1::uuid[]) and ch.pass_id is null and ch.payment_id is null
         and ($2::uuid[] is null or ch.id = any($2::uuid[]))
         and not exists (
           select 1 from payments pay
            where pay.provider = 'cash' and pay.status = 'pending'
-             and pay.purpose = 'studio_debt' and pay.user_id = ch.owner_id
+             and pay.purpose = 'studio_debt'
              and pay.raw -> 'charge_ids' ? ch.id::text)
       order by ch.created_at`,
-    [user.id, picked],
+    [await familyOwners(user.id), picked],
   );
   if (debts.length === 0) return { error: 'Нечего оплачивать.' };
 
@@ -797,7 +810,7 @@ export async function takeCash(
           and not exists (
             select 1 from payments pay
              where pay.provider = 'cash' and pay.status = 'pending'
-               and pay.purpose = 'studio_debt' and pay.user_id = ch.owner_id
+               and pay.purpose = 'studio_debt'
                and pay.raw -> 'charge_ids' ? ch.id::text)
         order by ch.created_at
         for update of ch`,

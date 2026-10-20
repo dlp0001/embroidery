@@ -2,6 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { takenBetween } from './billing';
 import { sales as courseSales, type Sales } from './course-admin';
 import { one, query, tx } from './db';
+import { familyOwners } from './family';
 import {
   cents, dayMonth, daysUntil, eventClosed, hhmm, money, nowHM, plural, plusDays, todayISO,
   weekdayDayMonth,
@@ -950,9 +951,10 @@ export async function moneyMonthView(name: string | null): Promise<View> {
  * только в кабинете, и половина этого в боте превратилась бы в лабиринт.
  */
 export async function payView(userId: string, origin: string): Promise<string> {
+  const family = await familyOwners(userId);
   const [unpaid, passes] = await Promise.all([
-    unpaidCharges(userId),
-    passBalances(userId),
+    unpaidCharges(family),
+    passBalances(family),
   ]);
 
   const lines: string[] = [];

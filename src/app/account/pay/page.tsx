@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { familyOwners } from '@/lib/family';
 import { requireParent } from '@/lib/session';
 import {
   PASS_WARN_DAYS, lessonPrice, passBalances, saleOffers, unpaidCharges,
@@ -26,6 +27,8 @@ export default async function PayPage({
   const user = await requireParent();
   const { error, cash, way } = await searchParams;
   const online = isConfigured();
+  // Долги и абонементы — семейные: платить вправе любой из родителей.
+  const family = await familyOwners(user.id);
   // Всё разом, а не по очереди. Дольше всех обычно проверка зависших
   // платежей: она спрашивает про каждый у PayPlus, по сети. Раньше страница
   // ждала сначала её, потом всё остальное, и складывала одно с другим.
@@ -36,8 +39,8 @@ export default async function PayPage({
     myPendingCash(user.id),
     paymentHistory(user.id),
     unfinishedPayments(user.id),
-    unpaidCharges(user.id),
-    passBalances(user.id),
+    unpaidCharges(family),
+    passBalances(family),
     lessonPrice(),
     saleOffers(),
   ]);
@@ -46,7 +49,7 @@ export default async function PayPage({
   // прочитанные с ней заодно, уже устарели и их надо взять заново.
   const [history, unpaid, passes, started] = check.paid > 0
     ? await Promise.all([
-        paymentHistory(user.id), unpaidCharges(user.id), passBalances(user.id),
+        paymentHistory(user.id), unpaidCharges(family), passBalances(family),
         unfinishedPayments(user.id),
       ])
     : [history0, unpaid0, passes0, started0];

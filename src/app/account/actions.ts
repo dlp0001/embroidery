@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type { SaveResult } from '@/components/AutoSave';
 import { one } from '@/lib/db';
+import { inviteUrl, takeReceipts } from '@/lib/family';
+import { siteOrigin } from '@/lib/site';
 import { phoneNumber, telegramNick } from '@/lib/format';
 import { onlyLooking, requireUser } from '@/lib/session';
 import { linkUrl, unlinkUser } from '@/lib/telegram';
@@ -128,6 +130,26 @@ export async function updateChild(formData: FormData): Promise<SaveResult> {
  * четверть часа, показывать её на странице, чтобы человек скопировал
  * руками, незачем.
  */
+/**
+ * Ссылка-приглашение второму родителю. Отдаём её в ответ, а не через
+ * адрес страницы: в адресной строке она осталась бы в истории браузера
+ * и на снимках экрана, а за ней — чужой кабинет.
+ */
+export async function inviteSecondParent(): Promise<{ url?: string; error?: string }> {
+  if (await onlyLooking()) return { error: 'Это чужой кабинет: отсюда только смотрят.' };
+  const user = await requireUser();
+  const url = await inviteUrl(user.id, await siteOrigin());
+  return { url };
+}
+
+/** Кому в семье выписывать квитанции. Метку держит кто-то один. */
+export async function setReceiptsHolder(formData: FormData): Promise<void> {
+  if (await onlyLooking()) return;
+  const user = await requireUser();
+  await takeReceipts(user.id, String(formData.get('userId') ?? ''));
+  refresh();
+}
+
 export async function connectTelegram(): Promise<void> {
   // Из чужого кабинета бот привязался бы к чужому человеку.
   if (await onlyLooking()) return;

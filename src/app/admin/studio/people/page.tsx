@@ -178,6 +178,12 @@ export default async function PeoplePage({
                 <input id={`bill-${f.user_id}`} name="billingName" maxLength={120}
                        defaultValue={f.billing_name ?? ''} placeholder="не задано"
                        style={{ ...inline, font: 'inherit', color: 'inherit' }} />
+                {/* Квитанции семьи идут на одного из родителей. Если не на
+                    этого — имя тут ни на что не влияет, и лучше это видеть
+                    сразу, чем искать, почему в бумаге другое имя. */}
+                {!f.receipts && f.children.some((ch) => ch.parents.length > 0) && (
+                  <span className="hint">чеки выписываются на второго родителя</span>
+                )}
               </div>
               <div className="sub" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
                 <label htmlFor={`tel-${f.user_id}`}>Телефон:</label>

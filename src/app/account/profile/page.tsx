@@ -1,10 +1,14 @@
 import { requireParent } from '@/lib/session';
+import { billTo, coParents } from '@/lib/family';
 import { archivedChildren, familyWithDays } from '@/lib/studio';
 import AutoSave from '@/components/AutoSave';
+import SecondParent from '@/components/SecondParent';
 import SelfCard from '@/components/SelfCard';
 import Toggles from '@/components/Toggles';
 import { chatOfUser } from '@/lib/telegram';
-import { createChild, togglePreferredDay, updateChild } from '../actions';
+import {
+  createChild, inviteSecondParent, setReceiptsHolder, togglePreferredDay, updateChild,
+} from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,10 +27,12 @@ export default async function ProfilePage(
   { searchParams }: { searchParams: Promise<{ tg?: string }> },
 ) {
   const user = await requireParent();
-  const [family, hidden, chat, params] = await Promise.all([
+  const [family, hidden, chat, others, holder, params] = await Promise.all([
     familyWithDays(user.id),
     archivedChildren(user.id),
     chatOfUser(user.id),
+    coParents(user.id),
+    billTo(user.id),
     searchParams,
   ]);
   // Своя карточка есть всегда, даже если взрослый сам на занятия не ходит
@@ -89,6 +95,14 @@ export default async function ProfilePage(
             </div>
           </div>
         ))}
+
+        <SecondParent
+          me={{ id: user.id, name: user.name ?? user.email }}
+          others={others}
+          holder={holder}
+          invite={inviteSecondParent}
+          pick={setReceiptsHolder}
+        />
 
         <div className="card" style={{ borderStyle: 'dashed' }}>
           <div className="what" style={{ marginBottom: 14 }}>Добавить ребёнка</div>
