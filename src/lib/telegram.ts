@@ -1457,7 +1457,7 @@ const DOC_WORD: Record<string, string> = {
 export function receiptCard(
   id: string,
   e: ReceiptCard & { doc_type?: string | null },
-  groups: { id: string; title: string }[],
+  groups: { id: string; title: string; slug?: string | null }[],
   split?: { parts: { kind: string; sum: number }[]; sum: number },
 ): View {
   const sum = e.amount
@@ -1489,16 +1489,23 @@ export function receiptCard(
     lines.push('', esc(e.what));
   }
 
-  lines.push('', 'К какой статье отнести?');
+  lines.push('', 'К какой статье отнести весь чек?');
 
-  // По две в ряд: названия длинные, в три кнопки строка не влезает.
+  // Статью, которой в чеке больше всего, ставим первой и одну в ряд: чаще
+  // всего нажмут именно её, и выбирать из шести ради этого незачем.
+  const top = split?.parts[0]?.kind ?? null;
+  const guessed = top ? groups.find((g) => g.slug === top) ?? null : null;
+  const rest = groups.filter((g) => g !== guessed);
+
+  const button = (g: { id: string; title: string }) => ({
+    text: g.title,
+    callback_data: `e${packId(id)}.${packId(g.id)}`,
+  });
+
   const keyboard: Keyboard = [];
-  for (let i = 0; i < groups.length; i += 2) {
-    keyboard.push(groups.slice(i, i + 2).map((g) => ({
-      text: g.title,
-      callback_data: `e${packId(id)}.${packId(g.id)}`,
-    })));
-  }
+  if (guessed) keyboard.push([button(guessed)]);
+  // Остальные по две в ряд: названия длинные, в три кнопки строка не влезает.
+  for (let i = 0; i < rest.length; i += 2) keyboard.push(rest.slice(i, i + 2).map(button));
   keyboard.push([{ text: 'Не проводить', callback_data: `ed${packId(id)}` }]);
 
   return { text: lines.join('\n'), keyboard, html: true };

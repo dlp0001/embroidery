@@ -10,11 +10,17 @@ import type { Item, Scanned } from './vision';
  * они под отчётность. Каждая наша группа знает, во что превращается там.
  */
 
-export type Kind = { id: string; title: string; icount_type: number };
+export type Kind = {
+  id: string;
+  title: string;
+  icount_type: number;
+  /** Постоянное имя: на нём говорит модель, разбирая строки чека. */
+  slug: string | null;
+};
 
 export async function kinds(): Promise<Kind[]> {
   return query<Kind>(
-    `select id, title, icount_type from expense_kinds
+    `select id, title, icount_type, slug from expense_kinds
       where active order by sort, title`,
   );
 }
