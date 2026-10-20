@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useTransition } from 'react';
 import InviteLink from '@/components/InviteLink';
+import PickOne from '@/components/PickOne';
 
 export type Parent = { id: string; name: string };
 
@@ -24,19 +24,6 @@ export default function SecondParent({
   invite: (form: FormData) => Promise<{ url?: string; error?: string }>;
   pick: (form: FormData) => Promise<void>;
 }) {
-  const [pending, start] = useTransition();
-  const [on, setOn] = useState(holder);
-
-  function choose(id: string): void {
-    if (id === on) return;
-    start(async () => {
-      setOn(id);
-      const form = new FormData();
-      form.append('userId', id);
-      await pick(form);
-    });
-  }
-
   const family = [me, ...others];
 
   return (
@@ -56,20 +43,14 @@ export default function SecondParent({
           </p>
 
           <div className="lbl" style={{ margin: '16px 0 0' }}>Квитанции выписывать на</div>
-          <div className="days" style={{ marginTop: 8 }}>
-            {family.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className={on === p.id ? 'day-on' : 'day'}
-                aria-pressed={on === p.id}
-                disabled={pending}
-                onClick={() => choose(p.id)}
-                style={{ minWidth: 0, padding: '0 18px' }}
-              >
-                {p.id === me.id ? 'На меня' : p.name}
-              </button>
-            ))}
+          <div style={{ marginTop: 8 }}>
+            <PickOne
+              items={family.map((p) => ({ id: p.id, label: p.id === me.id ? 'На меня' : p.name }))}
+              value={holder}
+              action={pick}
+              field="userId"
+              label="Квитанции выписывать на"
+            />
           </div>
           <p className="hint" style={{ marginTop: 10 }}>
             Имя в квитанции одно на семью, кто бы из вас ни заплатил: иначе

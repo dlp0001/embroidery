@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { phoneNumber, plural, telegramNick } from '@/lib/format';
-import { inviteUrl } from '@/lib/family';
+import { inviteUrl, takeReceipts } from '@/lib/family';
 import { isAdmin, onlyLooking, requireUser } from '@/lib/session';
 import { siteOrigin } from '@/lib/site';
 import {
@@ -69,6 +69,21 @@ export async function inviteSecondParentAction(
   const userId = text(form, 'userId', 40);
   if (!UUID.test(userId)) return { error: 'Непонятно, в какую семью приглашать.' };
   return { url: await inviteUrl(userId, await siteOrigin()) };
+}
+
+/**
+ * Передать метку квитанций другому родителю этой семьи. Родитель умеет
+ * это сам в профиле, но спрашивают об этом Варю, и по телефону проще
+ * сделать, чем объяснить.
+ */
+export async function setReceiptsAction(form: FormData): Promise<void> {
+  await requireAdmin();
+  const familyId = text(form, 'familyId', 40);
+  const targetId = text(form, 'targetId', 40);
+  if (!UUID.test(familyId) || !UUID.test(targetId)) return;
+  // takeReceipts сам откажет, если это родитель из другой семьи.
+  await takeReceipts(familyId, targetId);
+  refresh();
 }
 
 export async function renameUserAction(form: FormData): Promise<void> {

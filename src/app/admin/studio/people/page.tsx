@@ -1,13 +1,14 @@
 import { isAdmin, requireTeacher } from '@/lib/session';
-import { families, orphanChildren, peopleCount } from '@/lib/studio';
+import { families, orphanChildren, peopleCount, type Family } from '@/lib/studio';
 import { dayMonth, plural } from '@/lib/format';
 import FamilyCard from '@/components/FamilyCard';
 import InviteLink from '@/components/InviteLink';
+import PickOne from '@/components/PickOne';
 import Toggles from '@/components/Toggles';
 import {
   addChildAction, createParentAction, hideChildAction, inviteSecondParentAction,
   linkChildAction, renameChildAction, renameUserAction, restoreChildAction,
-  toggleDayAction, unlinkChildAction,
+  setReceiptsAction, toggleDayAction, unlinkChildAction,
 } from '@/app/admin/people-actions';
 
 export const dynamic = 'force-dynamic';
@@ -29,6 +30,20 @@ function DayRow({ participantId, days }: { participantId: string | null; days: n
       />
     </>
   );
+}
+
+/**
+ * Взрослые одной семьи: сам родитель и те, с кем у него общие дети.
+ * Второго родителя база держит при ребёнке, а метку квитанций — при
+ * человеке, поэтому список собираем здесь, из уже прочитанного.
+ */
+function kin(f: Family): { id: string; name: string; receipts: boolean }[] {
+  const seen = new Map<string, { id: string; name: string; receipts: boolean }>();
+  seen.set(f.user_id, { id: f.user_id, name: f.name ?? f.email, receipts: f.receipts });
+  for (const ch of f.children) {
+    for (const p of ch.parents) if (!seen.has(p.id)) seen.set(p.id, p);
+  }
+  return [...seen.values()];
 }
 
 const inline: React.CSSProperties = {
@@ -158,7 +173,9 @@ export default async function PeoplePage({
           </div>
         )}
 
-        {list.map((f) => (
+        {list.map((f) => {
+        const adults = kin(f);
+        return (
           <FamilyCard
             key={f.user_id}
             name={f.name ?? f.email}
@@ -179,12 +196,6 @@ export default async function PeoplePage({
                 <input id={`bill-${f.user_id}`} name="billingName" maxLength={120}
                        defaultValue={f.billing_name ?? ''} placeholder="не задано"
                        style={{ ...inline, font: 'inherit', color: 'inherit' }} />
-                {/* Квитанции семьи идут на одного из родителей. Если не на
-                    этого — имя тут ни на что не влияет, и лучше это видеть
-                    сразу, чем искать, почему в бумаге другое имя. */}
-                {!f.receipts && f.children.some((ch) => ch.parents.length > 0) && (
-                  <span className="hint">чеки выписываются на второго родителя</span>
-                )}
               </div>
               <div className="sub" style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
                 <label htmlFor={`tel-${f.user_id}`}>Телефон:</label>
@@ -204,6 +215,27 @@ export default async function PeoplePage({
                 )}
               </div>
             </form>
+
+            {/* Квитанции семьи идут на одного родителя, и его же имя — в
+                отчётности. Пока взрослый один, выбирать не из чего. */}
+            {adults.length > 1 && (
+              <>
+                <div className="lbl" style={{ margin: '16px 0 0' }}>Квитанции на</div>
+                <div style={{ marginTop: 8 }}>
+                  <PickOne
+                    items={adults.map((p) => ({ id: p.id, label: p.name }))}
+                    value={adults.find((p) => p.receipts)?.id ?? f.user_id}
+                    action={setReceiptsAction}
+                    fields={{ familyId: f.user_id }}
+                    label="Квитанции выписывать на"
+                  />
+                </div>
+                <p className="hint" style={{ marginTop: 8 }}>
+                  Бумага одна на семью, кто бы из родителей ни заплатил, и
+                  уходит на почту выбранного. Имя для квитанции берётся его.
+                </p>
+              </>
+            )}
 
             {f.attends ? (
               <>
@@ -295,7 +327,8 @@ export default async function PeoplePage({
               <button className="btn-quiet" type="submit">Добавить</button>
             </form>
           </FamilyCard>
-        ))}
+        );
+        })}
 
         {list.length === 0 && <p className="hint" style={{ marginTop: 20 }}>Пока никого нет.</p>}
 

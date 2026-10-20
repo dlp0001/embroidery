@@ -2177,7 +2177,7 @@ export type FamilyChild = {
   days: number[];
   archived: boolean;
   /** Другие взрослые, к которым привязан этот же ребёнок. */
-  parents: { id: string; name: string }[];
+  parents: { id: string; name: string; receipts: boolean }[];
 };
 
 export type Family = {
@@ -2328,7 +2328,8 @@ export async function families(): Promise<Family[]> {
                           двух записей одного ребёнка — и тогда лишнего видно. */
                        'parents', coalesce((select json_agg(json_build_object(
                                                      'id', gu.id,
-                                                     'name', coalesce(gu.name, gu.email))
+                                                     'name', coalesce(gu.name, gu.email),
+                                                     'receipts', gu.receipts)
                                                    order by coalesce(gu.name, gu.email))
                                               from guardians g2
                                               join users gu on gu.id = g2.user_id
