@@ -2,11 +2,12 @@ import { isAdmin, requireTeacher } from '@/lib/session';
 import { families, orphanChildren, peopleCount } from '@/lib/studio';
 import { dayMonth, plural } from '@/lib/format';
 import FamilyCard from '@/components/FamilyCard';
+import InviteLink from '@/components/InviteLink';
 import Toggles from '@/components/Toggles';
 import {
-  addChildAction, createParentAction, hideChildAction, linkChildAction,
-  renameChildAction, renameUserAction, restoreChildAction, toggleDayAction,
-  unlinkChildAction,
+  addChildAction, createParentAction, hideChildAction, inviteSecondParentAction,
+  linkChildAction, renameChildAction, renameUserAction, restoreChildAction,
+  toggleDayAction, unlinkChildAction,
 } from '@/app/admin/people-actions';
 
 export const dynamic = 'force-dynamic';
@@ -274,6 +275,16 @@ export default async function PeoplePage({
                 )}
               </div>
             ))}
+
+            {/* Второго родителя звать удобнее отсюда: с родителями
+                разговаривает Варя. Ссылка — на эту семью. */}
+            <InviteLink
+              invite={inviteSecondParentAction}
+              userId={f.user_id}
+              label="Пригласить второго родителя"
+              hint="Отправьте её родителю. Годна неделю, один раз."
+              style={{ marginTop: 18 }}
+            />
 
             <form action={addChildAction} style={{ display: 'flex', gap: 10, alignItems: 'flex-end', marginTop: 16 }}>
               <input type="hidden" name="userId" value={f.user_id} />

@@ -3,7 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { phoneNumber, plural, telegramNick } from '@/lib/format';
+import { inviteUrl } from '@/lib/family';
 import { isAdmin, onlyLooking, requireUser } from '@/lib/session';
+import { siteOrigin } from '@/lib/site';
 import {
   addChildTo, createParent, hideChild, linkChild, mergeChildren, renameChildById,
   restoreChild, saveParent, setPreferredDay, unlinkChild,
@@ -25,6 +27,8 @@ function refresh(): void {
   revalidatePath('/account');
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const text = (form: FormData, key: string, max = 120) =>
   String(form.get(key) ?? '').trim().slice(0, max);
 
@@ -44,6 +48,27 @@ export async function createParentAction(form: FormData): Promise<void> {
   await createParent(email, name, tg.nick);
   refresh();
   redirect('/admin/studio/people');
+}
+
+/**
+ * Ссылка второму родителю этой семьи. Кнопка есть и у родителя в
+ * профиле, но с родителями разговаривает Варя: объяснять по телефону,
+ * где в профиле искать, — лишний круг.
+ *
+ * Ссылка привязана к выбранной семье, а не к тому, кто её выдал: по ней
+ * человек становится опекуном детей этого родителя, а не Вариных.
+ */
+export async function inviteSecondParentAction(
+  form: FormData,
+): Promise<{ url?: string; error?: string }> {
+  try {
+    await requireAdmin();
+  } catch {
+    return { error: 'Приглашения заводит админ.' };
+  }
+  const userId = text(form, 'userId', 40);
+  if (!UUID.test(userId)) return { error: 'Непонятно, в какую семью приглашать.' };
+  return { url: await inviteUrl(userId, await siteOrigin()) };
 }
 
 export async function renameUserAction(form: FormData): Promise<void> {
