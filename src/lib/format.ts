@@ -192,3 +192,18 @@ export const WAYS: PayMethod[] = ['cash', 'bit', 'paybox', 'transfer'];
  * оплаченное битом в «Оплатах», оплаченным картой и не давал его тронуть.
  */
 export const BY_STUDIO = 'cash';
+
+/**
+ * Деньги с агорот. Студийные суммы круглые, и копейки там только мешают,
+ * а чек из магазина — нет: в нём 320.60, и округление до шекеля в отчёте
+ * о расходах превращается в копеечное враньё, которое потом не сходится
+ * с выпиской.
+ */
+export function cents(amount: string | number, currency = 'ILS'): string {
+  const n = Number(amount);
+  const sign = currency === 'ILS' ? '₪' : currency;
+  const digits = n.toLocaleString('ru-RU', {
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+  }).replace(/ /g, ' ');
+  return `${digits} ${sign}`;
+}

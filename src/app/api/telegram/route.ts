@@ -1,6 +1,8 @@
+import { after } from 'next/server';
 import { confirmCash, declineCash } from '@/lib/billing';
 import {
-  dropExpenseRow, kinds, pushExpense, rememberCard, saveReceipt, setKind, expenseById,
+  applyScan, dropExpenseRow, kinds, pushExpense, rememberCard, saveReceipt, setKind,
+  splitOf, expenseById,
 } from '@/lib/expenses';
 import { isConfigured as visionReady, readReceipt } from '@/lib/vision';
 import { cashConfirmed, cashDeclined, claimCard, claimOf } from '@/lib/notify';
@@ -12,7 +14,9 @@ import {
 } from '@/lib/telegram';
 
 export const runtime = 'nodejs';
-export const maxDuration = 10;
+/* Чек читается моделью полминуты, и эта работа идёт после ответа
+   телеграму — но внутри того же вызова, поэтому срок нужен с запасом. */
+export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
 /**
@@ -171,6 +175,10 @@ async function onPhoto(
     await send(chatId, 'Картинки я пока не понимаю. Напишите словами — передам в студию.');
     return;
   }
+  if (!visionReady()) {
+    await send(chatId, 'Распознавание не подключено: нет ключа к модели.');
+    return;
+  }
 
   const fileId = pickPhoto(sizes);
   const photo = fileId ? await fileBytes(fileId) : null;
@@ -179,35 +187,37 @@ async function onPhoto(
     return;
   }
 
-  if (!visionReady()) {
-    await send(chatId, 'Распознавание не подключено: нет ключа к модели.');
-    return;
-  }
+  // Снимок в базу сразу: читается он полминуты, и всё это время терять
+  // фотографию нельзя. Дальше отвечаем телеграму, не дожидаясь модели, —
+  // иначе он сочтёт вызов неудачным и пришлёт тот же чек заново.
+  const id = await saveReceipt({ photo, photoType: 'image/jpeg', userId: user.id, chatId });
+  const waiting = await sendAndGetId(chatId, 'Читаю чек…');
+  if (waiting) await rememberCard(id, waiting);
 
-  const read = await readReceipt(photo);
-  const id = await saveReceipt({
-    photo,
-    photoType: 'image/jpeg',
-    userId: user.id,
-    chatId,
-    scan: read.ok ? read.data : null,
-    error: read.ok ? null : read.error,
+  after(async () => {
+    const read = await readReceipt(photo);
+    await applyScan(id, read.ok ? read.data : null, read.ok ? null : read.error);
+
+    if (!read.ok) {
+      const said = [
+        'Снимок сохранил, но прочитать не смог.',
+        '',
+        read.error,
+        '',
+        `Поля можно заполнить руками: ${origin}/admin/studio/costs`,
+      ].join('\n');
+      if (waiting) await editMessage(chatId, waiting, said);
+      else await send(chatId, said);
+      return;
+    }
+
+    const card = receiptCard(id, read.data, await kinds(), await splitOf(id));
+    if (waiting) await editMessage(chatId, waiting, card.text, card.keyboard, card.html);
+    else {
+      const messageId = await sendAndGetId(chatId, card.text, card.keyboard, card.html);
+      if (messageId) await rememberCard(id, messageId);
+    }
   });
-
-  if (!read.ok) {
-    await send(chatId, [
-      'Снимок сохранил, но прочитать не смог.',
-      '',
-      read.error,
-      '',
-      `Поля можно заполнить руками: ${origin}/admin/studio/costs`,
-    ].join('\n'));
-    return;
-  }
-
-  const card = receiptCard(id, { ...read.data, doc_type: read.data.doc_type }, await kinds());
-  const messageId = await sendAndGetId(chatId, card.text, card.keyboard, card.html);
-  if (messageId) await rememberCard(id, messageId);
 }
 
 /** Что бот умеет. Разное у родителя и у преподавателя. */

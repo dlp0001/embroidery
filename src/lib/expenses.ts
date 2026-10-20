@@ -1,6 +1,6 @@
 import { one, query } from './db';
 import { addSupplier, createExpense, suppliers } from './icount';
-import type { Scanned } from './vision';
+import type { Item, Scanned } from './vision';
 
 /**
  * Расходы студии: снимок чека, разобранные поля и своя структура затрат.
@@ -54,31 +54,95 @@ export async function expenseById(id: string): Promise<Expense | null> {
   );
 }
 
-/** Кладёт снимок и то, что из него прочитали. Дальше его смотрит человек. */
+/**
+ * Кладёт снимок. Разбор приезжает следом, отдельным ходом: читается чек
+ * полминуты, а потерять фотографию, пока модель думает, нельзя.
+ */
 export async function saveReceipt(input: {
   photo: Buffer;
   photoType: string;
   userId: string | null;
   chatId: number;
-  scan: Scanned | null;
-  error?: string | null;
 }): Promise<string> {
-  const s = input.scan;
   const row = await one<{ id: string }>(
-    `insert into expenses
-       (photo, photo_type, supplier, supplier_vat, doc_type, doc_number,
-        spent_on, amount, vat, currency, user_id, chat_id, raw)
-     values ($1, $2, $3, $4, $5, $6, $7::date, $8, $9, $10, $11, $12, $13::jsonb)
-     returning id`,
-    [
-      input.photo, input.photoType,
-      s?.supplier ?? null, s?.supplier_vat ?? null, s?.doc_type ?? null, s?.doc_number ?? null,
-      s?.spent_on ?? null, s?.amount ?? null, s?.vat ?? null, s?.currency ?? 'ILS',
-      input.userId, input.chatId,
-      JSON.stringify({ ...(s ?? {}), ...(input.error ? { error: input.error } : {}) }),
-    ],
+    `insert into expenses (photo, photo_type, user_id, chat_id)
+     values ($1, $2, $3, $4) returning id`,
+    [input.photo, input.photoType, input.userId, input.chatId],
   );
   return row!.id;
+}
+
+/** Записывает прочитанное: шапку в колонки, строки чека своей таблицей. */
+export async function applyScan(
+  id: string, scan: Scanned | null, error?: string | null,
+): Promise<void> {
+  await query(
+    `update expenses set supplier = $2, supplier_vat = $3, doc_type = $4,
+            doc_number = $5, spent_on = $6::date, amount = $7, vat = $8,
+            currency = coalesce($9, currency), raw = $10::jsonb
+      where id = $1`,
+    [
+      id, scan?.supplier ?? null, scan?.supplier_vat ?? null, scan?.doc_type ?? null,
+      scan?.doc_number ?? null, scan?.spent_on ?? null, scan?.amount ?? null,
+      scan?.vat ?? null, scan?.currency ?? null,
+      JSON.stringify({ ...(scan ?? {}), ...(error ? { error } : {}) }),
+    ],
+  );
+  if (!scan?.items?.length) return;
+
+  // Перечитали — значит, прежние строки неверны: кладём заново.
+  await query('delete from expense_items where expense_id = $1', [id]);
+  const params: unknown[] = [id];
+  const rows: string[] = [];
+  scan.items.forEach((it, i) => {
+    const at = params.length;
+    params.push(i + 1, it.sku, it.name, it.qty, it.price, it.sum, it.kind);
+    rows.push(`($1, $${at + 1}, $${at + 2}, $${at + 3}, $${at + 4}, $${at + 5}, $${at + 6}, $${at + 7})`);
+  });
+  await query(
+    `insert into expense_items (expense_id, line_no, sku, name, qty, price, sum, kind_guess)
+     values ${rows.join(', ')}`,
+    params,
+  );
+}
+
+/** Строки чека по порядку печати. */
+export async function itemsOf(id: string): Promise<Item[]> {
+  const rows = await query<{
+    sku: string | null; name: string; qty: string | null;
+    price: string | null; sum: string | null; kind_guess: string | null;
+  }>(
+    `select sku, name, qty::text, price::text, sum::text, kind_guess
+       from expense_items where expense_id = $1 order by line_no`,
+    [id],
+  );
+  return rows.map((r) => ({
+    sku: r.sku,
+    name: r.name,
+    qty: r.qty === null ? null : Number(r.qty),
+    price: r.price === null ? null : Number(r.price),
+    sum: r.sum === null ? null : Number(r.sum),
+    kind: (r.kind_guess ?? 'other') as Item['kind'],
+  }));
+}
+
+export type Split = { kind: string; sum: number; n: number };
+
+/**
+ * Прикидка по группам: сколько из похода в магазин было материалами, а
+ * сколько едой. Считается по строкам, то есть по показаниям модели, —
+ * поэтому рядом всегда стоит, сошлись ли строки с итогом чека.
+ */
+export async function splitOf(id: string): Promise<{ parts: Split[]; sum: number }> {
+  const rows = await query<{ kind: string; sum: string; n: number }>(
+    `select coalesce(kind_guess, 'other') as kind,
+            coalesce(sum(sum), 0)::text as sum, count(*)::int as n
+       from expense_items where expense_id = $1
+      group by 1 order by sum(sum) desc nulls last`,
+    [id],
+  );
+  const parts = rows.map((r) => ({ kind: r.kind, sum: Number(r.sum), n: r.n }));
+  return { parts, sum: parts.reduce((s, p) => s + p.sum, 0) };
 }
 
 /** Запоминает, в каком сообщении висит карточка: её потом переписываем. */
@@ -204,4 +268,24 @@ export async function photoOf(id: string): Promise<{ bytes: Buffer; type: string
     'select photo, photo_type from expenses where id = $1', [id]);
   if (!row?.photo) return null;
   return { bytes: row.photo, type: row.photo_type ?? 'image/jpeg' };
+}
+
+/** Прикидка по группам сразу для списка чеков: по одному запросу на всех. */
+export async function splitsFor(ids: string[]): Promise<Map<string, Split[]>> {
+  if (ids.length === 0) return new Map();
+  const rows = await query<{ expense_id: string; kind: string; sum: string; n: number }>(
+    `select expense_id, coalesce(kind_guess, 'other') as kind,
+            coalesce(sum(sum), 0)::text as sum, count(*)::int as n
+       from expense_items where expense_id = any($1::uuid[])
+      group by 1, 2 order by sum(sum) desc nulls last`,
+    [ids],
+  );
+  const out = new Map<string, Split[]>();
+  for (const r of rows) {
+    out.set(r.expense_id, [
+      ...(out.get(r.expense_id) ?? []),
+      { kind: r.kind, sum: Number(r.sum), n: r.n },
+    ]);
+  }
+  return out;
 }

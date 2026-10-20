@@ -43,7 +43,30 @@ export type Scanned = {
   paid_by: string | null;
   /** Одной строкой: что купили. Нужно, чтобы выбрать группу затрат. */
   what: string | null;
+  /** Строки чека целиком: по ним потом собираются отчёты. */
+  items: Item[];
 };
+
+/**
+ * Строка чека. Группа — догадка модели, а не решение человека: она
+ * нужна, чтобы прикинуть, сколько из похода в магазин было материалами,
+ * а сколько едой.
+ */
+export type Item = {
+  sku: string | null;
+  name: string;
+  qty: number | null;
+  price: number | null;
+  sum: number | null;
+  kind: Guess;
+};
+
+/**
+ * Постоянные имена групп. Модель говорит на них, а не на названиях наших
+ * статей: статьи переименовывают, и разбор ломался бы каждый раз.
+ */
+export const GUESSES = ['materials', 'stationery', 'equipment', 'food', 'other'] as const;
+export type Guess = (typeof GUESSES)[number];
 
 const PROMPT = `Ты разбираешь фотографию израильского чека или счёта поставщика.
 
@@ -58,7 +81,17 @@ const PROMPT = `Ты разбираешь фотографию израильс�
   "vat": число, сумма НДС,
   "currency": "ILS",
   "paid_by": "card | cash | transfer | null",
-  "what": "одной короткой фразой по-русски, что купили"
+  "what": "одной короткой фразой по-русски, что купили",
+  "items": [
+    {
+      "sku": "артикул или штрихкод, как напечатан",
+      "name": "название позиции как на чеке",
+      "qty": число или null,
+      "price": цена за штуку или null,
+      "sum": сумма строки,
+      "kind": "materials | stationery | equipment | food | other"
+    }
+  ]
 }
 
 Правила:
@@ -67,7 +100,13 @@ const PROMPT = `Ты разбираешь фотографию израильс�
 - חשבונית מס = invoice, חשבונית מס קבלה = invrec, קבלה = receipt.
 - Дату бери из чека, а не сегодняшнюю. Израильский формат ДД/ММ/ГГГГ.
 - amount — строка לתשלום или סה"כ, то есть итог с НДС.
-- Чего не видно или не уверен — ставь null. Не угадывай.`;
+- Чего не видно или не уверен — ставь null. Не угадывай.
+- items: перечисли ВСЕ строки чека, по одной, в порядке печати. Название
+  оставляй как на чеке, не переводи.
+- kind на строке: materials — краски, бумага, холсты, кисти, ткань,
+  фурнитура, всё, из чего делают работы; stationery — ручки, скрепки,
+  файлы, картриджи, бытовая мелочь для студии; equipment — инструменты,
+  техника, мебель; food — еда и напитки; other — что не подошло.`;
 
 type Answer = { content?: { type?: string; text?: string }[] };
 
@@ -93,7 +132,9 @@ export async function readReceipt(
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 1000,
+        // Чек на тридцать строк в тысячу токенов не влезает, а обрезанный
+        // ответ — это не ошибка модели, а наша: она честно начала писать.
+        max_tokens: 8000,
         messages: [{
           role: 'user',
           content: [
@@ -139,11 +180,33 @@ export async function readReceipt(
         currency: str(got.currency) ?? 'ILS',
         paid_by: str(got.paid_by),
         what: str(got.what),
+        items: items(got.items),
       },
     };
   } catch {
     return { ok: false, error: `разбор не вышел: ${body.slice(0, 120)}` };
   }
+}
+
+/** Строки чека: пустые и безымянные отбрасываем, остальное приводим к виду. */
+function items(v: unknown): Item[] {
+  if (!Array.isArray(v)) return [];
+  const out: Item[] = [];
+  for (const row of v) {
+    const r = row as Record<string, unknown>;
+    const name = str(r.name);
+    if (!name) continue;
+    const kind = str(r.kind);
+    out.push({
+      sku: str(r.sku),
+      name,
+      qty: num(r.qty),
+      price: num(r.price),
+      sum: num(r.sum),
+      kind: (GUESSES as readonly string[]).includes(kind ?? '') ? (kind as Guess) : 'other',
+    });
+  }
+  return out;
 }
 
 function str(v: unknown): string | null {

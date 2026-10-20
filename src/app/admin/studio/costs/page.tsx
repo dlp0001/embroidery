@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { isAdmin, requireTeacher } from '@/lib/session';
-import { expensesIn, spentByKind, type ListRow } from '@/lib/expenses';
-import { dayMonth, money, plural, todayISO } from '@/lib/format';
+import { expensesIn, spentByKind, splitsFor, type ListRow } from '@/lib/expenses';
+import { cents, dayMonth, plural, todayISO } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +23,15 @@ function before(month: string): string {
   const d = new Date(Date.UTC(y, m - 2, 1));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
+
+/** Машинные группы строк по-русски: в них чек разложен «примерно». */
+const GUESS_WORD: Record<string, string> = {
+  materials: 'материалы',
+  stationery: 'канцелярия',
+  equipment: 'оборудование',
+  food: 'еда',
+  other: 'прочее',
+};
 
 /** Что с чеком: ждёт решения, проведён или отклонён. */
 function state(e: ListRow): { text: string; cls: string } {
@@ -64,6 +73,9 @@ export default async function CostsPage({
   const to = DATE.test(params.to ?? '') ? params.to! : now.to;
 
   const [byKind, rows] = await Promise.all([spentByKind(from, to), expensesIn(from, to)]);
+  // Разбор по строкам: показания модели, а не решение человека. Поэтому
+  // стоит мелко, под суммой, и ни во что не суммируется.
+  const splits = await splitsFor(rows.map((r) => r.id));
   const total = byKind.reduce((s, r) => s + Number(r.sum), 0);
   const waiting = rows.filter((r) => r.status === 'new');
 
@@ -112,13 +124,13 @@ export default async function CostsPage({
                   <tr key={r.kind_id ?? 'none'}>
                     <td>{r.kind_title ?? 'без статьи'}</td>
                     <td>{r.n}</td>
-                    <td>{money(r.sum, 'ILS')}</td>
+                    <td>{cents(r.sum, 'ILS')}</td>
                   </tr>
                 ))}
                 <tr className="total">
                   <td>Итого</td>
                   <td>{byKind.reduce((s, r) => s + r.n, 0)}</td>
-                  <td>{money(total, 'ILS')}</td>
+                  <td>{cents(total, 'ILS')}</td>
                 </tr>
               </tbody>
             </table>
@@ -148,12 +160,23 @@ export default async function CostsPage({
                       e.kind_title,
                     ].filter(Boolean).join(' · ')}
                   </div>
-                  {e.what && <div className="sub">{e.what}</div>}
+                  {(() => {
+                    const parts = splits.get(e.id) ?? [];
+                    if (parts.length === 0) {
+                      return e.what ? <div className="sub">{e.what}</div> : null;
+                    }
+                    return (
+                      <div className="sub">
+                        {parts.map((p) => `${GUESS_WORD[p.kind] ?? p.kind} ${
+                          cents(p.sum, e.currency)}`).join(' · ')}
+                      </div>
+                    );
+                  })()}
                   <div className={st.cls} style={{ marginTop: 6 }}>{st.text}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div className="sum">
-                    {e.amount ? money(e.amount, e.currency) : <span className="dim">—</span>}
+                    {e.amount ? cents(e.amount, e.currency) : <span className="dim">—</span>}
                   </div>
                   {e.has_photo && (
                     <a className="hint" href={`/admin/studio/costs/photo/${e.id}`}
@@ -166,9 +189,12 @@ export default async function CostsPage({
         })}
 
         <p className="hint" style={{ marginTop: 18 }}>
-          В iCount расход уходит той статьёй, которую выбрали: наша статья
-          знает, каким видом расхода она там становится. Снимок остаётся
-          здесь — в бухгалтерии его пока не показать.
+          В iCount расход уходит одной суммой и той статьёй, которую
+          выбрали: наша статья знает, каким видом расхода она там
+          становится. Строки чека хранятся только у нас — мелкая строка
+          под суммой это их разбор по группам, сделанный моделью. Он ни во
+          что не суммируется: это материал для будущих отчётов, а не
+          проведённые деньги.
         </p>
       </div>
     </>

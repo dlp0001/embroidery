@@ -4,21 +4,40 @@
     {
       "name": "site",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 4321
     },
     {
       "_": "То же самое, но с нерабочим ключом iCount: чеки в журнале видно, а выписать их нельзя — в настоящую бухгалтерию с дева ничего не уйдёт.",
       "name": "site-demo",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-lc", "ICOUNT_TOKEN=demo-not-a-real-token npm run dev"],
+      "runtimeArgs": [
+        "-lc",
+        "ICOUNT_TOKEN=demo-not-a-real-token npm run dev"
+      ],
       "port": 4321
     },
     {
       "_": "Для проверки вебхука Polar на курсе: известный тестовый секрет, чтобы подписать вызов руками (см. scripts/polar-webhook-test.mjs).",
       "name": "site-polar-test",
       "runtimeExecutable": "bash",
-      "runtimeArgs": ["-lc", "POLAR_WEBHOOK_SECRET=local-test-secret npm run dev"],
+      "runtimeArgs": [
+        "-lc",
+        "POLAR_WEBHOOK_SECRET=local-test-secret npm run dev"
+      ],
+      "port": 4321
+    },
+    {
+      "_": "То же, что site-demo, плюс ключ к модели: он лежит только в боевом файле окружения, а разбор чеков без него не проверить. Копировать ключ в .env.local не стали — берём на запуск и не храним второй раз.",
+      "name": "site-ai",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-lc",
+        "export $(grep ANTHROPIC_API_KEY .env.production.local | xargs) && ICOUNT_TOKEN=demo-not-a-real-token npm run dev"
+      ],
       "port": 4321
     }
   ]

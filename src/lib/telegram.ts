@@ -3,7 +3,7 @@ import { takenBetween } from './billing';
 import { sales as courseSales, type Sales } from './course-admin';
 import { one, query, tx } from './db';
 import {
-  dayMonth, daysUntil, eventClosed, hhmm, money, nowHM, plural, plusDays, todayISO,
+  cents, dayMonth, daysUntil, eventClosed, hhmm, money, nowHM, plural, plusDays, todayISO,
   weekdayDayMonth,
 } from './format';
 import { periodStats } from './stats';
@@ -1433,6 +1433,15 @@ export type ReceiptCard = {
   what: string | null;
 };
 
+/** Как называются машинные группы по-русски. Порядок — от крупного. */
+const GUESS_WORD: Record<string, string> = {
+  materials: 'материалы',
+  stationery: 'канцелярия',
+  equipment: 'оборудование',
+  food: 'еда',
+  other: 'прочее',
+};
+
 const DOC_WORD: Record<string, string> = {
   invoice: 'счёт-фактура',
   invrec: 'счёт-квитанция',
@@ -1449,9 +1458,10 @@ export function receiptCard(
   id: string,
   e: ReceiptCard & { doc_type?: string | null },
   groups: { id: string; title: string }[],
+  split?: { parts: { kind: string; sum: number }[]; sum: number },
 ): View {
   const sum = e.amount
-    ? `${money(e.amount, e.currency)}${e.vat ? `, НДС ${money(e.vat, e.currency)}` : ''}`
+    ? `${cents(e.amount, e.currency)}${e.vat ? `, НДС ${cents(e.vat, e.currency)}` : ''}`
     : 'сумма не разобрана';
   const lines = [
     `<b>${esc(e.supplier ?? 'поставщик не разобран')}</b>`,
@@ -1462,7 +1472,23 @@ export function receiptCard(
       e.doc_number ? `№ ${esc(e.doc_number)}` : null,
     ].filter(Boolean).join(' · '),
   ];
-  if (e.what) lines.push('', esc(e.what));
+  // Прикидка по строкам: сколько из похода в магазин было материалами,
+  // а сколько едой. Это показания модели, поэтому тут же говорим, сошлись
+  // ли строки с итогом: сошлись — значит, прочитаны все.
+  if (split?.parts.length) {
+    lines.push('', split.parts
+      .map((p) => `${GUESS_WORD[p.kind] ?? p.kind} ${cents(p.sum, e.currency)}`)
+      .join(' · '));
+    const total = Number(e.amount ?? 0);
+    const off = Math.abs(split.sum - total);
+    if (total > 0 && off >= 0.01) {
+      lines.push(`строки дают ${cents(split.sum, e.currency)} — на ${
+        cents(off, e.currency)} меньше итога`);
+    }
+  } else if (e.what) {
+    lines.push('', esc(e.what));
+  }
+
   lines.push('', 'К какой статье отнести?');
 
   // По две в ряд: названия длинные, в три кнопки строка не влезает.
