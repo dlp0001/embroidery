@@ -8,6 +8,8 @@ export type Line = {
   id: string;
   sku: string | null;
   name: string;
+  /** Перевод названия: иврит на чеке читают не все. */
+  name_ru: string | null;
   qty: string | null;
   sum: string | null;
   kind_guess: string | null;
@@ -80,8 +82,10 @@ export default function Lines({
                         alignItems: 'baseline', padding: '7px 0',
                         borderTop: '1px solid var(--line-soft)' }}>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 14 }}>{l.name}</div>
-              {l.sku && <div className="hint" style={{ fontSize: 11 }}>{l.sku}</div>}
+              <div style={{ fontSize: 14 }}>{l.name_ru ?? l.name}</div>
+              <div className="hint" style={{ fontSize: 11 }}>
+                {[l.name_ru ? l.name : null, l.sku].filter(Boolean).join(' · ')}
+              </div>
             </div>
             <div style={{ fontSize: 14, whiteSpace: 'nowrap' }}>
               {l.sum === null ? '—' : Number(l.sum).toFixed(2)}

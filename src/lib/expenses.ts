@@ -1,6 +1,6 @@
 import { one, query } from './db';
 import { addSupplier, createExpense, suppliers } from './icount';
-import type { Item, Scanned } from './vision';
+import { translate, type Item, type Scanned } from './vision';
 
 /**
  * Расходы студии: снимок чека, разобранные поля и своя структура затрат.
@@ -29,6 +29,7 @@ export type Expense = {
   id: string;
   supplier: string | null;
   trade_name: string | null;
+  trade_name_en: string | null;
   supplier_vat: string | null;
   doc_type: string | null;
   doc_number: string | null;
@@ -46,7 +47,8 @@ export type Expense = {
   what: string | null;
 };
 
-const FIELDS = `e.id, e.supplier, e.trade_name, e.supplier_vat, e.doc_type, e.doc_number,
+const FIELDS = `e.id, e.supplier, e.trade_name, e.trade_name_en, e.supplier_vat,
+                e.doc_type, e.doc_number,
                 e.spent_on::text, e.amount::text, e.vat::text, e.currency,
                 e.kind_id, k.title as kind_title, k.icount_type,
                 e.status, e.icount_id, e.chat_id::text, e.message_id::text,
@@ -304,6 +306,7 @@ export type LineRow = {
   line_no: number;
   sku: string | null;
   name: string;
+  name_ru: string | null;
   qty: string | null;
   price: string | null;
   sum: string | null;
@@ -313,7 +316,8 @@ export type LineRow = {
 export async function linesOf(ids: string[]): Promise<Map<string, LineRow[]>> {
   if (ids.length === 0) return new Map();
   const rows = await query<LineRow & { expense_id: string }>(
-    `select id, expense_id, line_no, sku, name, qty::text, price::text, sum::text, kind_guess
+    `select id, expense_id, line_no, sku, name, name_ru, qty::text, price::text,
+            sum::text, kind_guess
        from expense_items where expense_id = any($1::uuid[]) order by expense_id, line_no`,
     [ids],
   );
@@ -329,4 +333,37 @@ export async function linesOf(ids: string[]): Promise<Map<string, LineRow[]>> {
  */
 export async function setLineKind(lineId: string, guess: string): Promise<void> {
   await query('update expense_items set kind_guess = $2 where id = $1', [lineId, guess]);
+}
+
+/**
+ * Переводит названия: вывеску — латиницей, строки — на русский. Текст
+ * уже в базе, картинка не нужна, поэтому стоит это копейки и делается
+ * отдельным ходом — в том числе для чеков, разобранных давно.
+ */
+export async function addWords(id: string): Promise<boolean> {
+  const head = await one<{ trade_name: string | null; trade_name_en: string | null }>(
+    'select trade_name, trade_name_en from expenses where id = $1', [id]);
+  if (!head) return false;
+
+  const lines = await query<{ id: string; name: string }>(
+    `select id, name from expense_items
+      where expense_id = $1 and name_ru is null order by line_no`,
+    [id]);
+  const needShop = Boolean(head.trade_name && !head.trade_name_en);
+  if (!needShop && lines.length === 0) return false;
+
+  const said = await translate(
+    needShop ? head.trade_name : null,
+    lines.map((l) => l.name),
+  );
+  if (!said) return false;
+
+  if (said.shop) {
+    await query('update expenses set trade_name_en = $2 where id = $1', [id, said.shop]);
+  }
+  for (const [i, line] of lines.entries()) {
+    const ru = said.items[i];
+    if (ru) await query('update expense_items set name_ru = $2 where id = $1', [line.id, ru]);
+  }
+  return true;
 }

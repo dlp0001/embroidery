@@ -49,7 +49,8 @@
     "tg:log": "node --env-file-if-exists=.env.local scripts/tg-log.mjs",
     "tg:log:prod": "node --env-file-if-exists=.env.production.local scripts/tg-log.mjs",
     "course": "node --env-file-if-exists=.env.local scripts/course-link.mjs",
-    "course:prod": "node --env-file-if-exists=.env.production.local scripts/course-link.mjs"
+    "course:prod": "node --env-file-if-exists=.env.production.local scripts/course-link.mjs",
+    "words:prod": "node --env-file-if-exists=.env.production.local scripts/words.mjs"
   },
   "dependencies": {
     "googleapis": "^140.0.0",

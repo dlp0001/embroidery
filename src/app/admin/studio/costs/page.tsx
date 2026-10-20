@@ -156,7 +156,9 @@ export default async function CostsPage({
               <div className="row" style={{ alignItems: 'flex-start' }}>
                 <div>
                   <div className="what">
-                    {e.trade_name ?? e.supplier ?? 'поставщик не разобран'}
+                    {e.trade_name_en && e.trade_name
+                      ? `${e.trade_name_en} | ${e.trade_name}`
+                      : e.trade_name_en ?? e.trade_name ?? e.supplier ?? 'поставщик не разобран'}
                   </div>
                   {e.trade_name && e.supplier && (
                     <div className="sub">{e.supplier}</div>

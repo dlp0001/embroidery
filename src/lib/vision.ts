@@ -239,3 +239,72 @@ function num(v: unknown): number | null {
   const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(/[^\d.-]/g, ''));
   return Number.isFinite(n) && n !== 0 ? n : null;
 }
+
+/**
+ * Перевод названий. Отдельный вызов и нарочно дешёвый: здесь нет
+ * картинки, а значит, и той цены, которую стоит чтение чека. Берём
+ * быструю модель — перевести «מארז קנבסים» на русский ей по силам.
+ */
+const WORDS_MODEL = process.env.ANTHROPIC_WORDS_MODEL || 'claude-haiku-4-5-20251001';
+
+export type Words = {
+  /** Вывеска магазина латиницей: «Mini Max». */
+  shop: string | null;
+  /** Названия строк по-русски, в том же порядке, что пришли. */
+  items: (string | null)[];
+};
+
+export async function translate(
+  shop: string | null, items: string[],
+): Promise<Words | null> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key || (!shop && items.length === 0)) return null;
+
+  const ask = [
+    'Переведи для русского читателя то, что напечатано на израильском чеке.',
+    '',
+    shop ? `Вывеска магазина: ${shop}` : '',
+    items.length ? `Строки чека:\n${items.map((n, i) => `${i + 1}. ${n}`).join('\n')}` : '',
+    '',
+    'Верни ТОЛЬКО JSON: {"shop": "вывеска латиницей, как её пишут сами владельцы",',
+    '"items": ["русское название строки 1", ...]}',
+    '',
+    'Вывеску передай латиницей буква в букву — это транслитерация, а не',
+    'перевод: «מיני מקס» → «Mini Max». Улицы и города не досочиняй; если',
+    'часть неразборчива, опусти её.',
+    'Строк в items должно быть ровно столько же и в том же порядке.',
+    'Названия товаров переводи коротко и по делу: «набор холстов 30×40»,',
+    '«батарейки AA». Чего не понял — ставь null.',
+  ].filter(Boolean).join('\n');
+
+  try {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: WORDS_MODEL,
+        max_tokens: 4000,
+        messages: [{ role: 'user', content: ask }],
+      }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as Answer;
+    const said = (data.content ?? []).filter((c) => c.type === 'text')
+      .map((c) => c.text ?? '').join('').trim()
+      .replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
+    const got = JSON.parse(said) as { shop?: unknown; items?: unknown };
+    const list = Array.isArray(got.items) ? got.items : [];
+    return {
+      shop: str(got.shop),
+      // Длина должна совпасть со списком, иначе перевод не на свои места.
+      items: items.map((_, i) => str(list[i])),
+    };
+  } catch {
+    return null;
+  }
+}

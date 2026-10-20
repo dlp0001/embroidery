@@ -1,8 +1,8 @@
 import { after } from 'next/server';
 import { confirmCash, declineCash } from '@/lib/billing';
 import {
-  applyScan, dropExpenseRow, kinds, pushExpense, rememberCard, saveReceipt, setKind,
-  splitOf, expenseById,
+  addWords, applyScan, dropExpenseRow, kinds, pushExpense, rememberCard, saveReceipt,
+  setKind, splitOf, expenseById,
 } from '@/lib/expenses';
 import { isConfigured as visionReady, readReceipt } from '@/lib/vision';
 import { cashConfirmed, cashDeclined, claimCard, claimOf } from '@/lib/notify';
@@ -211,6 +211,10 @@ async function onPhoto(
       return;
     }
 
+    // Перевод названий: вывеска латиницей, строки по-русски. Отдельный
+    // вызов без картинки — он дешёвый, и без него карточка всё равно
+    // покажется, просто на иврите.
+    await addWords(id);
     const card = receiptCard(id, read.data, await kinds(), await splitOf(id));
     if (waiting) await editMessage(chatId, waiting, card.text, card.keyboard, card.html);
     else {
