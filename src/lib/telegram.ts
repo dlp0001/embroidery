@@ -71,7 +71,14 @@ async function call<T>(method: string, payload: unknown): Promise<ApiResult<T>> 
  * вечер незачем. Снимаем привязку молча, человек вернёт её кнопкой в
  * профиле, если захочет.
  */
-export type Button = { text: string; callback_data: string };
+/**
+ * Кнопка под сообщением. Обычная шлёт боту callback_data, а web_app
+ * открывает мини-приложение: это единственный способ попасть в него,
+ * кроме кнопки у поля ввода.
+ */
+export type Button =
+  | { text: string; callback_data: string; web_app?: never }
+  | { text: string; web_app: { url: string }; callback_data?: never };
 export type Keyboard = Button[][];
 
 /**
@@ -974,6 +981,19 @@ export async function moneyMonthView(name: string | null): Promise<View> {
   }
 
   return { text: lines.join('\n'), keyboard: [] };
+}
+
+/**
+ * Приглашение в мини-приложение. Телеграм открывает его только из своей
+ * кнопки: ссылкой в сообщении мини-приложение не открыть, поэтому и
+ * нужна отдельная команда.
+ */
+export function statsView(origin: string): View {
+  return {
+    text: 'Статистика студии: занятия на сегодня, деньги за месяц,'
+      + ' долги, курс и сам бот.',
+    keyboard: [[{ text: 'Открыть', web_app: { url: `${origin}/tg/stats` } }]],
+  };
 }
 
 /**

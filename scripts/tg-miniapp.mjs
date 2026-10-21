@@ -1,11 +1,12 @@
-// Кнопка «Статистика» в телеграме. Ставится точечно, в чаты Вари и
-// админов: у остальных рядом с полем ввода остаётся обычное меню команд,
-// и про мини-приложение они даже не узнают.
+// Доступ к мини-приложению со статистикой: команда /stats в меню у Вари
+// и админов. У родителей меню прежнее, и про мини-приложение они даже не
+// узнают: список команд телеграм хранит отдельно для каждого чата.
 //
-//   npm run tg:miniapp:prod            показать, кому стоит кнопка
-//   npm run tg:miniapp:prod -- --set   поставить
-//   npm run tg:miniapp:prod -- --set --only Дима   поставить одному
-//   npm run tg:miniapp:prod -- --off   вернуть меню команд
+//   npm run tg:miniapp:prod             показать, что у кого стоит
+//   npm run tg:miniapp:prod -- --set    добавить /stats в меню
+//   npm run tg:miniapp:prod -- --set --only Дима    одному
+//   npm run tg:miniapp:prod -- --set --button       ещё и кнопка у поля ввода
+//   npm run tg:miniapp:prod -- --off    убрать и то, и другое
 import pg from 'pg';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -18,6 +19,9 @@ const set = args.includes('--set');
 // Кому именно: часть имени. Без него кнопка ставится всем, кому положено.
 const onlyAt = args.indexOf('--only');
 const only = onlyAt === -1 ? null : (args[onlyAt + 1] ?? '').toLowerCase();
+// Кнопка у поля ввода — отдельно: она занимает место словом «Статистика»
+// и прячет под собой меню команд, поэтому по умолчанию её не ставим.
+const button = args.includes('--button');
 const off = args.includes('--off');
 const origin = (args.find((a) => a.startsWith('http')) ?? process.env.SITE_URL
   ?? 'https://www.re-create.art').replace(/\/+$/, '');
@@ -62,18 +66,38 @@ const webApp = `${origin}/tg/stats`;
 console.log(`Бот: @${(await api('getMe')).username}`);
 console.log(`Адрес мини-приложения: ${webApp}\n`);
 
+// Список для чата заменяет общий целиком, поэтому к общим командам
+// дописываем /stats, а не шлём её одну.
+const COMMON = [
+  { command: 'week', description: 'Расписание и запись' },
+  { command: 'pay', description: 'Оплата и задолженность' },
+  { command: 'help', description: 'Что умеет бот' },
+];
+const STATS = { command: 'stats', description: 'Статистика студии' };
+
 for (const r of people) {
-  if (set || off) {
+  const scope = { type: 'chat', chat_id: Number(r.chat_id) };
+  if (set) {
+    await api('setMyCommands', { scope, commands: [COMMON[0], COMMON[1], STATS, COMMON[2]] });
+  } else if (off) {
+    // Удаляем список чата: телеграм вернётся к общему, где /stats нет.
+    await api('deleteMyCommands', { scope });
+  }
+  if (set && button) {
     await api('setChatMenuButton', {
       chat_id: Number(r.chat_id),
-      menu_button: off
-        ? { type: 'commands' }
-        : { type: 'web_app', text: 'Статистика', web_app: { url: webApp } },
+      menu_button: { type: 'web_app', text: 'Статистика', web_app: { url: webApp } },
     });
   }
+  if (off || (set && !button)) {
+    await api('setChatMenuButton', { chat_id: Number(r.chat_id), menu_button: { type: 'commands' } });
+  }
+
+  const menu = await api('getMyCommands', { scope });
   const now = await api('getChatMenuButton', { chat_id: Number(r.chat_id) });
-  const what = now.type === 'web_app' ? `«${now.text}» → ${now.web_app?.url}` : now.type;
-  console.log(`  ${r.name ?? r.chat_id}: ${what}`);
+  const what = now.type === 'web_app' ? `кнопка «${now.text}»` : 'меню команд';
+  console.log(`  ${r.name ?? r.chat_id}: ${what} · ${
+    menu.length ? menu.map((x) => `/${x.command}`).join(' ') : 'список чата пуст, берётся общий'}`);
 }
 
 if (!set && !off) console.log('\nНичего не меняли. Поставить — флаг --set.');

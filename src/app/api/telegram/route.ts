@@ -9,8 +9,8 @@ import { cashConfirmed, cashDeclined, claimCard, claimOf } from '@/lib/notify';
 import {
   answerCallback, applyTap, bindChat, chatUser, editMessage, eventViews, fileBytes,
   isStudioAdmin, debtorsView, isTeacher, payView, readExpenseTap, readMoneyTap, readTap,
-  receiptCard, relayAnswer, relayFromParent, secretOk, send, sendAndGetId, teacherDayView,
-  viewAfterTap, weekView, PAY_LETTER,
+  receiptCard, relayAnswer, relayFromParent, secretOk, send, sendAndGetId, statsView,
+  teacherDayView, viewAfterTap, weekView, PAY_LETTER,
 } from '@/lib/telegram';
 
 export const runtime = 'nodejs';
@@ -109,6 +109,14 @@ async function onMessage(
     // бессмысленно. Родителю, само собой, свои.
     const studio = await isStudioAdmin(user.id);
     await send(chatId, studio ? await debtorsView(origin) : await payView(user.id, origin));
+    return;
+  }
+
+  // Статистика студии: не всем, и поэтому команда есть в меню только у
+  // Вари и админов. Родителю, набравшему её руками, ответит справка.
+  if (cmd === '/stats' && (teaches || await isStudioAdmin(user.id))) {
+    const view = statsView(origin);
+    await send(chatId, view.text, view.keyboard);
     return;
   }
 
