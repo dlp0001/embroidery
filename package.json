@@ -46,6 +46,8 @@
     "tg:setup": "node --env-file-if-exists=.env.local scripts/tg-setup.mjs",
     "tg:setup:prod": "node --env-file-if-exists=.env.production.local scripts/tg-setup.mjs",
     "tg:teacher": "node --env-file-if-exists=.env.production.local scripts/tg-teacher.mjs",
+    "tg:miniapp": "node --env-file-if-exists=.env.local scripts/tg-miniapp.mjs",
+    "tg:miniapp:prod": "node --env-file-if-exists=.env.production.local scripts/tg-miniapp.mjs",
     "tg:log": "node --env-file-if-exists=.env.local scripts/tg-log.mjs",
     "tg:log:prod": "node --env-file-if-exists=.env.production.local scripts/tg-log.mjs",
     "course": "node --env-file-if-exists=.env.local scripts/course-link.mjs",
