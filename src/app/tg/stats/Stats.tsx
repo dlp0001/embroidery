@@ -51,6 +51,68 @@ function salesLine(s: Pulse['course']['month']): string {
   return sums ? `${bought}, ${sums}` : bought;
 }
 
+/**
+ * Карточка с итогом, которая раскрывается по нажатию. Закрытая она
+ * такая же, как была: цифра справа и подпись под ней. Раскрытая
+ * показывает строки, из которых цифра сложилась.
+ *
+ * Открыта или закрыта — живёт в состоянии экрана, а не в адресе: экран
+ * один, и возвращаться к нему «назад» телеграм не даёт.
+ */
+function Fold({
+  title, total, note, accent = false, children,
+}: {
+  title: string;
+  total: string;
+  note: string;
+  accent?: boolean;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="card">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          display: 'block', width: '100%', padding: 0, border: 0,
+          background: 'none', textAlign: 'left', cursor: 'pointer',
+        }}
+      >
+        <div className="row">
+          <div className="what">
+            {title}
+            <span style={{
+              display: 'inline-block', marginLeft: 8, fontSize: 11,
+              color: 'var(--warm-gray)', transform: open ? 'rotate(90deg)' : 'none',
+              transition: 'transform .15s',
+            }}>▸</span>
+          </div>
+          <div className="what" style={accent ? { color: 'var(--rose-dark)' } : undefined}>
+            {total}
+          </div>
+        </div>
+        <div className="sub">{note}</div>
+      </button>
+      {open && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line-soft)' }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Строка внутри раскрытой карточки. */
+function Row({ left, right, dim = false }: { left: string; right: string; dim?: boolean }) {
+  return (
+    <div className="row" style={{ alignItems: 'baseline', marginBottom: 6 }}>
+      <div style={{ fontSize: 13, color: dim ? 'var(--warm-gray)' : 'var(--charcoal)' }}>{left}</div>
+      <div style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{right}</div>
+    </div>
+  );
+}
+
 export default function Stats() {
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -109,37 +171,55 @@ export default function Stats() {
         ))}
 
         <div className="lbl">Деньги с {dayMonth(m.since)}</div>
-        <div className="card">
-          <div className="row">
-            <div className="what">Получено</div>
-            <div className="what">{money(m.taken, m.currency)}</div>
-          </div>
-          <div className="sub">
-            {m.payments}&nbsp;{plural(m.payments, 'платёж', 'платежа', 'платежей')}
-          </div>
-        </div>
-        <div className="card">
-          <div className="row">
-            <div className="what">Реализация</div>
-            <div className="what">{money(m.lesson + m.camp, m.currency)}</div>
-          </div>
-          <div className="sub">
-            занятия — {money(m.lesson, m.currency)}
-            {m.camp > 0 ? ` · лагерь — ${money(m.camp, m.currency)}` : ''}
-          </div>
-        </div>
+
+        <Fold
+          title="Получено"
+          total={money(m.taken, m.currency)}
+          note={`${m.payments} ${plural(m.payments, 'платёж', 'платежа', 'платежей')}`}
+        >
+          {m.takenBy.map((r) => (
+            <Row
+              key={r.label}
+              left={`${r.label} · ${r.count}`}
+              right={money(r.sum, m.currency)}
+            />
+          ))}
+        </Fold>
+
+        <Fold
+          title="Реализация"
+          total={money(m.lesson + m.camp, m.currency)}
+          note={`занятия — ${money(m.lesson, m.currency)}${
+            m.camp > 0 ? ` · лагерь — ${money(m.camp, m.currency)}` : ''}`}
+        >
+          {m.done.map((r) => (
+            <Row
+              key={r.label}
+              left={`${r.label} · ${r.count}`}
+              right={money(r.sum, m.currency)}
+            />
+          ))}
+          <p className="hint" style={{ marginTop: 10 }}>
+            Занятие с абонемента стоит свою долю от его цены, а не сотню.
+          </p>
+        </Fold>
+
         {m.debtPeople > 0 && (
-          <div className="card">
-            <div className="row">
-              <div className="what">Долги</div>
-              <div className="what" style={{ color: 'var(--rose-dark)' }}>
-                {money(m.debtSum, m.currency)}
-              </div>
-            </div>
-            <div className="sub">
-              у {m.debtPeople}&nbsp;{plural(m.debtPeople, 'человека', 'человек', 'человек')}
-            </div>
-          </div>
+          <Fold
+            title="Долги"
+            total={money(m.debtSum, m.currency)}
+            accent
+            note={`у ${m.debtPeople} ${plural(m.debtPeople, 'человека', 'человек', 'человек')}`}
+          >
+            {m.debts.map((d) => (
+              <Row
+                key={d.who}
+                left={`${d.who} · ${d.lessons} ${
+                  plural(d.lessons, 'занятие', 'занятия', 'занятий')} с ${dayMonth(d.since)}`}
+                right={money(d.sum, m.currency)}
+              />
+            ))}
+          </Fold>
         )}
 
         <div className="lbl">Курс по вышивке</div>

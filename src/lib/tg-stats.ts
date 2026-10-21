@@ -28,6 +28,11 @@ export type PulseSession = {
   moved: boolean;
 };
 
+/** Строка в раскрытом блоке: подпись, сколько раз и сколько денег. */
+export type Line = { label: string; count: number; sum: number };
+
+export type Debt = { who: string; lessons: number; sum: number; since: string };
+
 export type Pulse = {
   today: string;
   sessions: PulseSession[];
@@ -40,6 +45,10 @@ export type Pulse = {
     camp: number;
     debtPeople: number;
     debtSum: number;
+    /** Раскрытые блоки: чем платили, что из чего сложилось, кто должен. */
+    takenBy: Line[];
+    done: Line[];
+    debts: Debt[];
   };
   course: { month: Sales; all: Sales };
   bot: {
@@ -64,15 +73,17 @@ export async function pulse(): Promise<Pulse> {
   const today = todayISO();
   const from = `${today.slice(0, 7)}-01`;
 
-  const [sessions, taken, done, debts, courseMonth, courseAll, counts] = await Promise.all([
-    teacherSessions(null, today),
-    takenBetween(from, today),
-    periodStats(from, today),
-    debtors(),
-    courseSales(COURSE_SLUG, from),
-    courseSales(COURSE_SLUG, null),
-    sideNumbers(),
-  ]);
+  const [sessions, taken, done, debts, courseMonth, courseAll, counts, takenBy] =
+    await Promise.all([
+      teacherSessions(null, today),
+      takenBetween(from, today),
+      periodStats(from, today),
+      debtors(),
+      courseSales(COURSE_SLUG, from),
+      courseSales(COURSE_SLUG, null),
+      sideNumbers(),
+      takenByWay(from, today),
+    ]);
 
   const booked = await bookedBySession(sessions.map((s) => s.session_id));
 
@@ -95,10 +106,63 @@ export async function pulse(): Promise<Pulse> {
       camp: Math.round(done.done.event.sum + done.done.eventPass.sum),
       debtPeople: debts.length,
       debtSum: Math.round(debts.reduce((sum, d) => sum + Number(d.amount), 0)),
+      takenBy,
+      done: doneLines(done.done),
+      debts: debts.map((d) => ({
+        who: d.name ?? d.email,
+        lessons: d.lessons,
+        sum: Math.round(Number(d.amount)),
+        since: d.since,
+      })),
     },
     course: { month: courseMonth, all: courseAll },
     ...counts,
   };
+}
+
+/**
+ * Чем платили за месяц. Отбор тот же, что у «Получено»: иначе строки
+ * не сложились бы в показанную сверху сумму, и экран спорил бы сам с
+ * собой. Способ берём из самого платежа: провайдер отвечает только на
+ * вопрос, кто принял деньги, а не чем их отдали.
+ */
+async function takenByWay(from: string, to: string): Promise<Line[]> {
+  const rows = await query<{ label: string; count: number; sum: string }>(
+    `select case
+              when p.raw ->> 'pay_method' = 'cash' then 'Наличными'
+              when p.raw ->> 'pay_method' = 'bit' then 'Bit'
+              when p.raw ->> 'pay_method' = 'paybox' then 'PayBox'
+              when p.raw ->> 'pay_method' = 'transfer' then 'Переводом'
+              when p.provider in ('cash', 'transfer') then 'Способ не записан'
+              else 'Картой'
+            end as label,
+            count(*)::int as count, coalesce(sum(p.amount), 0)::text as sum
+       from payments p
+      where p.status = 'paid'
+        and p.provider <> 'gift'
+        and p.purpose is distinct from 'studio_test'
+        and p.created_at >= $1::date
+        and p.created_at < ($2::date + 1)
+      group by 1
+      order by sum(p.amount) desc`,
+    [from, to],
+  );
+  return rows.map((r) => ({ label: r.label, count: r.count, sum: Math.round(Number(r.sum)) }));
+}
+
+/** Из чего сложилась реализация. Пустые строки не показываем. */
+function doneLines(done: Awaited<ReturnType<typeof periodStats>>['done']): Line[] {
+  return [
+    { label: 'Занятия поштучно', ...cell(done.single) },
+    { label: 'Занятия с абонемента', ...cell(done.pass) },
+    { label: 'Лагерь поштучно', ...cell(done.event) },
+    { label: 'Лагерь из пакета', ...cell(done.eventPass) },
+    { label: 'Подарено', ...cell(done.gift) },
+  ].filter((r) => r.count > 0);
+}
+
+function cell(row: { count: number; sum: number }): { count: number; sum: number } {
+  return { count: row.count, sum: Math.round(row.sum) };
 }
 
 async function bookedBySession(ids: string[]): Promise<Map<string, number>> {
