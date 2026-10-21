@@ -4,6 +4,7 @@
 //
 //   npm run tg:miniapp:prod            показать, кому стоит кнопка
 //   npm run tg:miniapp:prod -- --set   поставить
+//   npm run tg:miniapp:prod -- --set --only Дима   поставить одному
 //   npm run tg:miniapp:prod -- --off   вернуть меню команд
 import pg from 'pg';
 
@@ -14,6 +15,9 @@ if (!url) { console.error('DATABASE_URL не задан'); process.exit(1); }
 
 const args = process.argv.slice(2);
 const set = args.includes('--set');
+// Кому именно: часть имени. Без него кнопка ставится всем, кому положено.
+const onlyAt = args.indexOf('--only');
+const only = onlyAt === -1 ? null : (args[onlyAt + 1] ?? '').toLowerCase();
 const off = args.includes('--off');
 const origin = (args.find((a) => a.startsWith('http')) ?? process.env.SITE_URL
   ?? 'https://www.re-create.art').replace(/\/+$/, '');
@@ -45,13 +49,20 @@ const { rows } = await c.query(
 );
 await c.end();
 
-if (rows.length === 0) { console.error('Некому ставить: ни у кого из админов нет бота.'); process.exit(1); }
+const people = only
+  ? rows.filter((r) => (r.name ?? '').toLowerCase().includes(only))
+  : rows;
+if (people.length === 0) {
+  console.error(only ? `Никто из админов не похож на «${only}».`
+    : 'Некому ставить: ни у кого из админов нет бота.');
+  process.exit(1);
+}
 
 const webApp = `${origin}/tg/stats`;
 console.log(`Бот: @${(await api('getMe')).username}`);
 console.log(`Адрес мини-приложения: ${webApp}\n`);
 
-for (const r of rows) {
+for (const r of people) {
   if (set || off) {
     await api('setChatMenuButton', {
       chat_id: Number(r.chat_id),
