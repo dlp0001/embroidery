@@ -37,6 +37,13 @@ function receiptCycle(took: Took): { key: Want; text: string }[] {
   return [none, { key: 'cash', text: 'чек: наличные' }, ...app];
 }
 
+/** Порядок в «Ждём»: записан, обычно ходит, непонятно, редко, ни разу. */
+function rank(r: RosterRow): number {
+  if (r.booked) return 0;
+  const habit = habitOf(r);
+  return habit === 'often' ? 1 : habit === null ? 2 : habit === 'rare' ? 3 : 4;
+}
+
 function receiptText(took: Took, want: Want): string {
   return receiptCycle(took).find((r) => r.key === want)?.text ?? 'без чека';
 }
@@ -56,6 +63,41 @@ function expected(r: RosterRow): boolean {
 function Booked({ on }: { on: boolean }) {
   if (!on) return null;
   return <div className="signed">записан</div>;
+}
+
+/**
+ * Насколько всерьёз ждать того, кто не записывался.
+ *
+ * День в профиле — это «возможно, придём», и ставят его щедро: половина
+ * отмеченных не появляется месяцами. Поэтому рядом с именем говорим, как
+ * оно на деле выходило в последние восемь недель.
+ *
+ * 'often' — был на большинстве занятий, 'rare' — был, но редко,
+ * 'never' — ни разу, null — судить не по чему: занятий в этот срок не
+ * было вовсе.
+ */
+type Habit = 'often' | 'rare' | 'never' | null;
+
+function habitOf(r: RosterRow): Habit {
+  if (r.was === 0) return null;
+  if (r.came === 0) return 'never';
+  return r.came * 2 >= r.was ? 'often' : 'rare';
+}
+
+/** Пометка для того, кого ждут по привычке, а не по записи. */
+function Habit({ r }: { r: RosterRow }) {
+  const habit = habitOf(r);
+  if (habit === null) return null;
+  const text = habit === 'often'
+    ? 'обычно ходит, но не записан'
+    : habit === 'rare'
+      ? `ходит редко — ${r.came} из ${r.was}`
+      : 'ни разу за два месяца';
+  return (
+    <div className="signed" style={{ color: habit === 'often' ? undefined : 'var(--warm-gray)' }}>
+      {text}
+    </div>
+  );
 }
 
 /**
@@ -182,11 +224,13 @@ export default function Journal({
   }, [pending]);
 
   const present = roster.filter((r) => rowFor(r).present).length;
-  // Записавшиеся — первыми: их ждут наверняка, остальных по привычке.
+  // Записавшиеся — первыми: их ждут наверняка. Дальше те, кто ходит
+  // обычно, и только потом редкие: иначе человек, не появлявшийся два
+  // месяца, стоит в списке вровень с тем, кого ждут наверняка.
   // Сортировка устойчивая, поэтому внутри каждой части имена по алфавиту.
   const likely = roster.filter(expected)
     .slice()
-    .sort((a, b) => Number(b.booked) - Number(a.booked));
+    .sort((a, b) => rank(a) - rank(b));
   const rest = roster.filter((r) => !expected(r));
   // Заголовки нужны всегда, когда есть кого сворачивать. Раньше они
   // появлялись только вместе с «ждём», и в день, когда не ждут никого,
@@ -300,6 +344,10 @@ export default function Journal({
               <span className={row.present ? 'nm' : 'nm-off'}>{r.who}</span>
             </button>
             <Booked on={r.booked} />
+            {/* Пометка о привычке — только тем, кого ждут по дню в
+                профиле. Записанного ждут и без неё, а в «Остальных» не
+                ждут никого. */}
+            {!r.booked && r.preferred && <Habit r={r} />}
             <NoParent on={!r.owner_id} />
             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'baseline' }}>
               {m && (

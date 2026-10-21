@@ -666,23 +666,43 @@ export async function isTeacher(userId: string): Promise<boolean> {
     [userId]));
 }
 
-type RosterRow = { who: string; booking: string; declined: boolean; preferred: boolean };
+type RosterRow = {
+  who: string; booking: string; declined: boolean; preferred: boolean;
+  /** Занятий этой группы за восемь недель и сколько из них человек был. */
+  was: number;
+  came: number;
+};
 
 /**
  * Кого ждать на занятии. Состав тот же, что в журнале у Вари: все, кто
  * подходит занятию по типу. Различаем три вещи, потому что они означают
  * разное: записался, обычно ходит, но молчит, и прямо сказал «не придём».
+ *
+ * Для второго считаем ещё и то, как оно выходило на деле: день в профиле
+ * ставят щедро, и в одном списке оказывались и те, кто ходит каждую
+ * неделю, и те, кто не появлялся с лета.
  */
 async function roster(sessionId: string): Promise<RosterRow[]> {
   return query<RosterRow>(
     `with ses as (
-       select s.id, g.audience, g.kind, extract(isodow from s.held_on)::int as dow
+       select s.id, s.group_id, s.held_on, g.audience, g.kind,
+              extract(isodow from s.held_on)::int as dow
          from studio_sessions s join studio_groups g on g.id = s.group_id
         where s.id = $1
      )
      select coalesce(ch.name, u.name, 'Без имени') as who,
             coalesce(b.status, '') as booking,
             (b.declined_at is not null) as declined,
+            (select count(*)::int from studio_sessions s3 cross join ses
+              where s3.group_id = ses.group_id and s3.status <> 'cancelled'
+                and s3.held_on between ses.held_on - 56 and ses.held_on - 1) as was,
+            (select count(*)::int from attendance a3
+               join studio_sessions s3 on s3.id = a3.session_id
+               cross join ses
+              where a3.participant_id = p.id
+                and s3.group_id = ses.group_id and s3.status <> 'cancelled'
+                and a3.status in ('present', 'trial')
+                and s3.held_on between ses.held_on - 56 and ses.held_on - 1) as came,
             exists (select 1 from preferred_days pd cross join ses
                      where pd.participant_id = p.id and pd.weekday = ses.dow
                        and ses.kind = 'lesson') as preferred
@@ -755,9 +775,18 @@ async function sessionLines(
   const rows = await roster(sessionId);
   const coming = rows.filter((r) => r.booking === 'booked').map((r) => r.who);
   const refused = rows.filter((r) => r.declined).map((r) => r.who);
-  const usual = rows
-    .filter((r) => r.preferred && r.booking === '')
-    .map((r) => r.who);
+  // Отмеченный день — это «возможно, придём», и держать всех таких одной
+  // строкой бесполезно: в ней вперемешку те, кто ходит каждую неделю, и
+  // те, кто не появлялся два месяца. Варе важны первые.
+  const marked = rows.filter((r) => r.preferred && r.booking === '');
+  // Сюда же те, по кому судить не по чему: занятий этой группы за два
+  // месяца не было вовсе. Молчать про них нельзя — это новая группа или
+  // вернувшаяся после перерыва, и ждать их надо как раньше.
+  const usual = marked.filter((r) => r.came * 2 >= r.was).map((r) => r.who);
+  const seldom = marked
+    .filter((r) => r.was > 0 && r.came > 0 && r.came * 2 < r.was)
+    .map((r) => `${r.who} (${r.came} из ${r.was})`);
+  const gone = marked.filter((r) => r.was > 0 && r.came === 0).map((r) => r.who);
 
   // Перенос ставим сразу за временем: на эту строку и смотрят, решая,
   // когда быть в студии.
@@ -766,6 +795,8 @@ async function sessionLines(
     ? `Записались (${coming.length}): ${coming.join(', ')}`
     : 'Записанных нет.');
   if (usual.length > 0) lines.push(`Обычно ходят, но не отметились: ${usual.join(', ')}`);
+  if (seldom.length > 0) lines.push(`Ходят редко: ${seldom.join(', ')}`);
+  if (gone.length > 0) lines.push(`Ни разу за два месяца: ${gone.join(', ')}`);
   // Только те, кто прямо ответил боту «не придёт». Снятая на сайте запись
   // сюда не попадает: это отсутствие записи, а не обещание не прийти, и
   // мешать их в одну строку значит врать Варе про чужие слова.

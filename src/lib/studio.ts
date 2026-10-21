@@ -1051,6 +1051,10 @@ export type RosterRow = {
   gift: boolean;
   booked: boolean;
   preferred: boolean;
+  /** Занятий этой группы за последние восемь недель. */
+  was: number;
+  /** На скольких из них человек был. */
+  came: number;
   /** Деньги уже проведены: менять может только суперадмин. */
   locked: boolean;
   /**
@@ -1067,7 +1071,8 @@ export type RosterRow = {
 export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
   return query<RosterRow>(
     `with ses as (
-       select s.id, g.audience, g.kind, extract(isodow from s.held_on)::int as dow
+       select s.id, s.group_id, s.held_on, g.audience, g.kind,
+              extract(isodow from s.held_on)::int as dow
          from studio_sessions s join studio_groups g on g.id = s.group_id
         where s.id = $1
      ),
@@ -1126,6 +1131,22 @@ export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
             (select pay.invoice_url from payments pay where pay.id = c.payment_id) as receipt_url,
             (select pay.raw ->> 'pay_method' from payments pay where pay.id = c.payment_id) as pay_method,
             (c.id is not null) as locked,
+            /* Ходит ли человек на эти дни вообще. Считаем по той же
+               группе за последние восемь недель: отмеченный в профиле
+               день сам по себе не говорит ничего — его ставят на всякий
+               случай и забывают, а Варе нужно знать, кого ждать всерьёз.
+               Болезнь приходом не считаем: намерение было, а занятия не
+               случилось. */
+            (select count(*)::int from studio_sessions s3 cross join ses
+              where s3.group_id = ses.group_id and s3.status <> 'cancelled'
+                and s3.held_on between ses.held_on - 56 and ses.held_on - 1) as was,
+            (select count(*)::int from attendance a3
+               join studio_sessions s3 on s3.id = a3.session_id
+               cross join ses
+              where a3.participant_id = o.participant_id
+                and s3.group_id = ses.group_id and s3.status <> 'cancelled'
+                and a3.status in ('present', 'trial')
+                and s3.held_on between ses.held_on - 56 and ses.held_on - 1) as came,
             coalesce(b.status = 'booked', false) as booked,
             exists (select 1 from preferred_days pd cross join ses
                      where pd.participant_id = o.participant_id and pd.weekday = ses.dow
