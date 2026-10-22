@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { isAdmin, requireTeacher } from '@/lib/session';
-import { expensesIn, linesOf, spentByKind, splitsFor, type ListRow } from '@/lib/expenses';
+import {
+  expensesIn, linesOf, shopName, spentByKind, splitsFor, type ListRow,
+} from '@/lib/expenses';
 import { setLineKindAction } from '@/app/admin/cost-actions';
 import Lines from './Lines';
 import { cents, dayMonth, plural, todayISO } from '@/lib/format';
@@ -155,14 +157,8 @@ export default async function CostsPage({
             <div className="card" key={e.id}>
               <div className="row" style={{ alignItems: 'flex-start' }}>
                 <div>
-                  <div className="what">
-                    {e.trade_name_en && e.trade_name
-                      ? `${e.trade_name_en} | ${e.trade_name}`
-                      : e.trade_name_en ?? e.trade_name ?? e.supplier ?? 'поставщик не разобран'}
-                  </div>
-                  {e.trade_name && e.supplier && (
-                    <div className="sub">{e.supplier}</div>
-                  )}
+                  <div className="what">{shopName(e).title}</div>
+                  {shopName(e).sub && <div className="sub">{shopName(e).sub}</div>}
                   <div className="sub">
                     {[
                       e.spent_on ? dayMonth(e.spent_on) : 'дата не разобрана',

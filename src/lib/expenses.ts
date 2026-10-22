@@ -30,6 +30,7 @@ export type Expense = {
   supplier: string | null;
   trade_name: string | null;
   trade_name_en: string | null;
+  supplier_en: string | null;
   supplier_vat: string | null;
   doc_type: string | null;
   doc_number: string | null;
@@ -47,7 +48,7 @@ export type Expense = {
   what: string | null;
 };
 
-const FIELDS = `e.id, e.supplier, e.trade_name, e.trade_name_en, e.supplier_vat,
+const FIELDS = `e.id, e.supplier, e.supplier_en, e.trade_name, e.trade_name_en, e.supplier_vat,
                 e.doc_type, e.doc_number,
                 e.spent_on::text, e.amount::text, e.vat::text, e.currency,
                 e.kind_id, k.title as kind_title, k.icount_type,
@@ -340,26 +341,62 @@ export async function setLineKind(lineId: string, guess: string): Promise<void> 
  * уже в базе, картинка не нужна, поэтому стоит это копейки и делается
  * отдельным ходом — в том числе для чеков, разобранных давно.
  */
+/**
+ * Как назвать магазин. Вывеску человек узнаёт, фирму — нет, поэтому
+ * первой идёт вывеска, а фирма остаётся подписью. Латиница рядом с
+ * оригиналом: иврит на чеке читают не все.
+ *
+ * У маленькой лавки вывеска и фирма — одно и то же, отдельной строки на
+ * чеке нет. Тогда латиницу берём у фирмы и подписи не делаем: повторять
+ * то же самое дважды незачем.
+ */
+export function shopName(e: {
+  supplier: string | null;
+  supplier_en: string | null;
+  trade_name: string | null;
+  trade_name_en: string | null;
+}): { title: string; sub: string | null } {
+  const he = e.trade_name ?? e.supplier;
+  if (!he) return { title: 'поставщик не разобран', sub: null };
+  const en = e.trade_name ? e.trade_name_en : e.supplier_en;
+  return {
+    title: en ? `${en} | ${he}` : he,
+    sub: e.trade_name && e.supplier ? e.supplier : null,
+  };
+}
+
 export async function addWords(id: string): Promise<boolean> {
-  const head = await one<{ trade_name: string | null; trade_name_en: string | null }>(
-    'select trade_name, trade_name_en from expenses where id = $1', [id]);
+  const head = await one<{
+    trade_name: string | null; trade_name_en: string | null;
+    supplier: string | null; supplier_en: string | null;
+  }>(
+    `select trade_name, trade_name_en, supplier, supplier_en
+       from expenses where id = $1`, [id]);
   if (!head) return false;
 
   const lines = await query<{ id: string; name: string }>(
     `select id, name from expense_items
       where expense_id = $1 and name_ru is null order by line_no`,
     [id]);
+  // Вывеска и фирма переводятся по отдельности: у сетевого магазина это
+  // разные вещи, а у лавки вывески нет вовсе, и латиницу надо дать хотя
+  // бы фирме — иначе в списке расходов останется один иврит.
   const needShop = Boolean(head.trade_name && !head.trade_name_en);
-  if (!needShop && lines.length === 0) return false;
+  const needFirm = Boolean(head.supplier && !head.supplier_en);
+  if (!needShop && !needFirm && lines.length === 0) return false;
 
   const said = await translate(
     needShop ? head.trade_name : null,
+    needFirm ? head.supplier : null,
     lines.map((l) => l.name),
   );
   if (!said) return false;
 
-  if (said.shop) {
+  if (needShop && said.shop) {
     await query('update expenses set trade_name_en = $2 where id = $1', [id, said.shop]);
+  }
+  if (needFirm && said.firm) {
+    await query('update expenses set supplier_en = $2 where id = $1', [id, said.firm]);
   }
   for (const [i, line] of lines.entries()) {
     const ru = said.items[i];

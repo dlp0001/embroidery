@@ -16,25 +16,31 @@ const { rows: todo } = await c.query(
   `select distinct e.id from expenses e
      left join expense_items i on i.expense_id = e.id
     where (e.trade_name is not null and e.trade_name_en is null)
+       or (e.supplier is not null and e.supplier_en is null)
        or (i.id is not null and i.name_ru is null)`);
 console.log('чеков к переводу:', todo.length);
 
 for (const { id } of todo) {
   const head = (await c.query(
-    'select trade_name, trade_name_en from expenses where id = $1', [id])).rows[0];
+    `select trade_name, trade_name_en, supplier, supplier_en
+       from expenses where id = $1`, [id])).rows[0];
   const lines = (await c.query(
     `select id, name from expense_items where expense_id = $1 and name_ru is null
       order by line_no`, [id])).rows;
   const shop = head.trade_name && !head.trade_name_en ? head.trade_name : null;
+  const firm = head.supplier && !head.supplier_en ? head.supplier : null;
 
   const ask = [
     'Переведи для русского читателя то, что напечатано на израильском чеке.',
     shop ? `Вывеска магазина: ${shop}` : '',
+    firm ? `Название фирмы: ${firm}` : '',
     lines.length ? `Строки чека:\n${lines.map((l, i) => `${i + 1}. ${l.name}`).join('\n')}` : '',
     '',
-    'Верни ТОЛЬКО JSON: {"shop": "вывеска латиницей", "items": ["русское название", ...]}',
-    'Вывеску передай латиницей буква в букву — транслитерация, а не перевод:',
-    '«מיני מקס» → «Mini Max». Улицы и города не досочиняй.',
+    'Верни ТОЛЬКО JSON: {"shop": "вывеска латиницей", "firm": "фирма латиницей",',
+    '"items": ["русское название", ...]}',
+    'Вывеску и фирму передай латиницей буква в букву — транслитерация, а не',
+    'перевод: «מיני מקס» → «Mini Max», «מאי - ארט» → «Mai Art». Улицы и города',
+    'не досочиняй; «בע"מ» можно опустить.',
     'Строк в items ровно столько же и в том же порядке. Коротко и по делу.',
     'Чего не понял — null.',
   ].filter(Boolean).join('\n');
@@ -57,6 +63,9 @@ for (const { id } of todo) {
   if (shop && got.shop) {
     await c.query('update expenses set trade_name_en = $2 where id = $1', [id, got.shop]);
   }
+  if (firm && got.firm) {
+    await c.query('update expenses set supplier_en = $2 where id = $1', [id, got.firm]);
+  }
   let n = 0;
   for (const [i, line] of lines.entries()) {
     const ru = (got.items ?? [])[i];
@@ -65,6 +74,7 @@ for (const { id } of todo) {
       n++;
     }
   }
-  console.log(`${id}: вывеска ${got.shop ?? '—'}, строк переведено ${n} из ${lines.length}`);
+  console.log(`${id}: вывеска ${got.shop ?? '—'}, фирма ${got.firm ?? '—'},`
+    + ` строк переведено ${n} из ${lines.length}`);
 }
 await c.end();

@@ -2,6 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { takenBetween } from './billing';
 import { sales as courseSales, type Sales } from './course-admin';
 import { one, query, tx } from './db';
+import { shopName } from './expenses';
 import { familyOwners } from './family';
 import {
   cents, dayMonth, daysUntil, eventClosed, hhmm, money, nowHM, plural, plusDays, todayISO,
@@ -1477,8 +1478,10 @@ export function readExpenseTap(data: string): ExpenseTap | null {
 
 export type ReceiptCard = {
   supplier: string | null;
+  supplier_en?: string | null;
   /** Вывеска магазина: её человек узнаёт, фирму — нет. */
   trade_name?: string | null;
+  trade_name_en?: string | null;
   /** Числом из модели или строкой из базы: деньги печатаются одинаково. */
   amount: string | number | null;
   vat: string | number | null;
@@ -1518,9 +1521,13 @@ export function receiptCard(
   const sum = e.amount
     ? `${cents(e.amount, e.currency)}${e.vat ? `, НДС ${cents(e.vat, e.currency)}` : ''}`
     : 'сумма не разобрана';
+  const shop = shopName({
+    supplier: e.supplier, supplier_en: e.supplier_en ?? null,
+    trade_name: e.trade_name ?? null, trade_name_en: e.trade_name_en ?? null,
+  });
   const lines = [
-    `<b>${esc(e.trade_name ?? e.supplier ?? 'поставщик не разобран')}</b>`,
-    ...(e.trade_name && e.supplier ? [esc(e.supplier)] : []),
+    `<b>${esc(shop.title)}</b>`,
+    ...(shop.sub ? [esc(shop.sub)] : []),
     sum,
     [
       e.spent_on ? dayMonth(e.spent_on) : 'дата не разобрана',

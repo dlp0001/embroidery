@@ -250,28 +250,32 @@ const WORDS_MODEL = process.env.ANTHROPIC_WORDS_MODEL || 'claude-haiku-4-5-20251
 export type Words = {
   /** Вывеска магазина латиницей: «Mini Max». */
   shop: string | null;
+  /** Название фирмы латиницей: у маленькой лавки оно же и вывеска. */
+  firm: string | null;
   /** Названия строк по-русски, в том же порядке, что пришли. */
   items: (string | null)[];
 };
 
 export async function translate(
-  shop: string | null, items: string[],
+  shop: string | null, firm: string | null, items: string[],
 ): Promise<Words | null> {
   const key = process.env.ANTHROPIC_API_KEY;
-  if (!key || (!shop && items.length === 0)) return null;
+  if (!key || (!shop && !firm && items.length === 0)) return null;
 
   const ask = [
     'Переведи для русского читателя то, что напечатано на израильском чеке.',
     '',
     shop ? `Вывеска магазина: ${shop}` : '',
+    firm ? `Название фирмы: ${firm}` : '',
     items.length ? `Строки чека:\n${items.map((n, i) => `${i + 1}. ${n}`).join('\n')}` : '',
     '',
     'Верни ТОЛЬКО JSON: {"shop": "вывеска латиницей, как её пишут сами владельцы",',
-    '"items": ["русское название строки 1", ...]}',
+    '"firm": "название фирмы латиницей", "items": ["русское название строки 1", ...]}',
     '',
-    'Вывеску передай латиницей буква в букву — это транслитерация, а не',
-    'перевод: «מיני מקס» → «Mini Max». Улицы и города не досочиняй; если',
-    'часть неразборчива, опусти её.',
+    'Вывеску и фирму передай латиницей буква в букву — это транслитерация,',
+    'а не перевод: «מיני מקס» → «Mini Max», «מאי - ארט» → «Mai Art».',
+    'Улицы и города не досочиняй; если часть неразборчива, опусти её.',
+    'Формы вроде «בע"מ» (ООО) можно опускать: нужно читаемое имя.',
     'Строк в items должно быть ровно столько же и в том же порядке.',
     'Названия товаров переводи коротко и по делу: «набор холстов 30×40»,',
     '«батарейки AA». Чего не понял — ставь null.',
@@ -297,10 +301,11 @@ export async function translate(
     const said = (data.content ?? []).filter((c) => c.type === 'text')
       .map((c) => c.text ?? '').join('').trim()
       .replace(/^```(?:json)?\s*/i, '').replace(/```$/, '').trim();
-    const got = JSON.parse(said) as { shop?: unknown; items?: unknown };
+    const got = JSON.parse(said) as { shop?: unknown; firm?: unknown; items?: unknown };
     const list = Array.isArray(got.items) ? got.items : [];
     return {
       shop: str(got.shop),
+      firm: str(got.firm),
       // Длина должна совпасть со списком, иначе перевод не на свои места.
       items: items.map((_, i) => str(list[i])),
     };
