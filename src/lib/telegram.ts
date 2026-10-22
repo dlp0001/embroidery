@@ -8,6 +8,7 @@ import {
   cents, dayMonth, daysUntil, eventClosed, hhmm, money, nowHM, plural, plusDays, todayISO,
   weekdayDayMonth,
 } from './format';
+import { payoutPlan } from './payouts';
 import { periodStats } from './stats';
 import {
   PASS_WARN_DAYS, debtors, eventSlotsForUser, markDeclined, passBalances, sessionIsPast,
@@ -997,12 +998,40 @@ export function statsView(origin: string): View {
   };
 }
 
-/** То же, но про деньги кассы: когда Isracard переведёт за оплату картой. */
-export function payoutsView(origin: string): View {
-  return {
-    text: 'Выплаты Isracard: график оставшихся платежей на счёт студии.',
-    keyboard: [[{ text: 'Открыть', web_app: { url: `${origin}/tg/isracard` } }]],
-  };
+/** Сколько ближайших выплат показывать прямо в сообщении. */
+const PAYOUTS_SHOWN = 4;
+
+/**
+ * Деньги кассы: когда Isracard переведёт за оплату картой. Ближайшие
+ * выплаты пишем прямо в сообщении — за ними и спрашивают, а открывать
+ * ради трёх строк отдельный экран незачем. Экран остаётся под кнопкой:
+ * там видно, кто платил и сколько съела комиссия.
+ */
+export async function payoutsView(origin: string): Promise<View> {
+  const plan = await payoutPlan();
+  const open: Keyboard = [[{ text: 'Подробнее', web_app: { url: `${origin}/tg/isracard` } }]];
+
+  if (plan.upcoming.length === 0) {
+    return {
+      text: 'Isracard: впереди выплат нет, всё принятое картой уже пришло.',
+      keyboard: open,
+    };
+  }
+
+  const ahead = plan.upcoming.reduce((sum, p) => sum + p.net, 0);
+  const lines = ['Isracard, ближайшие выплаты:', ''];
+  for (const p of plan.upcoming.slice(0, PAYOUTS_SHOWN)) {
+    lines.push(`${dayMonth(p.day)} — ${money(Math.round(p.net))}`
+      + ` · ${p.credits.length}\u00a0${
+        plural(p.credits.length, 'платёж', 'платежа', 'платежей')}`);
+  }
+  const rest = plan.upcoming.length - PAYOUTS_SHOWN;
+  if (rest > 0) {
+    lines.push(`и ещё ${rest}\u00a0${plural(rest, 'выплата', 'выплаты', 'выплат')} дальше`);
+  }
+  lines.push('', `Всего впереди ${money(Math.round(ahead))}. Суммы после комиссии.`);
+
+  return { text: lines.join('\n'), keyboard: open };
 }
 
 /**

@@ -122,7 +122,7 @@ async function onMessage(
 
   // Выплаты Isracard — деньги кассы, поэтому только админам: Варе и мне.
   if (cmd === '/isracard' && await isStudioAdmin(user.id)) {
-    const view = payoutsView(origin);
+    const view = await payoutsView(origin);
     await send(chatId, view.text, view.keyboard);
     return;
   }
