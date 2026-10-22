@@ -230,6 +230,22 @@ function firm(name: string | null): string | null {
   return clean || name;
 }
 
+/**
+ * Название латиницей — или ничего.
+ *
+ * Модель иногда сбивается с алфавита посреди слова и возвращает
+ * «Ben Artzи»: читается как опечатка в базе, а не как имя магазина.
+ * Лучше показать иврит, чем такое.
+ */
+function latin(v: unknown): string | null {
+  const s = str(v);
+  if (s && /[\u0400-\u04ff\u0590-\u05ff]/.test(s)) {
+    console.warn('vision: название не латиницей, пропускаем:', s);
+    return null;
+  }
+  return s;
+}
+
 function str(v: unknown): string | null {
   const s = typeof v === 'string' ? v.trim() : '';
   return s && s !== 'null' ? s : null;
@@ -304,8 +320,8 @@ export async function translate(
     const got = JSON.parse(said) as { shop?: unknown; firm?: unknown; items?: unknown };
     const list = Array.isArray(got.items) ? got.items : [];
     return {
-      shop: str(got.shop),
-      firm: str(got.firm),
+      shop: latin(got.shop),
+      firm: latin(got.firm),
       // Длина должна совпасть со списком, иначе перевод не на свои места.
       items: items.map((_, i) => str(list[i])),
     };
