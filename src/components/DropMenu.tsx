@@ -39,7 +39,10 @@ export default function DropMenu({
   }, [open]);
 
   return (
-    <div ref={box} style={{ position: 'relative' }}>
+    // Тянемся на высоту соседних кнопок: иначе ссылка висит в ряду сама
+    // по себе, а список раскрывается из середины строки.
+    <div ref={box} style={{ position: 'relative', alignSelf: 'stretch',
+                            display: 'flex', alignItems: 'center' }}>
       <button
         type="button"
         className="linky"
@@ -50,8 +53,10 @@ export default function DropMenu({
       >
         {label}
         {/* Та же стрелка, что у свёрнутых списков в журнале и в «Людях»:
-            одинаковый знак должен значить одно и то же везде. */}
-        <span aria-hidden style={{ fontSize: 8, textDecoration: 'none' }}>
+            одинаковый знак должен значить одно и то же везде.
+            inline-block — чтобы подчёркивание ссылки под неё не лезло:
+            у строчного потомка его не отменить. */}
+        <span aria-hidden style={{ fontSize: 8, display: 'inline-block' }}>
           {open ? '▼' : '▶'}
         </span>
       </button>
