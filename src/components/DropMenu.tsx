@@ -1,0 +1,82 @@
+'use client';
+
+import { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
+
+/**
+ * Ссылка с выпадающим списком. Для того, за чем заглядывают изредка:
+ * в ряд такие страницы встают наравне с ежедневными и отнимают у них
+ * внимание, а убрать их совсем нельзя — они нужны.
+ *
+ * Закрывается само: по нажатию мимо, по Escape и после выбора. Меню,
+ * которое остаётся висеть, потом закрывают мышью, и это раздражает
+ * сильнее, чем лишний клик.
+ */
+export default function DropMenu({
+  label,
+  items,
+}: {
+  label: string;
+  items: { href: string; label: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent): void => {
+      if (!box.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', away);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('mousedown', away);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+
+  return (
+    <div ref={box} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        className="linky"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {label}
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          style={{
+            position: 'absolute', zIndex: 5, top: '100%', left: 0, marginTop: 8,
+            minWidth: 180, padding: '6px 0',
+            background: 'var(--cream)', border: '1px solid var(--line)',
+            boxShadow: '0 8px 24px rgba(26, 26, 46, 0.10)',
+          }}
+        >
+          {items.map((it) => (
+            <Link
+              key={it.href}
+              href={it.href}
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              style={{
+                display: 'block', padding: '9px 16px', whiteSpace: 'nowrap',
+                fontSize: 12, letterSpacing: '0.04em',
+                color: 'var(--charcoal)', textDecoration: 'none',
+              }}
+            >
+              {it.label}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

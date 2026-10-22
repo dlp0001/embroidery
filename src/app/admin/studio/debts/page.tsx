@@ -8,6 +8,7 @@ import {
   dayMonth, daysUntil, money, plural, todayISO, WAY, WAYS, type PayMethod,
 } from '@/lib/format';
 import Link from 'next/link';
+import DropMenu from '@/components/DropMenu';
 import { extendPassAction } from '@/app/admin/schedule-actions';
 import Fold from '@/components/Fold';
 import Section from '@/components/Section';
@@ -146,16 +147,24 @@ export default async function DebtsPage({
 
         {/* Соседние денежные страницы: не в шапке, где они теснили
             заголовок, а здесь — перед первой цифрой, которую читают.
-            Кнопками — то, куда ходят каждую неделю; ссылками — то, за чем
-            заглядывают изредка: платежи подряд и отчёт по смене. */}
+            Кнопками — то, куда ходят каждую неделю; остальное под
+            «Функциями»: эти страницы нужны, но раз в месяц, и в ряду они
+            отнимали внимание у ежедневных. */}
         {admin && (
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap',
                         alignItems: 'center', marginBottom: 14 }}>
             <Link className="btn-quiet" href="/admin/studio/stats">Статистика</Link>
-            <Link className="btn-quiet" href="/admin/studio/receipts">Чеки</Link>
-            <Link className="linky" href="/admin/studio/costs">Расходы</Link>
-            <Link className="linky" href="/admin/studio/payments">Платежи</Link>
-            <Link className="linky" href="/admin/studio/camp">Лагерь</Link>
+            <Link className="btn-quiet" href="/admin/studio/costs">Расходы</Link>
+            <DropMenu
+              label="Функции"
+              items={[
+                // Сразу к выбору платежей: на странице он и так первым
+                // делом раскрывается, а название обещает именно его.
+                { href: '/admin/studio/receipts?issue=1', label: 'Выписать чеки' },
+                { href: '/admin/studio/payments', label: 'Платежи' },
+                { href: '/admin/studio/camp', label: 'Лагерь' },
+              ]}
+            />
           </div>
         )}
 
