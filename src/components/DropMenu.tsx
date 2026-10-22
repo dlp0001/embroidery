@@ -46,8 +46,14 @@ export default function DropMenu({
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((v) => !v)}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
       >
         {label}
+        {/* Та же стрелка, что у свёрнутых списков в журнале и в «Людях»:
+            одинаковый знак должен значить одно и то же везде. */}
+        <span aria-hidden style={{ fontSize: 8, textDecoration: 'none' }}>
+          {open ? '▼' : '▶'}
+        </span>
       </button>
 
       {open && (
