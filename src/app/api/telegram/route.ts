@@ -9,8 +9,8 @@ import { cashConfirmed, cashDeclined, claimCard, claimOf } from '@/lib/notify';
 import {
   answerCallback, applyTap, bindChat, chatUser, editMessage, eventViews, fileBytes,
   isStudioAdmin, debtorsView, isTeacher, payView, readExpenseTap, readMoneyTap, readTap,
-  receiptCard, relayAnswer, relayFromParent, secretOk, send, sendAndGetId, statsView,
-  teacherDayView, viewAfterTap, weekView, PAY_LETTER,
+  payoutsView, receiptCard, relayAnswer, relayFromParent, secretOk, send, sendAndGetId,
+  statsView, teacherDayView, viewAfterTap, weekView, PAY_LETTER,
 } from '@/lib/telegram';
 
 export const runtime = 'nodejs';
@@ -116,6 +116,13 @@ async function onMessage(
   // Вари и админов. Родителю, набравшему её руками, ответит справка.
   if (cmd === '/stats' && (teaches || await isStudioAdmin(user.id))) {
     const view = statsView(origin);
+    await send(chatId, view.text, view.keyboard);
+    return;
+  }
+
+  // Выплаты Isracard — деньги кассы, поэтому только админам: Варе и мне.
+  if (cmd === '/isracard' && await isStudioAdmin(user.id)) {
+    const view = payoutsView(origin);
     await send(chatId, view.text, view.keyboard);
     return;
   }

@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { chatUser, isStudioAdmin, isTeacher } from './telegram';
 
 /**
  * Мини-приложение телеграма: страница сайта, открытая внутри телеграма.
@@ -70,4 +71,29 @@ export function checkInitData(initData: string | null): TgVisitor | null {
 export function initDataFromHeader(req: Request): string | null {
   const auth = req.headers.get('authorization') ?? '';
   return auth.startsWith('tma ') ? auth.slice(4) : null;
+}
+
+export type MiniUser = { id: string; name: string | null; admin: boolean };
+
+/**
+ * Кто открыл экран мини-приложения. null — подпись не сошлась, человека
+ * нет в студии или роль не та; какое из трёх, наружу не говорим: по
+ * разнице ответов чужой понял бы, что подпись у него приняли.
+ *
+ * admin — деньги кассы: кто должен, когда придут выплаты. У Вари эта
+ * роль есть, у преподавателя без неё — нет.
+ */
+export async function miniappUser(req: Request): Promise<MiniUser | null> {
+  const visitor = checkInitData(initDataFromHeader(req));
+  const user = visitor ? await chatUser(visitor.tgId) : null;
+  if (!user) {
+    console.warn('miniapp: отказ', visitor ? `tg ${visitor.tgId}` : 'подпись не сошлась');
+    return null;
+  }
+  const [admin, teacher] = await Promise.all([isStudioAdmin(user.id), isTeacher(user.id)]);
+  if (!admin && !teacher) {
+    console.warn('miniapp: отказ, роль не та —', user.name ?? user.id);
+    return null;
+  }
+  return { id: user.id, name: user.name, admin };
 }

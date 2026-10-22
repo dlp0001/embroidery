@@ -45,10 +45,12 @@ await c.connect();
 // Кому кнопка: преподаватель и админы. Роли те же, что проверяет роут
 // мини-приложения, иначе кнопка вела бы в «нет доступа».
 const { rows } = await c.query(
-  `select distinct u.name, u.tg_chat_id::text as chat_id
+  `select u.name, u.tg_chat_id::text as chat_id,
+          bool_or(r.role in ('admin', 'superadmin')) as admin
      from users u join user_roles r on r.user_id = u.id
     where r.role in ('teacher', 'admin', 'superadmin')
       and u.tg_chat_id is not null
+    group by u.id, u.name, u.tg_chat_id
     order by u.name`,
 );
 await c.end();
@@ -74,11 +76,15 @@ const COMMON = [
   { command: 'help', description: 'Что умеет бот' },
 ];
 const STATS = { command: 'stats', description: 'Статистика студии' };
+// Выплаты Isracard — деньги кассы, их видят только админы.
+const ISRACARD = { command: 'isracard', description: 'Выплаты Isracard' };
 
 for (const r of people) {
   const scope = { type: 'chat', chat_id: Number(r.chat_id) };
   if (set) {
-    await api('setMyCommands', { scope, commands: [COMMON[0], COMMON[1], STATS, COMMON[2]] });
+    const commands = [COMMON[0], COMMON[1], STATS,
+      ...(r.admin ? [ISRACARD] : []), COMMON[2]];
+    await api('setMyCommands', { scope, commands });
   } else if (off) {
     // Удаляем список чата: телеграм вернётся к общему, где /stats нет.
     await api('deleteMyCommands', { scope });

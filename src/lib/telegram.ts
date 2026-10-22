@@ -997,6 +997,14 @@ export function statsView(origin: string): View {
   };
 }
 
+/** То же, но про деньги кассы: когда Isracard переведёт за оплату картой. */
+export function payoutsView(origin: string): View {
+  return {
+    text: 'Выплаты Isracard: график оставшихся платежей на счёт студии.',
+    keyboard: [[{ text: 'Открыть', web_app: { url: `${origin}/tg/isracard` } }]],
+  };
+}
+
 /**
  * Свои долги и абонементы. Оплатить отсюда нельзя нарочно: выбрать, за
  * какие занятия платить, объявить наличные или взять абонемент можно
