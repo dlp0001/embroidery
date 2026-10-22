@@ -81,7 +81,7 @@ async function handle(params: {
     return Response.json({ received: true });
   }
 
-  await applyPayment(payment.id, check.transactionUid, 'callback');
+  await applyPayment(payment.id, check.transactionUid, 'callback', check.plan);
   console.log('payplus: платёж зачтён', payment.id);
   // Квитанция — уже после зачёта: если iCount молчит, деньги всё равно
   // засчитаны, а квитанцию догонит следующий заход родителя на страницу.

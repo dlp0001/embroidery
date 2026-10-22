@@ -1,9 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { after } from 'next/server';
 import { issueReceipt, takeCash } from '@/lib/billing';
 import { cashConfirmed } from '@/lib/notify';
+import { askPlans } from '@/lib/payouts';
 import { WAYS, type PayMethod } from '@/lib/format';
 import { isAdmin, onlyLooking, requireUser } from '@/lib/session';
 import type { SaveResult } from '@/components/AutoSave';
@@ -55,4 +57,19 @@ export async function takeCashAction(form: FormData): Promise<SaveResult> {
 
   refresh();
   return { ok: true };
+}
+
+/**
+ * Дописать к старым продажам картой разбивку от PayPlus: без неё график
+ * выплат считает каждую одним платежом. Ничего денежного не меняет, но
+ * в чужом кабинете всё равно не трогаем.
+ */
+export async function askPlansAction(): Promise<void> {
+  if (await onlyLooking()) redirect('/admin/studio/payouts');
+  await requireAdmin();
+  const done = await askPlans();
+  revalidatePath('/admin/studio/payouts');
+  redirect(`/admin/studio/payouts?${new URLSearchParams({
+    asked: String(done.asked), failed: String(done.failed),
+  })}`);
 }

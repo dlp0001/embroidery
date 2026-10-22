@@ -6,7 +6,7 @@ import {
   type Card, type Method, type PayApp, type ReceiptItem,
 } from './icount';
 import { logMoneyIn } from './ledger';
-import { createPaymentLink, fetchTransaction, isConfigured } from './payplus';
+import { createPaymentLink, fetchTransaction, isConfigured, type PayPlan } from './payplus';
 import { familyOwners } from './family';
 import { coverCampDays, extendOffer, lessonPrice, saleOffers } from './studio';
 
@@ -169,6 +169,8 @@ export async function applyPayment(
   paymentId: string,
   transactionUid: string | null,
   via: PaidVia = 'callback',
+  /** Как PayPlus разложил оплату: по нему считается график выплат. */
+  plan: PayPlan | null = null,
 ): Promise<void> {
   await tx(async (c) => {
     const { rows } = await c.query<{
@@ -181,8 +183,11 @@ export async function applyPayment(
     if (!p || p.status === 'paid') return;
 
     await c.query(
-      `update payments set status = 'paid', provider_id = coalesce($2, provider_id) where id = $1`,
-      [p.id, transactionUid],
+      `update payments set status = 'paid', provider_id = coalesce($2, provider_id),
+              raw = case when $3::jsonb is null then raw
+                         else coalesce(raw, '{}'::jsonb) || jsonb_build_object('plan', $3::jsonb) end
+        where id = $1`,
+      [p.id, transactionUid, plan ? JSON.stringify(plan) : null],
     );
     await logMoneyIn(c, {
       kind: 'payment_paid', actorId: null, ownerId: p.user_id, paymentId: p.id,
@@ -643,7 +648,7 @@ export async function verifyPending(userId: string): Promise<PendingCheck> {
       continue;
     }
 
-    await applyPayment(p.id, check.transactionUid, 'return');
+    await applyPayment(p.id, check.transactionUid, 'return', check.plan);
     await issueReceipt(p.id, check.card);
     out.paid++;
   }

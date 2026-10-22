@@ -162,6 +162,7 @@ export default async function DebtsPage({
                 // делом раскрывается, а название обещает именно его.
                 { href: '/admin/studio/receipts?issue=1', label: 'Выписать чеки' },
                 { href: '/admin/studio/payments', label: 'Платежи' },
+                { href: '/admin/studio/payouts', label: 'Выплаты Isracard' },
                 { href: '/admin/studio/camp', label: 'Лагерь' },
               ]}
             />

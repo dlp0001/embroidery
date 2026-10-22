@@ -115,6 +115,26 @@ export async function createPaymentLink(input: LinkInput): Promise<PaymentLink> 
   return { pageRequestUid: uid, url };
 }
 
+/**
+ * Как оплата разложена по платежам и чьей картой. Нужно для графика
+ * выплат Isracard: рассрочку он переводит частями по месяцам, а за
+ * иностранную карту берёт другую комиссию. См. lib/payouts.
+ */
+export type PayPlan = {
+  /** Когда прошла оплата, по часам PayPlus: «2026-10-22 18:40:11». */
+  date: string | null;
+  /** Сколько платежей. 1 — обычная оплата, больше — рассрочка. */
+  payments: number | null;
+  /** Первый платёж и каждый следующий. У обычной оплаты PayPlus шлёт нули. */
+  first: number | null;
+  rest: number | null;
+  /** Условия, как их называет PayPlus: regular, payments и прочие. */
+  terms: string | null;
+  /** Карта выпущена не в Израиле. null — PayPlus не сказал. */
+  foreign: boolean | null;
+  brand: string | null;
+};
+
 export type TransactionCheck = {
   paid: boolean;
   statusCode: string | null;
@@ -123,6 +143,7 @@ export type TransactionCheck = {
   reference: string | null;
   /** Хвост карты и номер подтверждения: нужны только для квитанции. */
   card: Card | null;
+  plan: PayPlan | null;
 };
 
 /** Спрашиваем у PayPlus, что на самом деле случилось с платежом. */
@@ -147,7 +168,10 @@ export async function fetchTransaction(params: {
   // складываем все места в стопку и ищем ключ по всей стопке сразу.
   const holder = obj(raw.data ?? raw);
   const tx = obj(holder.transaction ?? holder);
-  const where = [tx, holder, obj(tx.card_information ?? holder.card_information), obj(tx.payments)];
+  const where = [
+    tx, holder, obj(tx.card_information ?? holder.card_information),
+    obj(tx.payments ?? holder.payments),
+  ];
 
   const statusCode = text(where, 'status_code');
   const amount = number(where, 'amount');
@@ -159,6 +183,20 @@ export async function fetchTransaction(params: {
     payments: number(where, 'number_of_payments'),
   };
 
+  // card_foreign в примерах PayPlus бывает и 99: что это значит, не
+  // описано, поэтому верим только явным 0 и 1.
+  const foreign = text(where, 'card_foreign');
+  const plan: PayPlan = {
+    date: text(where, 'date'),
+    payments: card.payments,
+    first: number(where, 'first_payment_amount'),
+    rest: number(where, 'rest_payments_amount'),
+    terms: text(where, 'credit_terms'),
+    foreign: foreign === '1' || foreign === 'true' ? true
+      : foreign === '0' || foreign === 'false' ? false : null,
+    brand: card.brand,
+  };
+
   return {
     paid: statusCode === '000',
     statusCode,
@@ -167,6 +205,7 @@ export async function fetchTransaction(params: {
     reference: text(where, 'more_info'),
     // Без хвоста карты квитанция всё равно законна, поэтому пусто — не беда.
     card: Object.values(card).some((v) => v !== null) ? card : null,
+    plan: Object.values(plan).some((v) => v !== null) ? plan : null,
   };
 }
 
