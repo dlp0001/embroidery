@@ -20,8 +20,10 @@ const set = args.includes('--set');
 // Кому именно: часть имени. Без него кнопка ставится всем, кому положено.
 const onlyAt = args.indexOf('--only');
 const only = onlyAt === -1 ? null : (args[onlyAt + 1] ?? '').toLowerCase();
-// Кнопка у поля ввода — отдельно: она занимает место словом «Статистика»
-// и прячет под собой меню команд, поэтому по умолчанию её не ставим.
+// Кнопка у поля ввода — отдельно: она прячет под собой меню команд,
+// поэтому по умолчанию её не ставим. Ярлык обязателен, но пусть это
+// будет значок: слово рядом с полем ввода занимает место ни за чем,
+// а команды всё равно выпадают по набранному слэшу.
 const button = args.includes('--button');
 /*
  * Кнопки над полем ввода выглядели самым коротким путём, но приложению,
@@ -100,7 +102,7 @@ for (const r of people) {
   if (set && button) {
     await api('setChatMenuButton', {
       chat_id: Number(r.chat_id),
-      menu_button: { type: 'web_app', text: 'Статистика', web_app: { url: webApp } },
+      menu_button: { type: 'web_app', text: '\u{1F4CA}', web_app: { url: webApp } },
     });
   }
   if ((off && !keys) || (set && !button)) {
