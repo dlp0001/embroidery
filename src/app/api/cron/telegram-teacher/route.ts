@@ -33,7 +33,7 @@ export async function GET(req: Request): Promise<Response> {
   }
   const force: Force =
     asked === 'day' || asked === 'next' || asked === 'money' || asked === 'ask'
-      ? asked : null;
+      || asked === 'payout' ? asked : null;
 
   return Response.json({ force, ...(await sendDue(force)) });
 }

@@ -1,10 +1,11 @@
 import { one, query } from './db';
 import { tellCampChanges } from './notify';
-import { nowHM, todayISO } from './format';
+import { nowHM, plusDays, todayISO } from './format';
+import { payoutPlan } from './payouts';
 import {
   askAgainTargets, askView, claimSend, digestWatchers, isConfigured, moneyMonthView,
-  recordSent, releaseSend, send, sentAgoMin, teacherDayView, teacherSessionView,
-  teacherToday, teachersInBot,
+  moneyWatchers, payoutSoonView, recordSent, releaseSend, send, sentAgoMin,
+  teacherDayView, teacherSessionView, teacherToday, teachersInBot,
 } from './telegram';
 
 /**
@@ -47,7 +48,14 @@ const MONEY_UNTIL = '13:00';
 const ASK_AM_AT = '09:40';
 const ASK_AM_UNTIL = '12:00';
 
-export type Force = 'day' | 'next' | 'money' | 'ask' | null;
+/**
+ * Накануне выплаты Isracard. Утром: деньги приходят в течение дня, и
+ * узнать о них лучше до того, как они пришли, а не после.
+ */
+const PAYOUT_AT = '09:40';
+const PAYOUT_UNTIL = '13:00';
+
+export type Force = 'day' | 'next' | 'money' | 'ask' | 'payout' | null;
 
 export type DueResult = { at: string; tried: number; failed: number; sent: string[] };
 
@@ -169,18 +177,48 @@ export async function sendDue(force: Force): Promise<DueResult> {
     }
   }
 
+  // ── Накануне выплаты Isracard ──
+  const payoutDue = force
+    ? force === 'payout'
+    : now >= minutes(PAYOUT_AT) && now < minutes(PAYOUT_UNTIL);
+  if (payoutDue) {
+    const tomorrow = plusDays(today, 1);
+    const plan = await payoutPlan(today);
+    const soon = plan.upcoming.find((p) => p.day === tomorrow)
+      // Руками просим показать ближайшую: ждать дня выплаты, чтобы
+      // проверить сообщение, неудобно.
+      ?? (force === 'payout' ? plan.upcoming[0] : undefined);
+    if (soon) {
+      const campaign = `payout-soon:${soon.day}`;
+      const view = payoutSoonView(soon);
+      for (const who of await moneyWatchers()) {
+        if (force !== 'payout' && !(await claimSend(campaign, who.chat_id))) continue;
+        tried++;
+        if (await send(Number(who.chat_id), view.text)) {
+          await recordSent(campaign, who.chat_id, view.text);
+          sent.push(`выплата → ${who.name}`);
+        } else {
+          failed++;
+          if (force !== 'payout') await releaseSend(campaign, who.chat_id);
+        }
+      }
+    }
+  }
+
   const sunday = new Date(`${today}T00:00:00Z`).getUTCDay() === 0;
   const moneyDue = force
     ? force === 'money'
     : sunday && now >= minutes(MONEY_AT) && now < minutes(MONEY_UNTIL);
   if (moneyDue) {
     const campaign = `money-week:${today}`;
+    // Выплаты Isracard видят админы: это деньги кассы, а не занятия.
+    const admins = new Set((await moneyWatchers()).map((a) => a.chat_id));
     const seen = new Set<string>();
     for (const who of [...teachers, ...watchers]) {
       if (seen.has(who.chat_id)) continue;
       seen.add(who.chat_id);
       if (force !== 'money' && !(await claimSend(campaign, who.chat_id))) continue;
-      const view = await moneyMonthView(who.name);
+      const view = await moneyMonthView(who.name, admins.has(who.chat_id));
       tried++;
       if (await send(Number(who.chat_id), view.text)) {
         await recordSent(campaign, who.chat_id, view.text);

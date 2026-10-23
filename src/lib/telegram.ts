@@ -8,7 +8,7 @@ import {
   cents, dayMonth, daysUntil, eventClosed, hhmm, money, nowHM, plural, plusDays, todayISO,
   weekdayDayMonth,
 } from './format';
-import { payoutPlan } from './payouts';
+import { payoutPlan, type Payout } from './payouts';
 import { periodStats } from './stats';
 import {
   PASS_WARN_DAYS, debtors, eventSlotsForUser, markDeclined, passBalances, sessionIsPast,
@@ -938,14 +938,17 @@ function salesLine(s: Sales): string {
  * Абонемент, купленный в сентябре, кормит октябрь, а октябрьский долг
  * в кассу не попадёт вовсе, пока его не отдадут.
  */
-export async function moneyMonthView(name: string | null): Promise<View> {
+export async function moneyMonthView(
+  name: string | null, withPayouts = false,
+): Promise<View> {
   const today = todayISO();
   const from = `${today.slice(0, 7)}-01`;
-  const [taken, done, courseMonth, courseAll] = await Promise.all([
+  const [taken, done, courseMonth, courseAll, payouts] = await Promise.all([
     takenBetween(from, today),
     periodStats(from, today),
     courseSales(COURSE_SLUG, from),
     courseSales(COURSE_SLUG, null),
+    withPayouts ? payoutPlan(today) : null,
   ]);
   const cur = done.currency;
   const since = `с ${dayMonth(from)}`;
@@ -982,6 +985,23 @@ export async function moneyMonthView(name: string | null): Promise<View> {
     lines.push(`   всего — ${salesLine(courseAll)}`);
   }
 
+  // Выплаты — деньги, которые уже заработаны, но лежат у Isracard.
+  // В сводке их место рядом с кассой: это она, только с задержкой.
+  if (payouts && payouts.upcoming.length > 0) {
+    const ahead = payouts.upcoming.reduce((sum, p) => sum + p.net, 0);
+    lines.push('', 'Isracard:');
+    for (const p of payouts.upcoming.slice(0, PAYOUTS_SHOWN)) {
+      lines.push(`   ${dayMonth(p.day)} — ${money(Math.round(p.net))}`);
+    }
+    const rest = payouts.upcoming.length - PAYOUTS_SHOWN;
+    if (rest > 0) {
+      lines.push(`   и ещё ${rest}\u00a0${plural(rest, 'выплата', 'выплаты', 'выплат')}`);
+    }
+    if (payouts.upcoming.length > 1) {
+      lines.push(`   всего впереди ${money(Math.round(ahead))}`);
+    }
+  }
+
   return { text: lines.join('\n'), keyboard: [] };
 }
 
@@ -1000,6 +1020,37 @@ export function statsView(origin: string): View {
 
 /** Сколько ближайших выплат показывать прямо в сообщении. */
 const PAYOUTS_SHOWN = 4;
+
+/**
+ * Кому писать про деньги кассы: админам. Преподавателю без этой роли
+ * выплаты Isracard ни о чём не говорят, а Варя админ.
+ */
+export async function moneyWatchers(): Promise<Teacher[]> {
+  return query<Teacher>(
+    `select distinct u.id, u.name, u.tg_chat_id::text as chat_id
+       from users u join user_roles r on r.user_id = u.id
+      where r.role in ('admin', 'superadmin') and u.tg_chat_id is not null`);
+}
+
+/**
+ * Накануне выплаты. Сумма названа примерной нарочно: график выведен из
+ * договора, а не получен от Isracard, и разойтись он может на возвраты
+ * и на оплаты, проведённые мимо сайта.
+ */
+export function payoutSoonView(p: Payout): View {
+  return {
+    text: [
+      `Завтра выплата Isracard: ориентировочно ${money(Math.round(p.net))}.`,
+      '',
+      `${p.credits.length}\u00a0${plural(p.credits.length, 'платёж', 'платежа', 'платежей')}`
+        + ` на ${money(Math.round(p.gross))}, комиссия ${money(Math.round(p.fee))}.`,
+      '',
+      'Сумма посчитана по договору. Точная — в кабинете Isracard,'
+        + ' раздел будущих зачислений.',
+    ].join('\n'),
+    keyboard: [],
+  };
+}
 
 /**
  * Деньги кассы: когда Isracard переведёт за оплату картой. Ближайшие
