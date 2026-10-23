@@ -6,7 +6,8 @@
 //   npm run tg:miniapp:prod -- --set    добавить /stats в меню
 //   npm run tg:miniapp:prod -- --set --only Дима    одному
 //   npm run tg:miniapp:prod -- --set --button       ещё и кнопка у поля ввода
-//   npm run tg:miniapp:prod -- --off    убрать и то, и другое
+//   npm run tg:miniapp:prod -- --keys   кнопки над клавиатурой, одно касание
+//   npm run tg:miniapp:prod -- --off    убрать всё
 import pg from 'pg';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -22,6 +23,9 @@ const only = onlyAt === -1 ? null : (args[onlyAt + 1] ?? '').toLowerCase();
 // Кнопка у поля ввода — отдельно: она занимает место словом «Статистика»
 // и прячет под собой меню команд, поэтому по умолчанию её не ставим.
 const button = args.includes('--button');
+// Кнопки над полем ввода: самый короткий путь к приложению — одно
+// касание, и меню команд при этом остаётся на месте.
+const keys = args.includes('--keys');
 const off = args.includes('--off');
 const origin = (args.find((a) => a.startsWith('http')) ?? process.env.SITE_URL
   ?? 'https://www.re-create.art').replace(/\/+$/, '');
@@ -99,6 +103,25 @@ for (const r of people) {
     await api('setChatMenuButton', { chat_id: Number(r.chat_id), menu_button: { type: 'commands' } });
   }
 
+  // Постоянная клавиатура живёт в чате, пока её не убрали, поэтому
+  // ставится сообщением, а не настройкой. Isracard — только админу.
+  if (keys) {
+    const row = [{ text: 'Статистика', web_app: { url: webApp } }];
+    if (r.admin) row.push({ text: 'Isracard', web_app: { url: `${origin}/tg/isracard` } });
+    await api('sendMessage', {
+      chat_id: Number(r.chat_id),
+      text: 'Кнопки внизу открывают приложение сразу, без команды.',
+      reply_markup: { keyboard: [row], is_persistent: true, resize_keyboard: true },
+    });
+  }
+  if (off) {
+    await api('sendMessage', {
+      chat_id: Number(r.chat_id),
+      text: 'Кнопки убраны.',
+      reply_markup: { remove_keyboard: true },
+    });
+  }
+
   const menu = await api('getMyCommands', { scope });
   const now = await api('getChatMenuButton', { chat_id: Number(r.chat_id) });
   const what = now.type === 'web_app' ? `кнопка «${now.text}»` : 'меню команд';
@@ -106,4 +129,4 @@ for (const r of people) {
     menu.length ? menu.map((x) => `/${x.command}`).join(' ') : 'список чата пуст, берётся общий'}`);
 }
 
-if (!set && !off) console.log('\nНичего не меняли. Поставить — флаг --set.');
+if (!set && !off && !keys) console.log('\nНичего не меняли. Поставить — флаг --set.');
