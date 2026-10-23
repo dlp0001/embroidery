@@ -6,7 +6,7 @@
 //   npm run tg:miniapp:prod -- --set    добавить /stats в меню
 //   npm run tg:miniapp:prod -- --set --only Дима    одному
 //   npm run tg:miniapp:prod -- --set --button       ещё и кнопка у поля ввода
-//   npm run tg:miniapp:prod -- --keys   кнопки над клавиатурой, одно касание
+//   npm run tg:miniapp:prod -- --keys --off   убрать кнопки над клавиатурой
 //   npm run tg:miniapp:prod -- --off    убрать всё
 import pg from 'pg';
 
@@ -23,8 +23,12 @@ const only = onlyAt === -1 ? null : (args[onlyAt + 1] ?? '').toLowerCase();
 // Кнопка у поля ввода — отдельно: она занимает место словом «Статистика»
 // и прячет под собой меню команд, поэтому по умолчанию её не ставим.
 const button = args.includes('--button');
-// Кнопки над полем ввода: самый короткий путь к приложению — одно
-// касание, и меню команд при этом остаётся на месте.
+/*
+ * Кнопки над полем ввода выглядели самым коротким путём, но приложению,
+ * открытому из такой кнопки, телеграм не даёт подписи: initData пустой,
+ * и экран не понимает, кто пришёл. Такие кнопки задуманы для ответа боту
+ * внутрь чата, а не для входа. Оставлено только снятие: --keys --off.
+ */
 const keys = args.includes('--keys');
 const off = args.includes('--off');
 const origin = (args.find((a) => a.startsWith('http')) ?? process.env.SITE_URL
@@ -89,7 +93,7 @@ for (const r of people) {
     const commands = [COMMON[0], COMMON[1], STATS,
       ...(r.admin ? [ISRACARD] : []), COMMON[2]];
     await api('setMyCommands', { scope, commands });
-  } else if (off) {
+  } else if (off && !keys) {
     // Удаляем список чата: телеграм вернётся к общему, где /stats нет.
     await api('deleteMyCommands', { scope });
   }
@@ -99,25 +103,16 @@ for (const r of people) {
       menu_button: { type: 'web_app', text: 'Статистика', web_app: { url: webApp } },
     });
   }
-  if (off || (set && !button)) {
+  if ((off && !keys) || (set && !button)) {
     await api('setChatMenuButton', { chat_id: Number(r.chat_id), menu_button: { type: 'commands' } });
   }
 
   // Постоянная клавиатура живёт в чате, пока её не убрали, поэтому
   // ставится сообщением, а не настройкой. Isracard — только админу.
-  if (keys) {
-    const row = [{ text: 'Статистика', web_app: { url: webApp } }];
-    if (r.admin) row.push({ text: 'Isracard', web_app: { url: `${origin}/tg/isracard` } });
+  if (keys || off) {
     await api('sendMessage', {
       chat_id: Number(r.chat_id),
-      text: 'Кнопки внизу открывают приложение сразу, без команды.',
-      reply_markup: { keyboard: [row], is_persistent: true, resize_keyboard: true },
-    });
-  }
-  if (off) {
-    await api('sendMessage', {
-      chat_id: Number(r.chat_id),
-      text: 'Кнопки убраны.',
+      text: 'Кнопки внизу убраны: приложение открывается из меню, командой.',
       reply_markup: { remove_keyboard: true },
     });
   }
