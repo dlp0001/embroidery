@@ -1055,6 +1055,8 @@ export type RosterRow = {
   was: number;
   /** На скольких из них человек был. */
   came: number;
+  /** И сколько раз был на других занятиях этого же дня недели. */
+  came_other: number;
   /** Деньги уже проведены: менять может только суперадмин. */
   locked: boolean;
   /**
@@ -1147,6 +1149,19 @@ export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
                 and s3.group_id = ses.group_id and s3.status <> 'cancelled'
                 and a3.status in ('present', 'trial')
                 and s3.held_on between ses.held_on - 56 and ses.held_on - 1) as came,
+            /* И то же самое по другим занятиям этого дня недели. В дне с
+               одной группой это всегда ноль, и правило «кого ждём» не
+               меняется. А когда занятий в дне два, отмеченный в профиле
+               день перестаёт быть однозначным: ждём там, куда человек
+               ходит, а новенького — пока в обоих. */
+            (select count(*)::int from attendance a4
+               join studio_sessions s4 on s4.id = a4.session_id
+               join studio_groups g4 on g4.id = s4.group_id
+               cross join ses
+              where a4.participant_id = o.participant_id
+                and g4.kind = 'lesson' and g4.weekday = ses.dow and g4.id <> ses.group_id
+                and s4.status <> 'cancelled' and a4.status in ('present', 'trial')
+                and s4.held_on between ses.held_on - 56 and ses.held_on - 1) as came_other,
             coalesce(b.status = 'booked', false) as booked,
             exists (select 1 from preferred_days pd cross join ses
                      where pd.participant_id = o.participant_id and pd.weekday = ses.dow
