@@ -1457,6 +1457,33 @@ export async function askAgainTargets(): Promise<AskTarget[]> {
  * null — от занятия ничего не осталось: отменили или семья к нему уже
  * не подходит. Такое сообщение слать не за чем.
  */
+/** Пока разделение дня — новость. Дальше времена в шапке говорят сами. */
+const SPLIT_NEWS_DAYS = 28;
+
+const EVERY = ['воскресеньям', 'понедельникам', 'вторникам', 'средам',
+  'четвергам', 'пятницам', 'субботам'];
+
+/**
+ * «Теперь по четвергам два занятия». Строка живёт месяц от первого дня
+ * самой новой группы этого дня и пропадает сама: через месяц это уже не
+ * новость, а времена в шапке и так перечислены.
+ */
+async function splitNews(groupIds: string[], day: string): Promise<string | null> {
+  const row = await one<{ fresh: boolean }>(
+    `select max(t.first) > $2::date - $3::int as fresh
+       from (select min(s.held_on) as first from studio_sessions s
+              where s.group_id = any($1::uuid[]) group by s.group_id) t`,
+    [groupIds, day, SPLIT_NEWS_DAYS]);
+  if (!row?.fresh) return null;
+  const [y, m, d] = day.split('-').map(Number);
+  const every = EVERY[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  const n = groupIds.length;
+  // Числом в такой фразе пишут объявления, а не люди.
+  const count = n === 2 ? 'два' : n === 3 ? 'три' : String(n);
+  return `Теперь по ${every} ${count} ${plural(n, 'занятие', 'занятия', 'занятий')}`
+    + ' — выберите удобное время.';
+}
+
 export async function askView(userId: string, sessionId: string): Promise<View | null> {
   const when = await one<{ held_on: string }>(
     'select held_on::text from studio_sessions where id = $1', [sessionId]);
@@ -1497,6 +1524,8 @@ export async function askView(userId: string, sessionId: string): Promise<View |
     lines.push(weekdayDayMonth(when.held_on));
     lines.push('');
     for (const x of sessions) lines.push([hhmm(x.starts_at), places(x)].filter(Boolean).join(' · '));
+    const news = await splitNews(sessions.map((x) => x.group_id), when.held_on);
+    if (news) lines.push('', news);
   }
   lines.push('');
 
