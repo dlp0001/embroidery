@@ -114,6 +114,11 @@
   .inside-list-text strong { font-weight: 500; display: block; margin-bottom: 3px; }
   .inside-right img { width: 100%; aspect-ratio: 4/5; object-fit: cover; }
 
+  /* BAND — широкая полоса-передышка между разделами. Кадр вертикальный,
+     поэтому берём из него середину: object-fit сам обрежет края. */
+  .band { width: 100%; height: clamp(240px, 34vw, 440px); overflow: hidden; }
+  .band img { width: 100%; height: 100%; object-fit: cover; object-position: center 42%; display: block; }
+
   /* QUOTE */
   .quote-section { padding: 80px 64px; text-align: center; }
   .quote-mark { font-family: 'Cormorant Garamond', serif; font-size: 100px; line-height: 0.5; color: var(--rose-light); display: block; margin-bottom: 12px; }
@@ -384,6 +389,11 @@
       <img src="photo1.jpg" alt="Embroidery close-up">
     </div>
   </div>
+</section>
+
+<!-- BAND -->
+<section class="band">
+  <img src="photo3.jpg" alt="Hand-embroidered motifs covering a cotton sheet">
 </section>
 
 <!-- QUOTE -->
