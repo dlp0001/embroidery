@@ -77,11 +77,10 @@
   .dir-go { font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--rose); margin-top: auto; }
   .dir-badge { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm-gray); background: var(--linen); padding: 5px 14px; align-self: flex-start; margin-top: auto; }
 
-  /* Полоса-передышка перед цитатой. Кадр вертикальный, берём нижнюю
-     часть: в карточке курса выше показана его середина, и повторять её
-     второй раз на одной странице незачем. */
+  /* Полоса-передышка перед цитатой. Кадр вертикальный, берём середину —
+     тот же вид, что в полосе на странице курса. */
   .band { width: 100%; height: clamp(240px, 34vw, 440px); overflow: hidden; }
-  .band img { width: 100%; height: 100%; object-fit: cover; object-position: center 78%; display: block; }
+  .band img { width: 100%; height: 100%; object-fit: cover; object-position: center 42%; display: block; }
 
   .quote-section { background: var(--linen); padding: 90px 64px; text-align: center; }
   .quote-mark { font-family: 'Cormorant Garamond', serif; font-size: 100px; line-height: 0.5; color: var(--rose-light); display: block; margin-bottom: 12px; }
