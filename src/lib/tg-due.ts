@@ -160,8 +160,12 @@ export async function sendDue(force: Force): Promise<DueResult> {
     ? force === 'ask'
     : now >= minutes(ASK_AM_AT) && now < minutes(ASK_AM_UNTIL);
   if (askDue) {
+    // Вопрос один на день, даже когда занятий в нём два: ключ дневной.
+    const asked = new Set<string>();
     for (const t of await askAgainTargets()) {
-      const campaign = `ask-am:${t.session_id}`;
+      if (asked.has(`${t.chat_id}|${t.held_on}`)) continue;
+      asked.add(`${t.chat_id}|${t.held_on}`);
+      const campaign = `ask-am:${t.held_on}`;
       if (force !== 'ask' && !(await claimSend(campaign, t.chat_id))) continue;
       const view = await askView(t.user_id, t.session_id);
       // Занятие отменили, пока мы собирались, — спрашивать не о чем.

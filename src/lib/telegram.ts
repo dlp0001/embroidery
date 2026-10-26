@@ -1169,7 +1169,13 @@ export async function debtorsView(origin: string): Promise<string> {
 
 // ── Вечерний вопрос ───────────────────────────────────────
 
-export type AskTarget = { chat_id: string; user_id: string; session_id: string };
+export type AskTarget = {
+  chat_id: string;
+  user_id: string;
+  session_id: string;
+  /** День занятия: вопрос задаётся про день целиком, а не про занятие. */
+  held_on: string;
+};
 
 export type PackOut = {
   chat_id: string;
@@ -1362,14 +1368,13 @@ export function packOutView(t: PackOut, origin: string): { text: string } {
  * достаточно тем, кто ходит и профиль не заполнял; второго — новичкам,
  * которых в журнале ещё нет.
  *
- * Если занятий в этот день два, отмеченный день сам по себе ничего не
- * говорит: ходят-то в одно из них. Тогда второе основание отпадает у
- * тех, кто последние восемь недель ходил на соседнее занятие того же
- * дня, — им вопрос про это занятие не нужен.
+ * Занятий в дне бывает два; вопрос всё равно один и рассказывает про
+ * оба — какое из них выбрать, решает семья, а не мы.
  */
 export async function askTargets(): Promise<AskTarget[]> {
   return query<AskTarget>(
-    `select distinct u.tg_chat_id::text as chat_id, u.id as user_id, s.id as session_id
+    `select distinct u.tg_chat_id::text as chat_id, u.id as user_id, s.id as session_id,
+            s.held_on::text
        from studio_sessions s
        join studio_groups g on g.id = s.group_id and g.active and g.kind = 'lesson'
        join participants p
@@ -1396,19 +1401,8 @@ export async function askTargets(): Promise<AskTarget[]> {
                        join studio_sessions s2 on s2.id = a.session_id
                       where a.participant_id = p.id and a.status = 'present'
                         and s2.group_id = g.id and s2.held_on > current_date - 14)
-          or (exists (select 1 from preferred_days pd
-                       where pd.participant_id = p.id and pd.weekday = g.weekday)
-              /* Отмеченный день — про день, а не про занятие. Если в этот
-                 день есть второе занятие и человек ходит туда, спрашивать
-                 про это незачем: два вопроса в один вечер читаются как
-                 ошибка бота. */
-              and not exists (
-                select 1 from attendance a3
-                  join studio_sessions s3 on s3.id = a3.session_id
-                  join studio_groups g3 on g3.id = s3.group_id
-                 where a3.participant_id = p.id and a3.status in ('present', 'trial')
-                   and g3.kind = 'lesson' and g3.weekday = g.weekday and g3.id <> g.id
-                   and s3.held_on between s.held_on - 56 and s.held_on - 1)))`,
+          or exists (select 1 from preferred_days pd
+                      where pd.participant_id = p.id and pd.weekday = g.weekday))`,
   );
 }
 
@@ -1423,7 +1417,8 @@ export async function askTargets(): Promise<AskTarget[]> {
  */
 export async function askAgainTargets(): Promise<AskTarget[]> {
   return query<AskTarget>(
-    `select distinct u.tg_chat_id::text as chat_id, u.id as user_id, s.id as session_id
+    `select distinct u.tg_chat_id::text as chat_id, u.id as user_id, s.id as session_id,
+            s.held_on::text
        from studio_sessions s
        join studio_groups g on g.id = s.group_id and g.active and g.kind = 'lesson'
        join participants p
@@ -1449,19 +1444,8 @@ export async function askAgainTargets(): Promise<AskTarget[]> {
                        join studio_sessions s2 on s2.id = a.session_id
                       where a.participant_id = p.id and a.status = 'present'
                         and s2.group_id = g.id and s2.held_on > current_date - 14)
-          or (exists (select 1 from preferred_days pd
-                       where pd.participant_id = p.id and pd.weekday = g.weekday)
-              /* Отмеченный день — про день, а не про занятие. Если в этот
-                 день есть второе занятие и человек ходит туда, спрашивать
-                 про это незачем: два вопроса в один вечер читаются как
-                 ошибка бота. */
-              and not exists (
-                select 1 from attendance a3
-                  join studio_sessions s3 on s3.id = a3.session_id
-                  join studio_groups g3 on g3.id = s3.group_id
-                 where a3.participant_id = p.id and a3.status in ('present', 'trial')
-                   and g3.kind = 'lesson' and g3.weekday = g.weekday and g3.id <> g.id
-                   and s3.held_on between s.held_on - 56 and s.held_on - 1)))`,
+          or exists (select 1 from preferred_days pd
+                      where pd.participant_id = p.id and pd.weekday = g.weekday))`,
   );
 }
 
@@ -1478,49 +1462,80 @@ export async function askView(userId: string, sessionId: string): Promise<View |
     'select held_on::text from studio_sessions where id = $1', [sessionId]);
   if (!when) return null;
 
+  // Занятий в дне бывает два, и спрашиваем сразу про оба: семья вправе
+  // выбрать другое время, а два сообщения за вечер про один и тот же
+  // день читаются как поломка бота.
   const rows = (await slotsForUser(userId, when.held_on, when.held_on))
-    .filter((r) => r.session_id === sessionId);
+    .filter((r) => r.kind === 'lesson');
   if (rows.length === 0) return null;
 
   // Отказ тоже хранится строкой, поэтому «не придёт» отличимо от
   // «промолчал»: у первого есть отменённая запись, у второго нет ничего.
   const said = new Map<string, string>();
-  for (const r of await query<{ participant_id: string; status: string }>(
-    'select participant_id, status from bookings where session_id = $1', [sessionId])) {
-    said.set(r.participant_id, r.status);
+  for (const r of await query<{ session_id: string; participant_id: string; status: string }>(
+    `select b.session_id, b.participant_id, b.status
+       from bookings b join studio_sessions s on s.id = b.session_id
+      where s.held_on = $1::date`, [when.held_on])) {
+    said.set(`${r.session_id}|${r.participant_id}`, r.status);
   }
 
-  const head = rows[0];
-  const free = head.capacity === null ? null : Math.max(head.capacity - head.taken, 0);
+  const sessions = [...new Map(rows.map((r) => [r.session_id, r])).values()];
+  const places = (r: SlotRow): string => {
+    const free = r.capacity === null ? null : Math.max(r.capacity - r.taken, 0);
+    if (free === null) return '';
+    return free === 0 ? 'мест нет' : `свободно ${free} из ${r.capacity}`;
+  };
+
   // Утреннее напоминание шлёт этот же вид, а «завтра» в день занятия —
   // прямая ложь. Слово берём из даты, а не из того, кто нас позвал.
-  const lines = [
-    head.held_on === todayISO() ? 'Кто придёт сегодня?' : 'Кто придёт завтра?',
-    `${weekdayDayMonth(head.held_on)} · ${hhmm(head.starts_at)}`
-      + (free === null ? '' : ` · ${free === 0 ? 'мест нет' : `свободно ${free} из ${head.capacity}`}`),
-    '',
-  ];
+  const lines = [when.held_on === todayISO() ? 'Кто придёт сегодня?' : 'Кто придёт завтра?'];
+  if (sessions.length === 1) {
+    const only = sessions[0];
+    lines.push([weekdayDayMonth(only.held_on), hhmm(only.starts_at), places(only)]
+      .filter(Boolean).join(' · '));
+  } else {
+    lines.push(weekdayDayMonth(when.held_on));
+    lines.push('');
+    for (const x of sessions) lines.push([hhmm(x.starts_at), places(x)].filter(Boolean).join(' · '));
+  }
+  lines.push('');
+
+  const byWho = new Map<string, SlotRow[]>();
+  for (const r of rows) byWho.set(r.participant_id, [...(byWho.get(r.participant_id) ?? []), r]);
 
   const buttons: Button[] = [];
-  for (const r of rows) {
-    const state = r.booked ? 'придёт'
-      : said.get(r.participant_id) === 'cancelled' ? 'не придёт'
-      : 'не отмечено';
-    lines.push(`${r.who} — ${state}`);
-    // Обе кнопки стоят всегда: ответ можно поменять до самого занятия.
-    // Занять последнее место может только тот, кто ещё не записан.
-    if (!r.booked && free === 0) {
-      buttons.push({ text: `${r.who} · мест нет`, callback_data: tapData(r, false, 'ask') });
-    } else {
+  for (const mine of byWho.values()) {
+    const going = mine.filter((r) => r.booked);
+    const state = going.length > 0
+      ? (sessions.length === 1
+        ? 'придёт'
+        : `придёт в ${going.map((r) => hhmm(r.starts_at)).join(' и ')}`)
+      : mine.some((r) => said.get(`${r.session_id}|${r.participant_id}`) === 'cancelled')
+        ? 'не придёт'
+        : 'не отмечено';
+    lines.push(`${mine[0].who} — ${state}`);
+
+    for (const r of mine) {
+      // Время на кнопке — только когда занятий в дне несколько: иначе
+      // оно повторяет шапку и съедает место под именем.
+      const at = sessions.length === 1 ? '' : ` · ${hhmm(r.starts_at)}`;
+      const free = r.capacity === null ? null : Math.max(r.capacity - r.taken, 0);
+      // Обе кнопки стоят всегда: ответ можно поменять до самого занятия.
+      // Занять последнее место может только тот, кто ещё не записан.
+      if (!r.booked && free === 0) {
+        buttons.push({ text: `${r.who}${at} · мест нет`, callback_data: tapData(r, false, 'ask') });
+      } else {
+        buttons.push({
+          text: `${r.booked ? '✓ ' : ''}${r.who}${at} · придёт`,
+          callback_data: tapData(r, true, 'ask'),
+        });
+      }
+      const no = said.get(`${r.session_id}|${r.participant_id}`) === 'cancelled' && !r.booked;
       buttons.push({
-        text: `${r.booked ? '✓ ' : ''}${r.who} · придёт`,
-        callback_data: tapData(r, true, 'ask'),
+        text: `${no ? '✓ ' : ''}${r.who}${at} · не придёт`,
+        callback_data: tapData(r, false, 'ask'),
       });
     }
-    buttons.push({
-      text: `${said.get(r.participant_id) === 'cancelled' && !r.booked ? '✓ ' : ''}${r.who} · не придёт`,
-      callback_data: tapData(r, false, 'ask'),
-    });
   }
 
   return { text: lines.join('\n'), keyboard: rows2(buttons) };

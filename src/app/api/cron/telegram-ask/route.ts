@@ -39,8 +39,10 @@ export async function GET(req: Request): Promise<Response> {
   let skipped = 0;
   let failed = 0;
 
+  // Вопрос один на день: в нём оба занятия, если их в этот день два.
+  // Ключ рассылки поэтому дневной, а не по занятию.
   for (const t of targets) {
-    const campaign = `ask:${t.session_id}`;
+    const campaign = `ask:${t.held_on}`;
     // Место в журнале занимаем до отправки: крон может сработать дважды,
     // и родитель получит один и тот же вопрос два раза.
     if (!(await claimSend(campaign, t.chat_id))) { skipped++; continue; }
