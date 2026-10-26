@@ -453,22 +453,29 @@ function rows2(buttons: Button[]): Keyboard {
  */
 /** Кнопка на каждого, кого ещё можно записать или уже можно отменить. */
 function slotButtons(rows: SlotRow[], today: string): Button[] {
-  const buttons: Button[] = [];
-  for (const r of rows) {
+  const shown = rows.filter((r) => {
     // День прошёл — обещать приход поздно. Мест нет — записаться некуда,
     // но свою запись снять можно всегда.
-    if (r.held_on < today) continue;
+    if (r.held_on < today) return false;
     // День смены закрывается в обед: состав к этому часу уже у студии,
     // и кнопка, которая ничего не сделает, хуже её отсутствия.
-    if (r.kind !== 'lesson' && eventClosed(r.held_on)) continue;
+    if (r.kind !== 'lesson' && eventClosed(r.held_on)) return false;
     const free = r.capacity === null ? null : Math.max(r.capacity - r.taken, 0);
-    if (!r.booked && free === 0) continue;
-    buttons.push({
-      text: `${r.booked ? '✓ ' : ''}${shortDay(r.held_on)} · ${shortName(r.who)}`,
-      callback_data: tapData(r, !r.booked, 'list'),
-    });
-  }
-  return buttons;
+    return r.booked || free !== 0;
+  });
+
+  // Время на кнопке — только там, где в этот день у человека не одно
+  // занятие. Иначе «чт 29 · Линда» стоит дважды, и выбрать нельзя; а
+  // ставить время всем — растить кнопки в дни, где и так всё ясно.
+  const perDay = new Map<string, number>();
+  for (const r of shown) perDay.set(r.held_on, (perDay.get(r.held_on) ?? 0) + 1);
+
+  return shown.map((r) => ({
+    text: `${r.booked ? '✓ ' : ''}${(perDay.get(r.held_on) ?? 0) > 1
+      ? `${shortDay(r.held_on)}, ${hhmm(r.starts_at)}`
+      : shortDay(r.held_on)} · ${shortName(r.who)}`,
+    callback_data: tapData(r, !r.booked, 'list'),
+  }));
 }
 
 /**
