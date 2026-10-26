@@ -1051,12 +1051,14 @@ export type RosterRow = {
   gift: boolean;
   booked: boolean;
   preferred: boolean;
-  /** Занятий этой группы за последние восемь недель. */
+  /** Сколько раз этот день недели случался за восемь недель. */
   was: number;
-  /** На скольких из них человек был. */
+  /** В скольких из них человек был в студии — на любом занятии дня. */
   came: number;
-  /** И сколько раз был на других занятиях этого же дня недели. */
-  came_other: number;
+  /** Сколько раз был именно на этом занятии. */
+  here: number;
+  /** И сколько раз — на соседнем занятии того же дня. */
+  there: number;
   /** Деньги уже проведены: менять может только суперадмин. */
   locked: boolean;
   /**
@@ -1133,35 +1135,47 @@ export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
             (select pay.invoice_url from payments pay where pay.id = c.payment_id) as receipt_url,
             (select pay.raw ->> 'pay_method' from payments pay where pay.id = c.payment_id) as pay_method,
             (c.id is not null) as locked,
-            /* Ходит ли человек на эти дни вообще. Считаем по той же
-               группе за последние восемь недель: отмеченный в профиле
-               день сам по себе не говорит ничего — его ставят на всякий
-               случай и забывают, а Варе нужно знать, кого ждать всерьёз.
+            /* Как часто человек бывает в студии в этот день недели.
+               Считаем по дням, а не по занятиям: когда день разделён
+               надвое, занятий вдвое больше, а ходит человек по-прежнему
+               раз в неделю — и постоянный иначе выглядел бы редким.
                Болезнь приходом не считаем: намерение было, а занятия не
                случилось. */
-            (select count(*)::int from studio_sessions s3 cross join ses
-              where s3.group_id = ses.group_id and s3.status <> 'cancelled'
+            (select count(distinct s3.held_on)::int
+               from studio_sessions s3
+               join studio_groups g3 on g3.id = s3.group_id
+               cross join ses
+              where g3.kind = 'lesson' and g3.weekday = ses.dow
+                and s3.status <> 'cancelled'
                 and s3.held_on between ses.held_on - 56 and ses.held_on - 1) as was,
-            (select count(*)::int from attendance a3
+            (select count(distinct s3.held_on)::int
+               from attendance a3
                join studio_sessions s3 on s3.id = a3.session_id
+               join studio_groups g3 on g3.id = s3.group_id
                cross join ses
               where a3.participant_id = o.participant_id
-                and s3.group_id = ses.group_id and s3.status <> 'cancelled'
-                and a3.status in ('present', 'trial')
+                and g3.kind = 'lesson' and g3.weekday = ses.dow
+                and s3.status <> 'cancelled' and a3.status in ('present', 'trial')
                 and s3.held_on between ses.held_on - 56 and ses.held_on - 1) as came,
-            /* И то же самое по другим занятиям этого дня недели. В дне с
-               одной группой это всегда ноль, и правило «кого ждём» не
-               меняется. А когда занятий в дне два, отмеченный в профиле
-               день перестаёт быть однозначным: ждём там, куда человек
-               ходит, а новенького — пока в обоих. */
+            /* А это про то, куда именно он ходит, когда занятий в дне
+               два: сюда или к соседям. Окно короче: после перехода на
+               другое время старый след должен выветриться за три недели,
+               а не висеть два месяца. */
             (select count(*)::int from attendance a4
                join studio_sessions s4 on s4.id = a4.session_id
-               join studio_groups g4 on g4.id = s4.group_id
                cross join ses
               where a4.participant_id = o.participant_id
-                and g4.kind = 'lesson' and g4.weekday = ses.dow and g4.id <> ses.group_id
+                and s4.group_id = ses.group_id
                 and s4.status <> 'cancelled' and a4.status in ('present', 'trial')
-                and s4.held_on between ses.held_on - 56 and ses.held_on - 1) as came_other,
+                and s4.held_on between ses.held_on - 21 and ses.held_on - 1) as here,
+            (select count(*)::int from attendance a5
+               join studio_sessions s5 on s5.id = a5.session_id
+               join studio_groups g5 on g5.id = s5.group_id
+               cross join ses
+              where a5.participant_id = o.participant_id
+                and g5.kind = 'lesson' and g5.weekday = ses.dow and g5.id <> ses.group_id
+                and s5.status <> 'cancelled' and a5.status in ('present', 'trial')
+                and s5.held_on between ses.held_on - 21 and ses.held_on - 1) as there,
             coalesce(b.status = 'booked', false) as booked,
             exists (select 1 from preferred_days pd cross join ses
                      where pd.participant_id = o.participant_id and pd.weekday = ses.dow

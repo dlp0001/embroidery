@@ -684,11 +684,13 @@ export async function isTeacher(userId: string): Promise<boolean> {
 
 type RosterRow = {
   who: string; booking: string; declined: boolean; preferred: boolean;
-  /** Занятий этой группы за восемь недель и сколько из них человек был. */
+  /** Сколько раз этот день недели случался за восемь недель и в
+      скольких из них человек был в студии — на любом занятии дня. */
   was: number;
   came: number;
-  /** И сколько раз был на других занятиях этого же дня недели. */
-  came_other: number;
+  /** Сколько раз был на этом занятии и сколько — на соседнем. */
+  here: number;
+  there: number;
 };
 
 /**
@@ -711,24 +713,43 @@ async function roster(sessionId: string): Promise<RosterRow[]> {
      select coalesce(ch.name, u.name, 'Без имени') as who,
             coalesce(b.status, '') as booking,
             (b.declined_at is not null) as declined,
-            (select count(*)::int from studio_sessions s3 cross join ses
-              where s3.group_id = ses.group_id and s3.status <> 'cancelled'
+            /* Как часто человек бывает в студии в этот день недели.
+               По дням, а не по занятиям: разделённый надвое день не
+               делает постоянного редким. */
+            (select count(distinct s3.held_on)::int
+               from studio_sessions s3
+               join studio_groups g3 on g3.id = s3.group_id
+               cross join ses
+              where g3.kind = 'lesson' and g3.weekday = ses.dow
+                and s3.status <> 'cancelled'
                 and s3.held_on between ses.held_on - 56 and ses.held_on - 1) as was,
-            (select count(*)::int from attendance a3
+            (select count(distinct s3.held_on)::int
+               from attendance a3
                join studio_sessions s3 on s3.id = a3.session_id
+               join studio_groups g3 on g3.id = s3.group_id
                cross join ses
               where a3.participant_id = p.id
-                and s3.group_id = ses.group_id and s3.status <> 'cancelled'
-                and a3.status in ('present', 'trial')
+                and g3.kind = 'lesson' and g3.weekday = ses.dow
+                and s3.status <> 'cancelled' and a3.status in ('present', 'trial')
                 and s3.held_on between ses.held_on - 56 and ses.held_on - 1) as came,
+            /* А это про то, куда именно он ходит, когда занятий в дне
+               два: сюда или к соседям. Окно короче: после перехода на
+               другое время старый след должен выветриться за три недели,
+               а не висеть два месяца. */
             (select count(*)::int from attendance a4
                join studio_sessions s4 on s4.id = a4.session_id
-               join studio_groups g4 on g4.id = s4.group_id
                cross join ses
-              where a4.participant_id = p.id
-                and g4.kind = 'lesson' and g4.weekday = ses.dow and g4.id <> ses.group_id
+              where a4.participant_id = p.id and s4.group_id = ses.group_id
                 and s4.status <> 'cancelled' and a4.status in ('present', 'trial')
-                and s4.held_on between ses.held_on - 56 and ses.held_on - 1) as came_other,
+                and s4.held_on between ses.held_on - 21 and ses.held_on - 1) as here,
+            (select count(*)::int from attendance a5
+               join studio_sessions s5 on s5.id = a5.session_id
+               join studio_groups g5 on g5.id = s5.group_id
+               cross join ses
+              where a5.participant_id = p.id
+                and g5.kind = 'lesson' and g5.weekday = ses.dow and g5.id <> ses.group_id
+                and s5.status <> 'cancelled' and a5.status in ('present', 'trial')
+                and s5.held_on between ses.held_on - 21 and ses.held_on - 1) as there,
             exists (select 1 from preferred_days pd cross join ses
                      where pd.participant_id = p.id and pd.weekday = ses.dow
                        and ses.kind = 'lesson') as preferred
@@ -808,7 +829,7 @@ async function sessionLines(
   // занятии». Когда занятий в дне два, ждём там, куда человек ходит;
   // кто не ходил никуда — остаётся в обоих, пока не появится.
   const marked = rows.filter(
-    (r) => r.preferred && r.booking === '' && (r.came > 0 || r.came_other === 0));
+    (r) => r.preferred && r.booking === '' && (r.here > 0 || r.there === 0));
   // Сюда же те, по кому судить не по чему: занятий этой группы за два
   // месяца не было вовсе. Молчать про них нельзя — это новая группа или
   // вернувшаяся после перерыва, и ждать их надо как раньше.
