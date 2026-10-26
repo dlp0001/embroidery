@@ -77,6 +77,12 @@
   .dir-go { font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--rose); margin-top: auto; }
   .dir-badge { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm-gray); background: var(--linen); padding: 5px 14px; align-self: flex-start; margin-top: auto; }
 
+  /* Полоса-передышка перед цитатой. Кадр вертикальный, берём нижнюю
+     часть: в карточке курса выше показана его середина, и повторять её
+     второй раз на одной странице незачем. */
+  .band { width: 100%; height: clamp(240px, 34vw, 440px); overflow: hidden; }
+  .band img { width: 100%; height: 100%; object-fit: cover; object-position: center 78%; display: block; }
+
   .quote-section { background: var(--linen); padding: 90px 64px; text-align: center; }
   .quote-mark { font-family: 'Cormorant Garamond', serif; font-size: 100px; line-height: 0.5; color: var(--rose-light); display: block; margin-bottom: 12px; }
   .quote-text { font-family: 'Cormorant Garamond', serif; font-size: clamp(22px, 2.6vw, 34px); font-weight: 300; font-style: italic; color: var(--charcoal); max-width: 820px; margin: 0 auto; line-height: 1.5; }
@@ -155,7 +161,7 @@
   <div class="dir-grid">
 
     <a href="/studio" class="dir-card">
-      <div class="dir-media"><img src="studio.jpg" alt="Студия Свободного Творчества — занятие с детьми"></div>
+      <div class="dir-media"><img src="photo4.jpg" style="object-position: 50% 55%" alt="Студия Свободного Творчества — занятие с детьми"></div>
       <div class="dir-label">Студия · Старый Север, Тель-Авив</div>
       <div class="dir-title">Студия свободного творчества</div>
       <p class="dir-desc">Авторское пространство, где можно творить во все стороны и во всех техниках сразу — ради того, чтобы дать идее жить.</p>
@@ -194,6 +200,10 @@
     </div>
 
   </div>
+</section>
+
+<section class="band">
+  <img src="photo3.jpg" alt="Вышивки на простыне — работы студии">
 </section>
 
 <section class="quote-section">
