@@ -1059,6 +1059,10 @@ export type RosterRow = {
   here: number;
   /** И сколько раз — на соседнем занятии того же дня. */
   there: number;
+  /** В последний раз был именно здесь. Null — не был нигде. */
+  last_here: boolean | null;
+  /** Записан на соседнее занятие того же дня. */
+  booked_other: boolean;
   /** Деньги уже проведены: менять может только суперадмин. */
   locked: boolean;
   /**
@@ -1176,6 +1180,30 @@ export async function sessionRoster(sessionId: string): Promise<RosterRow[]> {
                 and g5.kind = 'lesson' and g5.weekday = ses.dow and g5.id <> ses.group_id
                 and s5.status <> 'cancelled' and a5.status in ('present', 'trial')
                 and s5.held_on between ses.held_on - 21 and ses.held_on - 1) as there,
+            /* Когда свежего следа нет совсем, смотрим, где человек был
+               в последний раз: пропавший на месяц ходил куда-то вполне
+               определённо, и показывать его в обоих журналах незачем.
+               Пусто — не был нигде, это новенький, и тогда ждём в обоих. */
+            /* Записался на соседнее занятие того же дня — значит там и
+               будет. Запись это прямое слово семьи, и привычку она
+               перевешивает. */
+            exists (select 1 from bookings b2
+                      join studio_sessions s7 on s7.id = b2.session_id
+                      join studio_groups g7 on g7.id = s7.group_id
+                      cross join ses
+                     where b2.participant_id = o.participant_id and b2.status = 'booked'
+                       and g7.kind = 'lesson'
+                       and s7.held_on = ses.held_on and s7.id <> ses.id) as booked_other,
+            ((select (array_agg(s6.group_id order by s6.held_on desc))[1]
+                from attendance a6
+                join studio_sessions s6 on s6.id = a6.session_id
+                join studio_groups g6 on g6.id = s6.group_id
+               where a6.participant_id = o.participant_id
+                 and g6.kind = 'lesson' and g6.weekday = (select dow from ses)
+                 and s6.status <> 'cancelled' and a6.status in ('present', 'trial')
+                 and s6.held_on between (select held_on from ses) - 56
+                                    and (select held_on from ses) - 1)
+             = (select group_id from ses)) as last_here,
             coalesce(b.status = 'booked', false) as booked,
             exists (select 1 from preferred_days pd cross join ses
                      where pd.participant_id = o.participant_id and pd.weekday = ses.dow

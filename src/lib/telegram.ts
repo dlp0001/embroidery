@@ -691,6 +691,10 @@ type RosterRow = {
   /** Сколько раз был на этом занятии и сколько — на соседнем. */
   here: number;
   there: number;
+  /** В последний раз был именно здесь. Null — не был нигде. */
+  last_here: boolean | null;
+  /** Записан на соседнее занятие того же дня. */
+  booked_other: boolean;
 };
 
 /**
@@ -750,6 +754,30 @@ async function roster(sessionId: string): Promise<RosterRow[]> {
                 and g5.kind = 'lesson' and g5.weekday = ses.dow and g5.id <> ses.group_id
                 and s5.status <> 'cancelled' and a5.status in ('present', 'trial')
                 and s5.held_on between ses.held_on - 21 and ses.held_on - 1) as there,
+            /* Когда свежего следа нет совсем, смотрим, где человек был
+               в последний раз: пропавший на месяц ходил куда-то вполне
+               определённо, и показывать его в обоих журналах незачем.
+               Пусто — не был нигде, это новенький, и тогда ждём в обоих. */
+            /* Записался на соседнее занятие того же дня — значит там и
+               будет. Запись это прямое слово семьи, и привычку она
+               перевешивает. */
+            exists (select 1 from bookings b2
+                      join studio_sessions s7 on s7.id = b2.session_id
+                      join studio_groups g7 on g7.id = s7.group_id
+                      cross join ses
+                     where b2.participant_id = p.id and b2.status = 'booked'
+                       and g7.kind = 'lesson'
+                       and s7.held_on = ses.held_on and s7.id <> ses.id) as booked_other,
+            ((select (array_agg(s6.group_id order by s6.held_on desc))[1]
+                from attendance a6
+                join studio_sessions s6 on s6.id = a6.session_id
+                join studio_groups g6 on g6.id = s6.group_id
+               where a6.participant_id = p.id
+                 and g6.kind = 'lesson' and g6.weekday = (select dow from ses)
+                 and s6.status <> 'cancelled' and a6.status in ('present', 'trial')
+                 and s6.held_on between (select held_on from ses) - 56
+                                    and (select held_on from ses) - 1)
+             = (select group_id from ses)) as last_here,
             exists (select 1 from preferred_days pd cross join ses
                      where pd.participant_id = p.id and pd.weekday = ses.dow
                        and ses.kind = 'lesson') as preferred
@@ -829,7 +857,8 @@ async function sessionLines(
   // занятии». Когда занятий в дне два, ждём там, куда человек ходит;
   // кто не ходил никуда — остаётся в обоих, пока не появится.
   const marked = rows.filter(
-    (r) => r.preferred && r.booking === '' && (r.here > 0 || r.there === 0));
+    (r) => r.preferred && r.booking === '' && !r.booked_other
+      && (r.here > 0 || (r.there === 0 && r.last_here !== false)));
   // Сюда же те, по кому судить не по чему: занятий этой группы за два
   // месяца не было вовсе. Молчать про них нельзя — это новая группа или
   // вернувшаяся после перерыва, и ждать их надо как раньше.
