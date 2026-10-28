@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { cookies } from 'next/headers';
+import { signDirectory } from './bunny-sign';
 import { MAX_DEVICES } from './course-limits';
 import { one, query, tx } from './db';
 import { dayMonth } from './format';
@@ -21,8 +22,12 @@ import { siteOrigin } from './site';
  */
 
 const BUNNY_LIBRARY = '675652';
+/** Зона CDN библиотеки: отсюда видео берёт свой плеер, без player.mediadelivery.net. */
+const BUNNY_CDN_HOST = 'vz-c3deb49f-ce8.b-cdn.net';
 /** Сколько живёт подписанная ссылка на плеер. Страница дольше не висит. */
 const PLAYER_HOURS = 4;
+/** Ссылка на видео для своего плеера: урок до двух часов плюс запас на паузы. */
+const STREAM_HOURS = 6;
 /** Не чаще одного письма со ссылкой за это время, чтобы форму не превратили в спам. */
 const LINK_PAUSE_MIN = 2;
 /** last_seen обновляем не на каждый заход: хватает точности до часа. */
@@ -70,6 +75,8 @@ export type Lesson = {
   title: string;
   description: string | null;
   embed: string | null;
+  /** Видео для своего плеера. null — ключ зоны не задан, тогда только плеер Bunny. */
+  stream: { src: string; poster: string } | null;
 };
 
 /**
@@ -88,6 +95,25 @@ export function bunnyEmbed(videoId: string): string {
   );
 }
 
+/**
+ * Видео напрямую с зоны CDN, для своего плеера на странице курса.
+ *
+ * Плеер Bunny (player.mediadelivery.net) общий для всех и из России ведёт
+ * на дальний сервер, до которого у части провайдеров запросы обрываются.
+ * Сама зона из России доступна, поэтому плеер свой, а видео — прямо из неё.
+ * Подпись на всю папку видео: список качеств, куски и обложка внутри неё.
+ */
+export function bunnyStream(videoId: string): { src: string; poster: string } | null {
+  const key = process.env.BUNNY_CDN_TOKEN_KEY?.trim();
+  if (!key) return null;
+  const expires = Math.floor(Date.now() / 1000) + STREAM_HOURS * 60 * 60;
+  const dir = `/${videoId}/`;
+  return {
+    src: signDirectory(BUNNY_CDN_HOST, dir, 'playlist.m3u8', key, expires),
+    poster: signDirectory(BUNNY_CDN_HOST, dir, 'thumbnail.jpg', key, expires),
+  };
+}
+
 /** Уроки с подписанным плеером. Звать только после проверки доступа. */
 export async function lessonsWithPlayers(courseId: string): Promise<Lesson[]> {
   const rows = await query<{
@@ -103,6 +129,7 @@ export async function lessonsWithPlayers(courseId: string): Promise<Lesson[]> {
     title: r.title,
     description: r.description,
     embed: r.video ? bunnyEmbed(r.video) : null,
+    stream: r.video ? bunnyStream(r.video) : null,
   }));
 }
 

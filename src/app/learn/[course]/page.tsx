@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { courseAccess, courseBySlug, lessonsWithPlayers, longDate } from '@/lib/course';
 import Shell from '../Shell';
 import RequestLinkForm from '../RequestLinkForm';
+import LessonPlayer from '../LessonPlayer';
 
 export const dynamic = 'force-dynamic';
 
@@ -103,16 +104,8 @@ export default async function CoursePage({ params }: { params: Promise<{ course:
               <div className="video-num">{String(l.position).padStart(2, '0')}</div>
               <div className="video-title">{l.title}</div>
             </div>
-            {l.embed && (
-              <div className="video-player">
-                <iframe
-                  src={l.embed}
-                  title={l.title}
-                  loading="lazy"
-                  allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
-                  allowFullScreen
-                />
-              </div>
+            {(l.stream || l.embed) && (
+              <LessonPlayer title={l.title} stream={l.stream} embed={l.embed} />
             )}
             {l.description && <div className="video-desc">{l.description}</div>}
           </div>

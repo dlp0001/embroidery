@@ -39,6 +39,26 @@
         "export $(grep ANTHROPIC_API_KEY .env.production.local | xargs) && ICOUNT_TOKEN=demo-not-a-real-token npm run dev"
       ],
       "port": 4321
+    },
+    {
+      "_": "Свой плеер курса с заведомо неверным ключом зоны Bunny: видно обложку и кнопку, а видео не грузится — так проверяется запасной путь на плеер Bunny.",
+      "name": "site-player-test",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-lc",
+        "BUNNY_CDN_TOKEN_KEY=not-a-real-key npm run dev"
+      ],
+      "port": 4321
+    },
+    {
+      "_": "Свой плеер курса с настоящим ключом зоны Bunny из боевого файла окружения: видео идёт прямо из vz-c3deb49f-ce8.b-cdn.net.",
+      "name": "site-video",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-lc",
+        "export $(grep -E '^BUNNY_CDN_TOKEN_KEY=' .env.production.local | xargs) && npm run dev"
+      ],
+      "port": 4321
     }
   ]
 }

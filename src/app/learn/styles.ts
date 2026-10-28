@@ -36,6 +36,14 @@ export const LEARN_CSS = `
   .lc .video-title { font-family: 'Cormorant Garamond', serif; font-size: 24px; font-weight: 400; color: var(--charcoal); }
   .lc .video-player { position: relative; padding-top: 56.25%; background: #000; }
   .lc .video-player iframe { border: 0; position: absolute; inset: 0; height: 100%; width: 100%; }
+  .lc .video-player video { position: absolute; inset: 0; width: 100%; height: 100%; background: #000; object-fit: contain; }
+  .lc .play-btn { position: absolute; inset: 0; margin: auto; width: 76px; height: 76px; border-radius: 50%; border: none; background: rgba(233,30,140,0.92); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.2s, background 0.2s; }
+  .lc .play-btn:hover { transform: scale(1.06); background: var(--rose-dark); }
+  .lc .play-btn svg { width: 34px; height: 34px; fill: #fff; margin-left: 4px; }
+  .lc .player-fail { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; background: rgba(26,26,46,0.92); color: #fff; font-size: 15px; text-align: center; padding: 20px; }
+  .lc .player-alt { padding: 10px 32px 0; text-align: right; }
+  .lc .player-alt button { background: none; border: none; padding: 0; font: inherit; font-size: 12px; color: var(--warm-gray); text-decoration: underline; text-decoration-color: rgba(102,102,102,0.35); text-underline-offset: 3px; cursor: pointer; }
+  .lc .player-alt button:hover { color: var(--rose); }
   .lc .video-desc { padding: 20px 32px; font-size: 14px; color: var(--warm-gray); line-height: 1.85; border-top: 1px solid rgba(200,168,112,0.15); }
 
   .lc .btn { display: inline-block; padding: 16px 36px; background: var(--rose); color: #fff; border: none; font-family: 'Jost', sans-serif; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: background 0.2s; text-align: center; }
@@ -71,6 +79,8 @@ export const LEARN_CSS = `
     .lc .video-num { font-size: 34px; }
     .lc .video-title { font-size: 21px; }
     .lc .video-desc { padding: 16px 18px; }
+    .lc .player-alt { padding: 10px 18px 0; }
+    .lc .play-btn { width: 64px; height: 64px; }
     .lc .gate-card { padding: 40px 24px; }
     .lc footer { padding: 32px 20px; flex-direction: column; align-items: flex-start; }
   }
