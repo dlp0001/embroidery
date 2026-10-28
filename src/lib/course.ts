@@ -101,7 +101,10 @@ export function bunnyEmbed(videoId: string): string {
  * Плеер Bunny (player.mediadelivery.net) общий для всех и из России ведёт
  * на дальний сервер, до которого у части провайдеров запросы обрываются.
  * Сама зона из России доступна, поэтому плеер свой, а видео — прямо из неё.
- * Подпись на всю папку видео: список качеств, куски и обложка внутри неё.
+ * Подпись на всю папку видео: список качеств и куски внутри неё.
+ *
+ * Обложка своя, кадр из урока в public/media/lessons/<id видео>.jpg: имя
+ * обложки в зоне Bunny выдаёт только его плеер, а секрета в ней нет.
  */
 export function bunnyStream(videoId: string): { src: string; poster: string } | null {
   const key = process.env.BUNNY_CDN_TOKEN_KEY?.trim();
@@ -110,7 +113,7 @@ export function bunnyStream(videoId: string): { src: string; poster: string } | 
   const dir = `/${videoId}/`;
   return {
     src: signDirectory(BUNNY_CDN_HOST, dir, 'playlist.m3u8', key, expires),
-    poster: signDirectory(BUNNY_CDN_HOST, dir, 'thumbnail.jpg', key, expires),
+    poster: `/media/lessons/${videoId}.jpg`,
   };
 }
 

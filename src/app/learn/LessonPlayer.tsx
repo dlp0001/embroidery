@@ -11,7 +11,10 @@ type HlsLike = { destroy(): void; startLoad(): void; recoverMediaError(): void }
  * сервер, до которого у части провайдеров запросы обрываются.
  *
  * До нажатия грузится только обложка: уроков на странице четыре, и тянуть
- * все сразу незачем. Safari умеет такое видео сам, остальным — hls.js.
+ * все сразу незачем. Играет hls.js, старым айфонам — их собственный HLS.
+ *
+ * Зона Bunny пускает только с Referer re-create.art: с localhost видео
+ * не пойдёт, проверять это можно только на боевом сайте.
  * Если свой плеер не справился, под рукой плеер Bunny.
  */
 export default function LessonPlayer({
@@ -37,16 +40,18 @@ export default function LessonPlayer({
     setStarted(true);
     setFailed(false);
 
-    if (el.canPlayType('application/vnd.apple.mpegurl')) {
-      el.src = stream.src;
-      el.addEventListener('error', () => setFailed(true), { once: true });
-      el.play().catch(() => {});
-      return;
-    }
-
     const { default: Hls } = await (lib.current ?? import('hls.js'));
+    // hls.js — везде, где он работает: так видны ошибки и есть повтор.
+    // Свой HLS у браузера — только запасной путь для старых айфонов: Chrome
+    // тоже теперь говорит, что умеет HLS, но при сбое молчит.
     if (!Hls.isSupported()) {
-      setFailed(true);
+      if (el.canPlayType('application/vnd.apple.mpegurl')) {
+        el.src = stream.src;
+        el.addEventListener('error', () => setFailed(true), { once: true });
+        el.play().catch(() => {});
+      } else {
+        setFailed(true);
+      }
       return;
     }
     const player = new Hls({ capLevelToPlayerSize: true });
